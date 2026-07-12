@@ -88,3 +88,47 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to app1.victoria-tech.com
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: docker
+    environment: production
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload deployment files
+        run: |
+          ssh -p 22 kyhoon@app1.victoria-tech.com 'mkdir -p /home/kyhoon/fold-web'
+          scp -P 22 deploy/compose.yaml deploy/deploy.sh deploy/rollback.sh \
+            kyhoon@app1.victoria-tech.com:/home/kyhoon/fold-web/
+
+      - name: Log in to Docker Hub on server
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          printf '%s' "$DOCKERHUB_TOKEN" | \
+            ssh -p 22 kyhoon@app1.victoria-tech.com \
+              'docker login --username victoriatech --password-stdin'
+
+      - name: Deploy tagged image
+        env:
+          IMAGE: victoriatech/fold_web:${{ github.ref_name }}
+        run: |
+          printf -v QUOTED_IMAGE '%q' "$IMAGE"
+          ssh -p 22 kyhoon@app1.victoria-tech.com \
+            "chmod 700 /home/kyhoon/fold-web/deploy.sh /home/kyhoon/fold-web/rollback.sh && /home/kyhoon/fold-web/deploy.sh $QUOTED_IMAGE"
