@@ -1,0 +1,20 @@
+name: fold-web
+
+services:
+  app:
+    image: ${APP_IMAGE:-fold-web:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:${APP_PORT:-10000}:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
