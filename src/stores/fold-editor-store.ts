@@ -22,6 +22,26 @@ const cloneProfile = (profile: FoldProfile): FoldProfile =>
   JSON.parse(JSON.stringify(profile)) as FoldProfile;
 const now = () => new Date().toISOString();
 
+function defaultBendAtJoint(previous: PointMm, joint: PointMm, next: PointMm) {
+  const incoming = { x: joint.x - previous.x, y: joint.y - previous.y };
+  const outgoing = { x: next.x - joint.x, y: next.y - joint.y };
+  const incomingLength = Math.hypot(incoming.x, incoming.y);
+  const outgoingLength = Math.hypot(outgoing.x, outgoing.y);
+  if (incomingLength < 0.001 || outgoingLength < 0.001) return null;
+
+  const cross = incoming.x * outgoing.y - incoming.y * outgoing.x;
+  const dot = incoming.x * outgoing.x + incoming.y * outgoing.y;
+  const normalizedCross = cross / (incomingLength * outgoingLength);
+  if (Math.abs(normalizedCross) < 0.0001) return null;
+
+  const cosine = Math.max(-1, Math.min(1, dot / (incomingLength * outgoingLength)));
+  return {
+    direction: (cross < 0 ? "front" : "back") as BendDirection,
+    cutType: "v-cut" as const,
+    angle: Math.round((Math.acos(cosine) * 180 / Math.PI) * 100) / 100,
+  };
+}
+
 const createExampleProfile = () => {
   const profile = createFoldProfile({
     name: "알루미늄 절곡 예제",
@@ -58,6 +78,7 @@ export class FoldEditorStore {
   pointerWorld: PointMm | null = null;
   history: FoldProfile[] = [];
   future: FoldProfile[] = [];
+  drawingCompletionRevision = 0;
 
   constructor() {
     makeAutoObservable(this, {}, { autoBind: true });
@@ -121,6 +142,10 @@ export class FoldEditorStore {
 
   setMode(mode: EditorMode) {
     if (mode === "draw" && this.isClosed) return;
+    if (mode === "select" && this.mode === "draw") {
+      this.finishDrawing();
+      return;
+    }
     this.mode = mode;
     this.draftStart = mode === "draw" ? this.activeBlock?.segments.at(-1)?.end ?? null : null;
   }
@@ -163,6 +188,7 @@ export class FoldEditorStore {
   }
 
   selectSegment(id: string | null, blockId = this.activeBlockId) {
+    if (id && this.mode === "draw") this.finishDrawing();
     this.activeBlockId = blockId;
     this.selectedSegmentId = id;
     if (id) this.mode = "select";
@@ -177,6 +203,11 @@ export class FoldEditorStore {
     if (distanceMm(this.draftStart, point) < 1) return;
 
     this.checkpoint();
+    const previousSegment = this.activeBlock.segments.at(-1);
+    if (previousSegment && !previousSegment.bendAfter) {
+      const bend = defaultBendAtJoint(previousSegment.start, previousSegment.end, point);
+      if (bend) previousSegment.bendAfter = bend;
+    }
     const segment = createFoldSegment(this.draftStart, point);
     this.activeBlock.segments.push(segment);
     this.selectedSegmentId = segment.id;
@@ -194,6 +225,14 @@ export class FoldEditorStore {
     const end = this.activeBlock.segments.at(-1)!.end;
     this.checkpoint();
     const closingSegment = createFoldSegment(end, start);
+    const previousSegment = this.activeBlock.segments.at(-1)!;
+    if (!previousSegment.bendAfter) {
+      const bend = defaultBendAtJoint(previousSegment.start, end, start);
+      if (bend) previousSegment.bendAfter = bend;
+    }
+    const firstSegment = this.activeBlock.segments[0];
+    const closingBend = defaultBendAtJoint(end, start, firstSegment.end);
+    if (closingBend) closingSegment.bendAfter = closingBend;
     this.activeBlock.segments.push(closingSegment);
     this.selectedSegmentId = closingSegment.id;
     this.touch();
@@ -201,9 +240,11 @@ export class FoldEditorStore {
   }
 
   finishDrawing() {
+    const completed = this.mode === "draw";
     this.mode = "select";
     this.draftStart = null;
     this.pointerWorld = null;
+    if (completed) this.drawingCompletionRevision += 1;
   }
 
   deleteSelected() {

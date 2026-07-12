@@ -18,14 +18,14 @@ const createProfile = () => {
 };
 
 describe("solid geometry", () => {
-  it("creates a closed eight-vertex prism for each segment", () => {
+  it("caps only the exposed ends of a connected solid", () => {
     const [solid] = createSolidGeometry(createFoldModelInput(createProfile()).input);
 
     expect(solid.positions).toHaveLength(48);
-    expect(solid.indices).toHaveLength(72);
+    expect(solid.indices).toHaveLength(60);
     expect(solid.segmentRanges).toEqual([
-      { segmentId: "solid-1", vertexStart: 0, vertexCount: 8, indexStart: 0, indexCount: 36 },
-      { segmentId: "solid-2", vertexStart: 8, vertexCount: 8, indexStart: 36, indexCount: 36 },
+      { segmentId: "solid-1", vertexStart: 0, vertexCount: 8, indexStart: 0, indexCount: 30 },
+      { segmentId: "solid-2", vertexStart: 8, vertexCount: 8, indexStart: 30, indexCount: 30 },
     ]);
     expect(Math.max(...solid.indices)).toBe(15);
   });
@@ -73,6 +73,7 @@ describe("solid geometry", () => {
     const closingEndStart = block.positions.slice(78, 84);
 
     expect(block.closed).toBe(true);
+    expect(block.segmentRanges.every((range) => range.indexCount === 24)).toBe(true);
     expect(closingEndStart.slice(0, 3)).toEqual(firstStart.slice(3, 6));
     expect(closingEndStart.slice(3, 6)).toEqual(firstStart.slice(0, 3));
   });

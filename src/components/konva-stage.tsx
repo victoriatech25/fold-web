@@ -118,6 +118,7 @@ export const KonvaStage = observer(function KonvaStage({ height = DEFAULT_STAGE_
   }, [height, width]);
 
   useEffect(() => {
+    if (foldEditorStore.mode === "draw") return;
     fitView();
   }, [fitView]);
 

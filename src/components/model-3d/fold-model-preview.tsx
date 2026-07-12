@@ -168,10 +168,13 @@ function ModelScene({
   hiddenBlockIds: Set<string>;
   onSelectSegment?: () => void;
 }) {
+  const maximumDimension = Math.max(...bounds.size, 1);
+  const near = Math.max(0.1, maximumDimension / 2000);
+  const far = Math.max(1000, maximumDimension * 20);
   return (
     <>
       <color attach="background" args={["#edf1f3"]} />
-      {projection === "perspective" ? <PerspectiveCamera makeDefault fov={38} near={0.1} far={100000} /> : <OrthographicCamera makeDefault near={-100000} far={100000} />}
+      {projection === "perspective" ? <PerspectiveCamera makeDefault fov={38} near={near} far={far} /> : <OrthographicCamera makeDefault near={-far} far={far} />}
       <hemisphereLight args={["#ffffff", "#64748b", 1.7]} />
       <directionalLight position={[800, 1200, 900]} intensity={2.4} />
       <directionalLight position={[-700, -300, -500]} intensity={0.65} />
@@ -198,6 +201,8 @@ function ModelScene({
 
 export const FoldModelPreview = observer(function FoldModelPreview({ compact = false, height, onSelectSegment }: { compact?: boolean; height?: number; onSelectSegment?: () => void }) {
   const [fitRequest, setFitRequest] = useState(0);
+  const drawingCompletionRevision = foldEditorStore.drawingCompletionRevision;
+  const appliedDrawingCompletionRef = useRef(drawingCompletionRevision);
   const [view, setView] = useState<StandardView>("iso");
   const [renderMode, setRenderMode] = useState<RenderMode>("solid");
   const [projection, setProjection] = useState<Projection>("perspective");
@@ -210,6 +215,12 @@ export const FoldModelPreview = observer(function FoldModelPreview({ compact = f
     setView(next);
     setFitRequest((value) => value + 1);
   };
+
+  useEffect(() => {
+    if (appliedDrawingCompletionRef.current === drawingCompletionRevision) return;
+    appliedDrawingCompletionRef.current = drawingCompletionRevision;
+    setFitRequest((value) => value + 1);
+  }, [drawingCompletionRevision]);
 
   return (
     <section style={{ height: height ?? (compact ? 360 : 620) }} className={`bg-[#edf1f3] ${compact ? "xl:border-l xl:border-slate-300" : ""}`} aria-label="3D 미리보기">
@@ -234,7 +245,7 @@ export const FoldModelPreview = observer(function FoldModelPreview({ compact = f
               return <button key={block.blockId} type="button" aria-pressed={visible} disabled={visible && visibleCount === 1} onClick={() => setHiddenBlockIds((current) => { const next = new Set(current); if (next.has(block.blockId)) next.delete(block.blockId); else next.add(block.blockId); return next; })} className={`h-7 rounded px-2 text-[11px] font-semibold ${visible ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"} disabled:cursor-not-allowed`}>{block.name}</button>;
             })}</div> : null}
             {model.warnings.length > 0 ? <div className="absolute right-3 top-3 z-10 flex max-w-[360px] items-start gap-2 rounded border border-amber-300 bg-amber-50/95 px-3 py-2 text-xs text-amber-950 shadow-sm"><TriangleAlert size={16} className="mt-0.5 shrink-0 text-amber-700" /><span>{model.warnings[0].message}</span></div> : null}
-            <Canvas style={{ cursor: "grab" }} dpr={[1, 2]} gl={{ antialias: true, alpha: false }} fallback={<ModelFallback message="이 브라우저에서는 WebGL 3D 미리보기를 사용할 수 없습니다." />}>
+            <Canvas style={{ cursor: "grab" }} dpr={[1, 2]} gl={{ antialias: true, alpha: false, logarithmicDepthBuffer: true }} fallback={<ModelFallback message="이 브라우저에서는 WebGL 3D 미리보기를 사용할 수 없습니다." />}>
               <ModelScene blocks={model.blocks} bounds={model.bounds} fitRequest={fitRequest} view={view} projection={projection} renderMode={renderMode} hiddenBlockIds={hiddenBlockIds} onSelectSegment={onSelectSegment} />
             </Canvas>
           </>

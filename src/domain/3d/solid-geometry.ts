@@ -88,17 +88,21 @@ function createSolidBlock(block: FoldModelBlockInput, input: FoldModelInput): Fo
     indices.push(
       vertexStart, vertexStart + 1, vertexStart + 2, vertexStart, vertexStart + 2, vertexStart + 3,
       vertexStart + 4, vertexStart + 6, vertexStart + 5, vertexStart + 4, vertexStart + 7, vertexStart + 6,
-      vertexStart, vertexStart + 4, vertexStart + 5, vertexStart, vertexStart + 5, vertexStart + 1,
       vertexStart + 1, vertexStart + 5, vertexStart + 6, vertexStart + 1, vertexStart + 6, vertexStart + 2,
-      vertexStart + 2, vertexStart + 6, vertexStart + 7, vertexStart + 2, vertexStart + 7, vertexStart + 3,
       vertexStart + 3, vertexStart + 7, vertexStart + 4, vertexStart + 3, vertexStart + 4, vertexStart,
     );
+    if (!block.closed && segmentIndex === 0) {
+      indices.push(vertexStart, vertexStart + 4, vertexStart + 5, vertexStart, vertexStart + 5, vertexStart + 1);
+    }
+    if (!block.closed && segmentIndex === block.segments.length - 1) {
+      indices.push(vertexStart + 2, vertexStart + 6, vertexStart + 7, vertexStart + 2, vertexStart + 7, vertexStart + 3);
+    }
     segmentRanges.push({
       segmentId: segment.id,
       vertexStart,
       vertexCount: 8,
       indexStart,
-      indexCount: 36,
+      indexCount: indices.length - indexStart,
     });
   });
 

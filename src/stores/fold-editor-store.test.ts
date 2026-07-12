@@ -60,6 +60,32 @@ describe("FoldEditorStore", () => {
     expect(segments(store)[0].end).toEqual({ x: 110, y: 20 });
   });
 
+  it("assigns front and back V-CUT bends from the drawing turn", () => {
+    const front = new FoldEditorStore();
+    front.clearProfile();
+    front.addDrawPoint({ x: 0, y: 0 });
+    front.addDrawPoint({ x: 100, y: 0 });
+    front.addDrawPoint({ x: 100, y: -50 });
+    expect(segments(front)[0].bendAfter).toEqual({ direction: "front", cutType: "v-cut", angle: 90 });
+
+    const back = new FoldEditorStore();
+    back.clearProfile();
+    back.addDrawPoint({ x: 0, y: 0 });
+    back.addDrawPoint({ x: 100, y: 0 });
+    back.addDrawPoint({ x: 100, y: 50 });
+    expect(segments(back)[0].bendAfter).toEqual({ direction: "back", cutType: "v-cut", angle: 90 });
+  });
+
+  it("does not add a bend to a straight continuation", () => {
+    const store = new FoldEditorStore();
+    store.clearProfile();
+    store.addDrawPoint({ x: 0, y: 0 });
+    store.addDrawPoint({ x: 100, y: 0 });
+    store.addDrawPoint({ x: 180, y: 0 });
+
+    expect(segments(store)[0].bendAfter).toBeUndefined();
+  });
+
   it("reconnects and recalculates the next segment after deleting a middle segment", () => {
     const store = new FoldEditorStore();
     store.selectSegment(segments(store)[1].id);
@@ -144,6 +170,18 @@ describe("FoldEditorStore", () => {
     expect(closing.end).toEqual(first);
     expect(store.isClosed).toBe(true);
     expect(store.mode).toBe("select");
+    expect(store.drawingCompletionRevision).toBe(1);
+  });
+
+  it("signals drawing completion when switching back to the selection tool", () => {
+    const store = new FoldEditorStore();
+    store.setMode("draw");
+    store.setMode("select");
+
+    expect(store.mode).toBe("select");
+    expect(store.drawingCompletionRevision).toBe(1);
+    store.setMode("select");
+    expect(store.drawingCompletionRevision).toBe(1);
   });
 
   it("does not close a profile before it has enough sides", () => {

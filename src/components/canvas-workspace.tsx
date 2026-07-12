@@ -3,10 +3,11 @@
 import dynamic from "next/dynamic";
 import { observer } from "mobx-react-lite";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Box, Columns2, CornerDownRight, LayoutTemplate, Minus, MousePointer2, PencilLine, Plus, Redo2, RotateCcw, Save, SlidersHorizontal, Square, Trash2, Undo2 } from "lucide-react";
+import { Box, Columns2, CornerDownRight, LayoutTemplate, ListOrdered, Minus, MousePointer2, PencilLine, Plus, Redo2, RotateCcw, Save, SlidersHorizontal, Square, Trash2, Undo2 } from "lucide-react";
 
 import { distanceMm, type BendDirection, type CutType, type DecimalOperation } from "@/domain/fold-profile";
 import { findBoxBaseSegments } from "@/domain/3d";
+import { createFoldPointList } from "@/domain/fold-point-info";
 import { materialFromPreset } from "@/domain/material-preset";
 import { foldEditorStore } from "@/stores/fold-editor-store";
 import { materialPresetStore } from "@/stores/material-preset-store";
@@ -31,7 +32,7 @@ const toolButton = "inline-flex h-9 w-9 items-center justify-center rounded bord
 const SPLIT_TOTAL_HEIGHT = 660;
 
 export const CanvasWorkspace = observer(function CanvasWorkspace() {
-  const [propertyTab, setPropertyTab] = useState<"segment" | "material">("segment");
+  const [propertyTab, setPropertyTab] = useState<"segment" | "material" | "points">("segment");
   const [viewMode, setViewMode] = useState<"2d" | "split" | "3d" | "developed">("2d");
   const [splitColumnPercent, setSplitColumnPercent] = useState(50);
   const [splitTopHeight, setSplitTopHeight] = useState(360);
@@ -46,6 +47,10 @@ export const CanvasWorkspace = observer(function CanvasWorkspace() {
   const boxDepth = boxBases ? distanceMm(boxBases[1].start, boxBases[1].end) : 0;
   const updateBend = (partial: Partial<{ direction: BendDirection; cutType: CutType; angle: number }>) =>
     foldEditorStore.updateSelectedBend(partial.direction ?? bend?.direction ?? "front", partial.cutType ?? bend?.cutType ?? "v-cut", partial.angle ?? bend?.angle ?? 90);
+  const changeViewMode = (next: "2d" | "split" | "3d" | "developed") => {
+    if ((next === "3d" || next === "developed") && foldEditorStore.mode === "draw") foldEditorStore.finishDrawing();
+    setViewMode(next);
+  };
   const startSplitResize = (axis: "column" | "row") => (event: ReactPointerEvent<HTMLDivElement>) => {
     const container = event.currentTarget.parentElement;
     if (!container) return;
@@ -115,10 +120,10 @@ export const CanvasWorkspace = observer(function CanvasWorkspace() {
           <ToolButton label="연속 선 그리기" active={foldEditorStore.mode === "draw"} disabled={foldEditorStore.isClosed} onClick={() => foldEditorStore.setMode("draw")}><PencilLine size={17} /></ToolButton>
         </div>
         <div className="flex items-center gap-1 border-r border-slate-300 pr-2" aria-label="화면 모드">
-          <ViewButton label="2D" active={viewMode === "2d"} onClick={() => setViewMode("2d")}><Square size={15} /></ViewButton>
-          <span className="hidden xl:inline-flex"><ViewButton label="분할" active={viewMode === "split"} onClick={() => setViewMode("split")}><Columns2 size={15} /></ViewButton></span>
-          <ViewButton label="3D" active={viewMode === "3d"} onClick={() => setViewMode("3d")}><Box size={15} /></ViewButton>
-          <ViewButton label="전개도" active={viewMode === "developed"} onClick={() => setViewMode("developed")}><LayoutTemplate size={15} /></ViewButton>
+          <ViewButton label="절곡" active={viewMode === "2d"} onClick={() => changeViewMode("2d")}><Square size={15} /></ViewButton>
+          <ViewButton label="3D" active={viewMode === "3d"} onClick={() => changeViewMode("3d")}><Box size={15} /></ViewButton>
+          <ViewButton label="전개도" active={viewMode === "developed"} onClick={() => changeViewMode("developed")}><LayoutTemplate size={15} /></ViewButton>
+          <span className="hidden xl:inline-flex"><ViewButton label="분할" active={viewMode === "split"} onClick={() => changeViewMode("split")}><Columns2 size={15} /></ViewButton></span>
         </div>
         <div className="flex items-center gap-1 border-r border-slate-300 pr-2">
           <ToolButton label="실행 취소" disabled={!foldEditorStore.canUndo} onClick={foldEditorStore.undo}><Undo2 size={17} /></ToolButton>
@@ -178,9 +183,10 @@ export const CanvasWorkspace = observer(function CanvasWorkspace() {
           </> : null}
         </div>
         <aside className="flex min-w-0 flex-col bg-white">
-          <div className="grid grid-cols-2 border-b border-slate-200 bg-slate-50 p-1">
+          <div className="grid grid-cols-3 border-b border-slate-200 bg-slate-50 p-1">
             <button type="button" onClick={() => setPropertyTab("segment")} className={`h-9 rounded text-xs font-semibold ${propertyTab === "segment" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}>선 속성</button>
             <button type="button" onClick={() => setPropertyTab("material")} className={`inline-flex h-9 items-center justify-center gap-1.5 rounded text-xs font-semibold ${propertyTab === "material" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}><SlidersHorizontal size={14} /> 연신율 설정</button>
+            <button type="button" onClick={() => setPropertyTab("points")} className={`inline-flex h-9 items-center justify-center gap-1.5 rounded text-xs font-semibold ${propertyTab === "points" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}><ListOrdered size={14} /> 포인트</button>
           </div>
 
           {propertyTab === "segment" ? selected ? (
@@ -224,7 +230,7 @@ export const CanvasWorkspace = observer(function CanvasWorkspace() {
                 </div>
               </div>
             </div>
-          ) : <div className="border-b border-slate-200 px-4 py-8 text-center text-xs text-slate-500">캔버스에서 선을 선택하세요.</div> : <MaterialSettings />}
+          ) : <div className="border-b border-slate-200 px-4 py-8 text-center text-xs text-slate-500">캔버스에서 선을 선택하세요.</div> : propertyTab === "material" ? <MaterialSettings /> : <PointList />}
 
           <div className="space-y-3 border-b border-slate-200 p-4">
             <h2 className="text-sm font-bold text-slate-900">제품</h2>
@@ -260,6 +266,44 @@ export const CanvasWorkspace = observer(function CanvasWorkspace() {
         </aside>
       </div>
     </section>
+  );
+});
+
+const PointList = observer(function PointList() {
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+  const blocks = foldEditorStore.profile.blocks.map((block) => ({ block, points: createFoldPointList(block) }));
+  const cutLabel = { "v-cut": "V-CUT", "a-cut": "A-CUT", "no-cut": "NO-CUT" } as const;
+
+  return (
+    <div className="max-h-[620px] overflow-y-auto border-b border-slate-200 bg-white">
+      {blocks.every(({ points }) => points.length === 0) ? <div className="px-4 py-8 text-center text-xs text-slate-500">절곡도를 그리면 포인트 정보가 표시됩니다.</div> : blocks.map(({ block, points }) => points.length > 0 ? (
+        <section key={block.id} aria-label={`${block.name} 포인트 목록`}>
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-slate-100 px-3 py-2">
+            <h2 className="text-xs font-bold text-slate-800">{block.name}</h2>
+            <span className="font-mono text-[10px] text-slate-500">{points.length} POINTS</span>
+          </div>
+          <div className="grid grid-cols-[36px_1fr_1fr_58px_58px_42px] border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-[10px] font-semibold text-slate-500">
+            <span>번호</span><span>X</span><span>Y</span><span>방향</span><span>컷</span><span>각도</span>
+          </div>
+          {points.map((item) => {
+            const selected = selectedPointId === item.id;
+            return (
+              <button key={item.id} type="button" onClick={() => { setSelectedPointId(item.id); foldEditorStore.selectSegment(item.segmentId, item.blockId); }} className={`block w-full border-b border-slate-100 px-2 py-2 text-left transition ${selected ? "bg-teal-50" : "hover:bg-slate-50"}`}>
+                <span className="grid grid-cols-[36px_1fr_1fr_58px_58px_42px] items-center text-center font-mono text-[11px] text-slate-700">
+                  <strong className={selected ? "text-teal-800" : "text-slate-900"}>P{item.index + 1}</strong>
+                  <span>{item.point.x.toFixed(1)}</span>
+                  <span>{item.point.y.toFixed(1)}</span>
+                  <span className={item.bend?.direction === "front" ? "font-sans font-bold text-red-700" : item.bend ? "font-sans font-bold text-blue-700" : "text-slate-400"}>{item.bend ? item.bend.direction === "front" ? "앞각" : "뒷각" : "-"}</span>
+                  <span className="font-sans text-[10px] font-semibold">{item.bend ? cutLabel[item.bend.cutType] : "-"}</span>
+                  <span>{item.bend ? item.bend.angle.toFixed(0) : "-"}</span>
+                </span>
+                <span className="mt-1 block pl-9 text-[10px] text-slate-400">진입 {item.incomingLength?.toFixed(1) ?? "-"} mm · 진출 {item.outgoingLength?.toFixed(1) ?? "-"} mm</span>
+              </button>
+            );
+          })}
+        </section>
+      ) : null)}
+    </div>
   );
 });
 
