@@ -92,7 +92,11 @@ jobs:
   deploy:
     name: Deploy to app1.victoria-tech.com
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - production
     timeout-minutes: 15
     needs: docker
     environment: production
@@ -100,52 +104,21 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
 
-      - name: Configure SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      - name: Install deployment files
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<'EOF'
-          Host fold-web-production
-            HostName app1.victoria-tech.com
-            User kyhoon
-            Port 22
-            IdentityFile ~/.ssh/id_ed25519
-            IdentitiesOnly yes
-            BatchMode yes
-            ConnectTimeout 15
-            ServerAliveInterval 15
-            ServerAliveCountMax 2
-            HostKeyAlias app1.victoria-tech.com
-          EOF
-          chmod 600 ~/.ssh/config
-
-      - name: Verify SSH connection
-        run: ssh fold-web-production 'echo "SSH connection verified"'
-
-      - name: Upload deployment files
-        run: |
-          ssh fold-web-production 'mkdir -p /home/kyhoon/fold-web'
-          scp deploy/compose.yaml deploy/deploy.sh deploy/rollback.sh \
-            fold-web-production:/home/kyhoon/fold-web/
+          install -m 755 -d /home/kyhoon/fold-web
+          install -m 644 deploy/compose.yaml /home/kyhoon/fold-web/compose.yaml
+          install -m 700 deploy/deploy.sh deploy/rollback.sh /home/kyhoon/fold-web/
 
       - name: Log in to Docker Hub on server
         env:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           printf '%s' "$DOCKERHUB_TOKEN" | \
-            ssh fold-web-production \
-              'docker login --username victoriatech --password-stdin'
+            docker login --username victoriatech --password-stdin
 
       - name: Deploy tagged image
         env:
           IMAGE: victoriatech/fold_web:${{ github.ref_name }}
         run: |
-          printf -v QUOTED_IMAGE '%q' "$IMAGE"
-          ssh fold-web-production \
-            "chmod 700 /home/kyhoon/fold-web/deploy.sh /home/kyhoon/fold-web/rollback.sh && /home/kyhoon/fold-web/deploy.sh $QUOTED_IMAGE"
+          /home/kyhoon/fold-web/deploy.sh "$IMAGE"
