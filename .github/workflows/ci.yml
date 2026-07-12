@@ -110,19 +110,36 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<'EOF'
+          Host fold-web-production
+            HostName app1.victoria-tech.com
+            User kyhoon
+            Port 22
+            IdentityFile ~/.ssh/id_ed25519
+            IdentitiesOnly yes
+            BatchMode yes
+            ConnectTimeout 15
+            ServerAliveInterval 15
+            ServerAliveCountMax 2
+            HostKeyAlias app1.victoria-tech.com
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Verify SSH connection
+        run: ssh fold-web-production 'echo "SSH connection verified"'
 
       - name: Upload deployment files
         run: |
-          ssh -p 22 kyhoon@app1.victoria-tech.com 'mkdir -p /home/kyhoon/fold-web'
-          scp -P 22 deploy/compose.yaml deploy/deploy.sh deploy/rollback.sh \
-            kyhoon@app1.victoria-tech.com:/home/kyhoon/fold-web/
+          ssh fold-web-production 'mkdir -p /home/kyhoon/fold-web'
+          scp deploy/compose.yaml deploy/deploy.sh deploy/rollback.sh \
+            fold-web-production:/home/kyhoon/fold-web/
 
       - name: Log in to Docker Hub on server
         env:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           printf '%s' "$DOCKERHUB_TOKEN" | \
-            ssh -p 22 kyhoon@app1.victoria-tech.com \
+            ssh fold-web-production \
               'docker login --username victoriatech --password-stdin'
 
       - name: Deploy tagged image
@@ -130,5 +147,5 @@ jobs:
           IMAGE: victoriatech/fold_web:${{ github.ref_name }}
         run: |
           printf -v QUOTED_IMAGE '%q' "$IMAGE"
-          ssh -p 22 kyhoon@app1.victoria-tech.com \
+          ssh fold-web-production \
             "chmod 700 /home/kyhoon/fold-web/deploy.sh /home/kyhoon/fold-web/rollback.sh && /home/kyhoon/fold-web/deploy.sh $QUOTED_IMAGE"
