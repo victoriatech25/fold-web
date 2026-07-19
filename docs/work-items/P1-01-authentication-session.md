@@ -320,6 +320,7 @@ npm run auth:issue-password-reset -- --email admin@example.com
 | Playwright Chromium | 3건 통과 |
 | Next.js production build | 통과 |
 | production dependency high·critical gate | 통과 |
+| GitHub 필수 CI | `Quality and PostgreSQL integration` 통과, 2분 42초 |
 | Argon2id 로컬 표본 | 20회, median 17ms, p95 19ms, max 19ms |
 
 Argon2id 수치는 Apple Silicon 로컬 개발 환경의 참고값일 뿐이다. 운영 서버·DB가 결정되면 동일 parameter로 p95를 다시 측정하고 1초 미만 범위에서 상향 여부를 별도 승인한다.
@@ -360,7 +361,7 @@ PostgreSQL 통합 검증에는 다음이 포함된다.
 - [x] Origin·Host·cookie·no-store 보안 기준을 충족한다.
 - [x] 최초 관리자 bootstrap과 reset token이 비밀을 남기지 않는다.
 - [x] 미인증 사용자가 편집 화면과 보호 API에 접근할 수 없다.
-- [ ] 단위·PostgreSQL·API·Playwright는 통과, 원격 CI 확인 대기
+- [x] 단위·PostgreSQL·API·Playwright·원격 CI가 통과한다.
 - [ ] Chrome·Edge 사용자 직접 검수 대기
 - [x] P1-02·P1-03 후속 경계가 기록된다.
 
