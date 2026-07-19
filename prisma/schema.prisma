@@ -21,6 +21,11 @@ enum UserStatus {
   DISABLED
 }
 
+enum AuthThrottleScope {
+  ACCOUNT
+  SOURCE
+}
+
 enum MembershipStatus {
   ACTIVE
   SUSPENDED
@@ -173,6 +178,18 @@ model PasswordResetToken {
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
+}
+
+model AuthThrottle {
+  scope           AuthThrottleScope
+  keyHash         String            @db.Char(64)
+  windowStartedAt DateTime          @db.Timestamptz(6)
+  failureCount    Int               @default(0)
+  blockedUntil    DateTime?         @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @db.Timestamptz(6)
+
+  @@id([scope, keyHash])
+  @@index([blockedUntil])
 }
 
 model Department {
