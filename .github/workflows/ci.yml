@@ -53,6 +53,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Intentional P0-12 required-check failure
+        run: exit 1
+
       - name: Install dependencies
         run: npm ci
 
