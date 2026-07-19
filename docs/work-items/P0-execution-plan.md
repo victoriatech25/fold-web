@@ -1,6 +1,6 @@
 # P0 실행계획 — 범위, 데이터, 기반 위험 제거
 
-> 상태: `IN_PROGRESS`
+> 상태: `DONE`
 >
 > 우선순위: `P0`
 >
@@ -249,7 +249,7 @@ P0 완료 시 다음 상태를 확보한다.
 
 - 인증 제품 또는 외부 API를 새로 도입해야 하는 설계가 필요한 경우 선택 확인
 
-### P0-12 품질·CI 기준선 — `VERIFYING`
+### P0-12 품질·CI 기준선 — `DONE`
 
 작업 문서: [P0-12 품질·CI 기준선](./P0-12-quality-ci-baseline.md)
 
@@ -297,9 +297,9 @@ P0 완료 시 다음 상태를 확보한다.
 - [x] `P0-09` Prisma Schema v1 승인
 - [x] `P0-10` migration·seed·테스트 DB 자동화 검증
 - [x] `P0-11` Prisma transaction 서버 통합 테스트 통과
-- [ ] `P0-12` 로컬·CI 품질 게이트 통과
-- [ ] 모든 차단 게이트의 결정과 근거 기록
-- [ ] 관련 종합 문서 갱신
+- [x] `P0-12` 로컬·CI 품질 게이트 통과
+- [x] 모든 차단 게이트의 결정과 근거 기록
+- [x] 관련 종합 문서 갱신
 
 ## 6. 진행 기록
 
@@ -317,3 +317,5 @@ P0 완료 시 다음 상태를 확보한다.
 | 2026-07-19 | P0-12 로컬 기준선 | 검증 중 | PostgreSQL 16 CI service, migration 누락·typecheck·통합·audit gate 추가 및 비파괴 실패 시험 완료, D0-12 승인 대기 |
 | 2026-07-19 | P0-12 권장안 승인 | 승인 완료 | D0-12-A~H 전체 승인, GitHub CLI 미설치로 branch·PR·Actions 검증 대기 |
 | 2026-07-19 | GitHub CLI 준비 | 완료 | gh 2.96.0 설치·victoriatech25 인증, main 보호 미설정 확인, branch·PR·Actions 검증 착수 |
+| 2026-07-19 | P0-12 GitHub 실검증 | 완료 | PR #1 CI 전체 성공, main 보호 적용, 임시 PR #2 실패 시 BLOCKED·배포 SKIPPED 확인 후 정리 |
+| 2026-07-19 | P0 완료 | 완료 | P0-01~P0-12 기준선·계산·PostgreSQL·Prisma·서버·CI 위험 제거 완료, draft PR #1 사용자 검토 대기 |

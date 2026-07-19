@@ -2,7 +2,7 @@
 
 > 기준일: 2026-07-19
 >
-> 기준 브랜치/커밋: `main` / `1e27a70`
+> 기준 브랜치/PR: `codex/p0-foundation-baseline` / `#1`
 >
 > MFC 참조 프로젝트: `/Users/kyhoon/Library/Mobile Documents/com~apple~CloudDocs/회사/hicomtech/도면`
 >
@@ -358,7 +358,7 @@ npm ci
   → production dependency audit
 ```
 
-전체 npm audit JSON은 14일 artifact로 보관하고 production dependency의 high·critical 취약점은 실패 처리한다. 현재 이 변경은 로컬 검증을 통과했지만 GitHub Actions 실제 실행과 `main` 보호 규칙 적용은 `D0-12` 승인 후 진행한다.
+전체 npm audit JSON은 14일 artifact로 보관하고 production dependency의 high·critical 취약점은 실패 처리한다. PR `#1`의 GitHub Actions 실제 실행이 전체 성공했고, `main`에는 해당 품질 작업을 필수로 하는 보호 규칙을 적용했다. 임시 실패 PR에서는 병합이 `BLOCKED`되고 Docker·운영 배포가 실행되지 않음을 확인한 뒤 시험 branch를 제거했다.
 
 Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행된다. 이미지는 `victoriatech/fold_web`에 게시되고, `production` 라벨의 self-hosted Linux runner가 `/home/kyhoon/fold-web`에 배포 파일을 설치한 뒤 태그 이미지를 올린다. Docker와 배포 job은 품질 job 성공에 의존한다.
 
