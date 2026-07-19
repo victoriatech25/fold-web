@@ -81,12 +81,46 @@ describe("fixed elongation", () => {
     const result = calculateProfile([first, segment("s2", 50)], material, fixed);
 
     expect(result.segments[0]).toMatchObject({
-      automaticCorrection: 1,
+      automaticCorrection: 1.2,
       appliedCorrection: 3,
       correctionSource: "manual",
       calculatedLength: 97,
     });
     expect(result.segments[1].correctionSource).toBe("automatic");
+  });
+
+  it("preserves fractional fixed corrections", () => {
+    const segments: FoldSegment[] = [
+      segment("s1", 100, { direction: "front", cutType: "a-cut", angle: 90 }),
+      segment("s2", 50),
+    ];
+    const result = calculateProfile(segments, material, { ...fixed, decimalPlaces: 1 });
+
+    expect(result.segments.map((item) => item.automaticCorrection)).toEqual([0.8, 0.8]);
+    expect(result.segments.map((item) => item.calculatedLength)).toEqual([99.2, 49.2]);
+    expect(result.calculatedWidth).toBe(148.4);
+  });
+
+  it("excludes a disabled bend from both adjacent segments", () => {
+    const first = segment("s1", 100, { direction: "front", cutType: "v-cut", angle: 90 });
+    first.calculateElongation = false;
+    const result = calculateProfile([first, segment("s2", 50)], material, fixed);
+
+    expect(result.segments).toEqual([
+      expect.objectContaining({
+        id: "s1",
+        calculatedLength: 100,
+        automaticCorrection: 0,
+        correctionSource: "disabled",
+      }),
+      expect.objectContaining({
+        id: "s2",
+        calculatedLength: 50,
+        automaticCorrection: 0,
+        correctionSource: "automatic",
+      }),
+    ]);
+    expect(result.calculatedWidth).toBe(150);
   });
 });
 

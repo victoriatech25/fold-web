@@ -1,0 +1,555 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "WEB-REFERENCE-V1",
+  "description": "MFC 실행 환경 없이 코드 분석과 승인된 웹 규칙으로 구성한 비식별 절곡 계산 기준",
+  "source": {
+    "kind": "web-reference",
+    "legacyExecutableObserved": false,
+    "containsPersonalData": false,
+    "createdAt": "2026-07-19"
+  },
+  "defaults": {
+    "material": {
+      "thickness": 2,
+      "insideBendRadius": 2,
+      "cutAngle": 135,
+      "elongation": {
+        "v-cut": 1.2,
+        "a-cut": 0.8,
+        "no-cut": 2
+      },
+      "cutDepth": {
+        "v-cut": 0.5,
+        "a-cut": 0.8,
+        "no-cut": 0
+      }
+    },
+    "calculation": {
+      "mode": "fixed",
+      "vCutEnabled": true,
+      "decimalPlaces": 0,
+      "decimalOperation": "round"
+    },
+    "product": {
+      "length": 2400,
+      "quantity": 10
+    }
+  },
+  "cases": [
+    {
+      "caseId": "WR-001",
+      "title": "직선 기준",
+      "verification": {
+        "status": "approved",
+        "classification": "WEB_IMPROVEMENT"
+      },
+      "input": {
+        "blocks": [[{ "id": "s1", "length": 100 }]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 100, "automaticCorrection": 0, "appliedCorrection": 0, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 100,
+        "calculatedWidth": 100,
+        "appliedCorrectionTotal": 0,
+        "areaEachM2": 0.24,
+        "areaTotalM2": 2.4
+      }
+    },
+    {
+      "caseId": "WR-002",
+      "title": "FIX 앞각 V-CUT",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 99, "automaticCorrection": 1.2, "appliedCorrection": 1, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 49, "automaticCorrection": 1.2, "appliedCorrection": 1, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 148,
+        "appliedCorrectionTotal": 2,
+        "areaEachM2": 0.3552,
+        "areaTotalM2": 3.552
+      }
+    },
+    {
+      "caseId": "WR-003",
+      "title": "FIX 뒷각 V-CUT",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "back", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 101, "automaticCorrection": -1.2, "appliedCorrection": -1, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 51, "automaticCorrection": -1.2, "appliedCorrection": -1, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 152,
+        "appliedCorrectionTotal": -2,
+        "areaEachM2": 0.3648,
+        "areaTotalM2": 3.648
+      }
+    },
+    {
+      "caseId": "WR-004",
+      "title": "FIX 앞각 A-CUT 소수 보존",
+      "verification": {
+        "status": "approved",
+        "classification": "LEGACY_DEFECT"
+      },
+      "input": {
+        "calculation": { "decimalPlaces": 1 },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "a-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 99.2, "automaticCorrection": 0.8, "appliedCorrection": 0.8, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 49.2, "automaticCorrection": 0.8, "appliedCorrection": 0.8, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 148.4,
+        "appliedCorrectionTotal": 1.6,
+        "areaEachM2": 0.35616,
+        "areaTotalM2": 3.5616
+      }
+    },
+    {
+      "caseId": "WR-005",
+      "title": "FIX 뒷각 A-CUT 소수 보존",
+      "verification": {
+        "status": "approved",
+        "classification": "LEGACY_DEFECT"
+      },
+      "input": {
+        "calculation": { "decimalPlaces": 1 },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "back", "cutType": "a-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 100.8, "automaticCorrection": -0.8, "appliedCorrection": -0.8, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 50.8, "automaticCorrection": -0.8, "appliedCorrection": -0.8, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 151.6,
+        "appliedCorrectionTotal": -1.6,
+        "areaEachM2": 0.36384,
+        "areaTotalM2": 3.6384
+      }
+    },
+    {
+      "caseId": "WR-006",
+      "title": "V-CUT 비활성 NO-CUT 대체",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "calculation": { "vCutEnabled": false },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 98, "automaticCorrection": 2, "appliedCorrection": 2, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 48, "automaticCorrection": 2, "appliedCorrection": 2, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 146,
+        "appliedCorrectionTotal": 4,
+        "areaEachM2": 0.3504,
+        "areaTotalM2": 3.504
+      }
+    },
+    {
+      "caseId": "WR-007",
+      "title": "FIX 1 미만 보정 보존",
+      "verification": {
+        "status": "approved",
+        "classification": "LEGACY_DEFECT"
+      },
+      "input": {
+        "material": { "elongation": { "v-cut": 0.4 } },
+        "calculation": { "decimalPlaces": 1 },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 99.6, "automaticCorrection": 0.4, "appliedCorrection": 0.4, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 49.6, "automaticCorrection": 0.4, "appliedCorrection": 0.4, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 149.2,
+        "appliedCorrectionTotal": 0.8,
+        "areaEachM2": 0.35808,
+        "areaTotalM2": 3.5808
+      }
+    },
+    {
+      "caseId": "WR-008",
+      "title": "앞각과 뒷각 혼합",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50, "bendAfter": { "direction": "back", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s3", "length": 80 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 99, "automaticCorrection": 1.2, "appliedCorrection": 1, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 50, "automaticCorrection": 0, "appliedCorrection": 0, "correctionSource": "automatic" },
+          { "id": "s3", "calculatedLength": 81, "automaticCorrection": -1.2, "appliedCorrection": -1, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 230,
+        "calculatedWidth": 230,
+        "appliedCorrectionTotal": 0,
+        "areaEachM2": 0.552,
+        "areaTotalM2": 5.52
+      }
+    },
+    {
+      "caseId": "WR-009",
+      "title": "RATIO 앞각",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "calculation": { "mode": "ratio", "decimalPlaces": 1 },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 98.5, "automaticCorrection": 1.5, "appliedCorrection": 1.5, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 48.5, "automaticCorrection": 1.5, "appliedCorrection": 1.5, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 147,
+        "appliedCorrectionTotal": 3,
+        "areaEachM2": 0.3528,
+        "areaTotalM2": 3.528
+      }
+    },
+    {
+      "caseId": "WR-010",
+      "title": "RATIO 뒷각",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "calculation": { "mode": "ratio", "decimalPlaces": 1 },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "back", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 100.5, "automaticCorrection": -0.5, "appliedCorrection": -0.5, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 50.5, "automaticCorrection": -0.5, "appliedCorrection": -0.5, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 151,
+        "appliedCorrectionTotal": -1,
+        "areaEachM2": 0.3624,
+        "areaTotalM2": 3.624
+      }
+    },
+    {
+      "caseId": "WR-011",
+      "title": "RATIO cut angle 미만",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "calculation": { "mode": "ratio", "decimalPlaces": 1 },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 134 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 98.5, "automaticCorrection": 1.5, "appliedCorrection": 1.5, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 48.5, "automaticCorrection": 1.5, "appliedCorrection": 1.5, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 147,
+        "appliedCorrectionTotal": 3,
+        "areaEachM2": 0.3528,
+        "areaTotalM2": 3.528
+      }
+    },
+    {
+      "caseId": "WR-012",
+      "title": "RATIO cut angle 동일",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "calculation": { "mode": "ratio", "decimalPlaces": 1 },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 135 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 100, "automaticCorrection": 0, "appliedCorrection": 0, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 50, "automaticCorrection": 0, "appliedCorrection": 0, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 150,
+        "appliedCorrectionTotal": 0,
+        "areaEachM2": 0.36,
+        "areaTotalM2": 3.6
+      }
+    },
+    {
+      "caseId": "WR-013",
+      "title": "RATIO cut angle 초과",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "calculation": { "mode": "ratio", "decimalPlaces": 1 },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 136 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 100, "automaticCorrection": 0, "appliedCorrection": 0, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 50, "automaticCorrection": 0, "appliedCorrection": 0, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 150,
+        "appliedCorrectionTotal": 0,
+        "areaEachM2": 0.36,
+        "areaTotalM2": 3.6
+      }
+    },
+    {
+      "caseId": "WR-014",
+      "title": "구간별 수동 연신",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "blocks": [[
+          { "id": "s1", "length": 100, "elongationOverride": 3, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 97, "automaticCorrection": 1.2, "appliedCorrection": 3, "correctionSource": "manual" },
+          { "id": "s2", "calculatedLength": 49, "automaticCorrection": 1.2, "appliedCorrection": 1, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 146,
+        "appliedCorrectionTotal": 4,
+        "areaEachM2": 0.3504,
+        "areaTotalM2": 3.504
+      }
+    },
+    {
+      "caseId": "WR-015",
+      "title": "구간 계산 제외",
+      "verification": {
+        "status": "approved",
+        "classification": "WEB_IMPROVEMENT"
+      },
+      "input": {
+        "blocks": [[
+          { "id": "s1", "length": 100, "calculateElongation": false, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 100, "automaticCorrection": 0, "appliedCorrection": 0, "correctionSource": "disabled" },
+          { "id": "s2", "calculatedLength": 50, "automaticCorrection": 0, "appliedCorrection": 0, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 150,
+        "appliedCorrectionTotal": 0,
+        "areaEachM2": 0.36,
+        "areaTotalM2": 3.6
+      }
+    },
+    {
+      "caseId": "WR-016",
+      "title": "RATIO 정수 반올림",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "calculation": { "mode": "ratio", "decimalPlaces": 0, "decimalOperation": "round" },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 99, "automaticCorrection": 1.5, "appliedCorrection": 1, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 49, "automaticCorrection": 1.5, "appliedCorrection": 1, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 148,
+        "appliedCorrectionTotal": 2,
+        "areaEachM2": 0.3552,
+        "areaTotalM2": 3.552
+      }
+    },
+    {
+      "caseId": "WR-017",
+      "title": "RATIO 소수 처리 없음",
+      "verification": {
+        "status": "approved",
+        "classification": "WEB_IMPROVEMENT"
+      },
+      "input": {
+        "calculation": { "mode": "ratio", "decimalPlaces": 2, "decimalOperation": "none" },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 98.5, "automaticCorrection": 1.5, "appliedCorrection": 1.5, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 48.5, "automaticCorrection": 1.5, "appliedCorrection": 1.5, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 147,
+        "appliedCorrectionTotal": 3,
+        "areaEachM2": 0.3528,
+        "areaTotalM2": 3.528
+      }
+    },
+    {
+      "caseId": "WR-018",
+      "title": "RATIO 정수 버림",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "calculation": { "mode": "ratio", "decimalPlaces": 0, "decimalOperation": "floor" },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 98, "automaticCorrection": 1.5, "appliedCorrection": 2, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 48, "automaticCorrection": 1.5, "appliedCorrection": 2, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 146,
+        "appliedCorrectionTotal": 4,
+        "areaEachM2": 0.3504,
+        "areaTotalM2": 3.504
+      }
+    },
+    {
+      "caseId": "WR-019",
+      "title": "RATIO 정수 올림",
+      "verification": {
+        "status": "approved",
+        "classification": "PARITY_REQUIRED"
+      },
+      "input": {
+        "material": { "cutDepth": { "v-cut": 0.2 } },
+        "calculation": { "mode": "ratio", "decimalPlaces": 0, "decimalOperation": "ceil" },
+        "blocks": [[
+          { "id": "s1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } },
+          { "id": "s2", "length": 50 }
+        ]]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "s1", "calculatedLength": 99, "automaticCorrection": 1.8, "appliedCorrection": 1, "correctionSource": "automatic" },
+          { "id": "s2", "calculatedLength": 49, "automaticCorrection": 1.8, "appliedCorrection": 1, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 148,
+        "appliedCorrectionTotal": 2,
+        "areaEachM2": 0.3552,
+        "areaTotalM2": 3.552
+      }
+    },
+    {
+      "caseId": "WR-020",
+      "title": "박스형 다중 블록 합산",
+      "verification": {
+        "status": "approved",
+        "classification": "WEB_IMPROVEMENT"
+      },
+      "input": {
+        "profileType": "box",
+        "product": { "length": 2000, "quantity": 3 },
+        "blocks": [
+          [{ "id": "face-1", "length": 100, "bendAfter": { "direction": "front", "cutType": "v-cut", "angle": 90 } }],
+          [{ "id": "face-2", "length": 50 }]
+        ]
+      },
+      "approvedExpected": {
+        "segments": [
+          { "id": "face-1", "calculatedLength": 99, "automaticCorrection": 1.2, "appliedCorrection": 1, "correctionSource": "automatic" },
+          { "id": "face-2", "calculatedLength": 50, "automaticCorrection": 0, "appliedCorrection": 0, "correctionSource": "automatic" }
+        ],
+        "inputLengthTotal": 150,
+        "calculatedWidth": 149,
+        "appliedCorrectionTotal": 1,
+        "areaEachM2": 0.298,
+        "areaTotalM2": 0.894
+      }
+    }
+  ]
+}

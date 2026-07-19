@@ -54,7 +54,7 @@ export function legacyRound(value: number, parameter: number): number {
   const factor = 10 ** (parameter - 1);
   const scaled = value * factor;
   const rounded = scaled > 0 ? Math.floor(scaled + 0.5) : Math.ceil(scaled - 0.5);
-  return rounded / factor;
+  return rounded === 0 ? 0 : rounded / factor;
 }
 
 function legacyDecimal(value: number, places: number, operation: DecimalOperation) {
@@ -88,25 +88,16 @@ export function calculateProfile(
   settings: CalculationSettings,
 ): ProfileCalculation {
   const calculated = segments.map((segment, index) => {
-    if (segment.calculateElongation === false) {
-      return {
-        id: segment.id,
-        inputLength: segment.inputLength,
-        calculatedLength: segment.inputLength,
-        automaticCorrection: 0,
-        appliedCorrection: 0,
-        correctionSource: "disabled" as const,
-      };
-    }
-
-    const previousBend = segments[index - 1]?.bendAfter;
-    const nextBend = segment.bendAfter;
+    const previousSegment = segments[index - 1];
+    const previousBend =
+      previousSegment?.calculateElongation === false ? undefined : previousSegment?.bendAfter;
+    const nextBend = segment.calculateElongation === false ? undefined : segment.bendAfter;
     const contribution = settings.mode === "fixed" ? fixedContribution : ratioContribution;
     const rawCorrection =
       contribution(previousBend, rule, settings.vCutEnabled) +
       contribution(nextBend, rule, settings.vCutEnabled);
     const automaticCorrection =
-      settings.mode === "fixed" ? Math.trunc(legacyRound(rawCorrection, 5)) : rawCorrection;
+      settings.mode === "fixed" ? legacyRound(rawCorrection, 5) : rawCorrection;
     const correction = segment.elongationOverride ?? automaticCorrection;
     const rawLength = segment.inputLength - correction;
     const calculatedLength = legacyDecimal(
@@ -121,7 +112,12 @@ export function calculateProfile(
       calculatedLength,
       automaticCorrection,
       appliedCorrection: segment.inputLength - calculatedLength,
-      correctionSource: segment.elongationOverride === undefined ? "automatic" as const : "manual" as const,
+      correctionSource:
+        segment.elongationOverride !== undefined
+          ? "manual" as const
+          : segment.calculateElongation === false && previousBend === undefined
+            ? "disabled" as const
+            : "automatic" as const,
     };
   });
 

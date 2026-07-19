@@ -131,7 +131,11 @@ describe("FoldEditorStore", () => {
     store.setSelectedElongationOverride(5);
     expect(store.selectedSegmentCalculation).toMatchObject({ correctionSource: "manual", appliedCorrection: 5 });
     store.setSelectedElongationOverride(null);
-    expect(store.selectedSegmentCalculation).toMatchObject({ correctionSource: "automatic", appliedCorrection: automatic });
+    expect(store.selectedSegmentCalculation).toMatchObject({
+      correctionSource: "automatic",
+      automaticCorrection: automatic,
+      appliedCorrection: 1,
+    });
   });
 
   it("updates product dimensions used by the area calculation", () => {
