@@ -1,6 +1,12 @@
 import { CanvasWorkspace } from "@/components/canvas-workspace";
+import { LogoutButton } from "@/components/auth/logout-button";
+import { requireAuthenticatedPage } from "@/server/auth/auth-dal";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const auth = await requireAuthenticatedPage();
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950">
       <header className="border-b border-slate-300 bg-white">
@@ -12,7 +18,13 @@ export default function Home() {
               <p className="truncate text-[11px] text-slate-500">알루미늄 전개 폭 계산 프로토타입</p>
             </div>
           </div>
-          <div className="hidden items-center gap-2 text-xs text-slate-500 sm:flex"><span className="h-2 w-2 rounded-full bg-emerald-500" /> 로컬 작업</div>
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right text-xs sm:block">
+              <p className="font-semibold text-slate-700">{auth.displayName}</p>
+              <p className="text-slate-500">{auth.organizationName}</p>
+            </div>
+            <LogoutButton />
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-[1600px] py-4 sm:px-4 sm:py-6"><CanvasWorkspace /></main>

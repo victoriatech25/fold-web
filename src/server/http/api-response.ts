@@ -4,6 +4,9 @@ const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,100}$/;
 
 export type ApiErrorCode =
   | "INVALID_REQUEST"
+  | "UNAUTHENTICATED"
+  | "FORBIDDEN"
+  | "RATE_LIMITED"
   | "NOT_FOUND"
   | "PAYLOAD_TOO_LARGE"
   | "UNSUPPORTED_MEDIA_TYPE"
