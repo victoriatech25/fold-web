@@ -1,6 +1,7 @@
 import { CanvasWorkspace } from "@/components/canvas-workspace";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { requireAuthenticatedPage } from "@/server/auth/auth-dal";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,14 @@ export default async function Home() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {auth.permissions.includes("admin.manage") ? (
+              <Link
+                className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                href="/admin/users"
+              >
+                조직 관리
+              </Link>
+            ) : null}
             <div className="hidden text-right text-xs sm:block">
               <p className="font-semibold text-slate-700">{auth.displayName}</p>
               <p className="text-slate-500">{auth.organizationName}</p>

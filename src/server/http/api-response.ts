@@ -8,6 +8,7 @@ export type ApiErrorCode =
   | "FORBIDDEN"
   | "RATE_LIMITED"
   | "NOT_FOUND"
+  | "CONFLICT"
   | "PAYLOAD_TOO_LARGE"
   | "UNSUPPORTED_MEDIA_TYPE"
   | "INTERNAL_ERROR";

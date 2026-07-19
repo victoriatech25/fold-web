@@ -32,6 +32,7 @@ run(
     "run",
     "src/server/platform/database-smoke.integration.test.ts",
     "src/server/auth/auth.integration.test.ts",
+    "src/server/admin/admin.integration.test.ts",
   ],
   {
     ...process.env,

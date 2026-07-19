@@ -1,6 +1,6 @@
 # P1-02 — 조직·사용자·RBAC
 
-> 상태: `READY`
+> 상태: `VERIFYING`
 >
 > 우선순위: `P1`
 >
@@ -325,17 +325,19 @@ metadata에는 비밀번호·token·hash를 넣지 않는다. P1-03에서 전후
 | 단계 | 상태 | 작업 | 종료 검증 |
 |---|---|---|---|
 | `01` | `DONE` | 현재 Prisma·seed·P1-01 경계 분석 | 본 문서 3장 |
-| `02` | `READY` | D1-02-A~L 결정 승인 | 사용자 승인 |
-| `03` | `TODO` | 설치 버전 Next.js 권한·Route Handler 문서 재확인 | 로컬 문서 |
-| `04` | `TODO` | permission catalog·system role seed | seed 멱등 시험 |
-| `05` | `TODO` | permission context·guard·DAL | 단위·DB 시험 |
-| `06` | `TODO` | 관리자 repository·application service | 조직 격리 시험 |
-| `07` | `TODO` | 사용자 초대·상태·reset API | lifecycle 통합 |
-| `08` | `TODO` | 부서·custom role API | 충돌·reserved 시험 |
-| `09` | `TODO` | 관리자 UI·navigation | 접근성·반응형 |
-| `10` | `TODO` | Playwright·CI·Chrome·Edge 검수 | 완료 대조 |
+| `02` | `DONE` | D1-02-A~L 결정 승인 | 2026-07-19 전체 승인 |
+| `03` | `DONE` | 설치 버전 Next.js 권한·Route Handler 문서 재확인 | 로컬 문서 |
+| `04` | `DONE` | permission catalog·system role seed | 17 permission·4 system role 멱등 seed |
+| `05` | `DONE` | permission context·guard·DAL | permission 합집합·조직 guard 단위 시험 |
+| `06` | `DONE` | 관리자 repository·application service | 전용 조직 PostgreSQL 격리 시험 |
+| `07` | `DONE` | 사용자 초대·상태·reset API | 30분 hash token·session revoke 통합 시험 |
+| `08` | `DONE` | 부서·custom role API | system role·reserved permission·낙관적 충돌 방어 |
+| `09` | `DONE` | 관리자 UI·navigation | 3개 관리 화면·cursor 검색·1회 URL·위험 변경 확인 |
+| `10` | `VERIFYING` | Playwright·CI·Chrome·Edge 검수 | 자동 검증 완료, 사용자 Chrome·Edge 검수 대기 |
 
 ## 14. D1-02 권장 결정안
+
+2026-07-19 사용자가 `D1-02-A~L` 권장안 전체를 승인했다.
 
 | ID | 권장안 |
 |---|---|
@@ -354,19 +356,67 @@ metadata에는 비밀번호·token·hash를 넣지 않는다. P1-03에서 전후
 
 ## 15. 완료 기준
 
-- [ ] 공개 가입·MFC 계정 이전 경로가 없다.
-- [ ] 인증 context가 활성 role의 permission 합집합을 사용한다.
-- [ ] UI와 무관하게 모든 관리자 API가 `admin.manage`를 검사한다.
-- [ ] 타 조직 ID로 조회·변경·role 할당할 수 없다.
-- [ ] 사용자 초대·비밀번호 설정·로그인 흐름이 연결된다.
-- [ ] 상태·membership 정지가 기존 session을 폐기한다.
-- [ ] 마지막 관리자와 자기 계정 보호가 동시 요청에서도 유지된다.
-- [ ] system role·reserved permission을 임의 변경할 수 없다.
-- [ ] custom role·부서 변경이 안전하게 반영된다.
-- [ ] hard delete 없이 상태와 감사 이력을 유지한다.
-- [ ] 단위·PostgreSQL·API·Playwright·필수 CI가 통과한다.
+- [x] 공개 가입·MFC 계정 이전 경로가 없다.
+- [x] 인증 context가 활성 role의 permission 합집합을 사용한다.
+- [x] UI와 무관하게 모든 관리자 API가 `admin.manage`를 검사한다.
+- [x] 타 조직 ID로 조회·변경·role 할당할 수 없다.
+- [x] 사용자 초대·비밀번호 설정·로그인 흐름이 연결된다.
+- [x] 상태·membership 정지가 기존 session을 폐기한다.
+- [x] 마지막 관리자와 자기 계정 보호가 동시 요청에서도 유지된다.
+- [x] system role·reserved permission을 임의 변경할 수 없다.
+- [x] custom role·부서 변경이 안전하게 반영된다.
+- [x] hard delete 없이 상태와 감사 이력을 유지한다.
+- [x] 단위·PostgreSQL·API·Playwright·필수 CI가 통과한다.
 - [ ] Chrome·Edge 사용자 직접 검수가 승인된다.
 
 ## 16. 사용자 결정 게이트
 
-`D1-02-A~L` 승인 전에는 seed 역할표, 관리자 API, UI 구현을 시작하지 않는다. 권장안 일부를 변경하면 영향을 받는 permission matrix·상태 전이·API·테스트를 먼저 수정한 뒤 착수한다.
+`D1-02-A~L`은 2026-07-19 전체 승인됐다. 이후 권장안을 변경하면 영향을 받는 permission matrix·상태 전이·API·테스트를 먼저 수정하고 사용자에게 다시 확인받는다.
+
+## 17. 구현·자동 검증 결과
+
+2026-07-19 기준 다음 수직 흐름을 구현했다.
+
+```text
+ADMINISTRATOR 로그인
+→ admin.manage 기반 관리 navigation
+→ 부서·custom role 생성
+→ VIEWER 사용자 초대와 1회 URL
+→ 비밀번호 설정·일반 사용자 로그인
+→ admin navigation 미표시·페이지 404·API 403
+→ 관리자 정지 처리
+→ 기존 일반 사용자 session 즉시 폐기
+```
+
+자동 검증 결과:
+
+| 검증 | 결과 |
+|---|---|
+| TypeScript | 통과 |
+| ESLint | 통과 |
+| 단위 테스트 | 111건 통과 |
+| PostgreSQL 통합 테스트 | 17건 통과 |
+| Playwright Chromium | 4개 시나리오 통과 |
+| Next.js production build | 통과 |
+| 인앱 브라우저 기능 확인 | 로그인·초대·부서·role 생성과 콘솔 오류 없음 |
+
+마지막 관리자 동시 변경은 테스트 전용 조직을 사용해 다른 통합 테스트와 격리했다. 사용자 변경 transaction은 조직 row lock 뒤 현재 활성 관리자 수를 재확인하므로, 서로 다른 관리자를 동시에 제거해도 최소 1명이 유지된다.
+
+## 18. 사용자 Chrome·Edge 검수 절차
+
+로컬 서비스를 실행한 뒤 두 브라우저에서 같은 항목을 확인한다.
+
+```bash
+npm run dev
+```
+
+1. 관리자 계정으로 로그인하고 편집기 상단의 `조직 관리`가 표시되는지 확인한다.
+2. `/admin/departments`에서 부서를 추가하고 이름·사용 상태를 변경한다.
+3. `/admin/roles`에서 system role 4종이 읽기 전용인지 확인하고 custom role을 추가한다.
+4. `/admin/users`에서 사용자 초대 URL을 발급하고 한 번만 표시되는지 확인한다.
+5. 초대 계정 비밀번호 설정·로그인 후 `조직 관리`가 보이지 않는지 확인한다.
+6. 일반 계정으로 `/admin/users` 직접 접근 시 관리 화면이 열리지 않는지 확인한다.
+7. 관리자가 일반 계정을 정지한 뒤 기존 일반 계정 화면을 새로고침하면 로그인으로 이동하는지 확인한다.
+8. 1366×768 이상에서 사용자·부서·역할 화면의 입력과 버튼이 겹치지 않는지 확인한다.
+
+Chrome·Edge 결과가 승인되면 상태를 `DONE`으로 변경하고 P1-03 상세계획으로 넘어간다.
