@@ -20,9 +20,29 @@ concurrency:
 
 jobs:
   quality:
-    name: Test, lint, and build
+    name: Quality and PostgreSQL integration
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://fold_web_app:ci-only-app-password@127.0.0.1:5432/fold_web_test?schema=public
+      MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/fold_web_test?schema=public
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/fold_web_shadow?schema=public
+      TEST_DATABASE_URL: postgresql://fold_web_app:ci-only-app-password@127.0.0.1:5432/fold_web_test?schema=public
+      TEST_MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/fold_web_test?schema=public
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: fold_web_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fold_web_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Check out source
         uses: actions/checkout@v6
@@ -36,14 +56,60 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
+      - name: Prepare isolated PostgreSQL roles and shadow database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql --host 127.0.0.1 --username postgres --dbname fold_web_test \
+            --set ON_ERROR_STOP=on \
+            --command "CREATE ROLE fold_web_app LOGIN PASSWORD 'ci-only-app-password'"
+          psql --host 127.0.0.1 --username postgres --dbname fold_web_test \
+            --set ON_ERROR_STOP=on \
+            --command "CREATE ROLE fold_web_readonly NOLOGIN"
+          psql --host 127.0.0.1 --username postgres --dbname fold_web_test \
+            --set ON_ERROR_STOP=on \
+            --command "CREATE DATABASE fold_web_shadow"
+
+      - name: Validate and generate Prisma Client
+        run: |
+          npm run db:validate
+          npm run db:generate
+
+      - name: Reject schema changes without a migration
+        run: npm run db:migrate:check
+
+      - name: Run unit tests
         run: npm test
 
       - name: Run ESLint
         run: npm run lint
 
+      - name: Run TypeScript
+        run: npm run typecheck
+
+      - name: Run PostgreSQL integration tests
+        run: npm run test:integration
+
+      - name: Verify applied migration status
+        run: npm run db:migrate:status
+
       - name: Build Next.js
         run: npm run build
+
+      - name: Enforce high and critical production dependency gate
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Record complete dependency audit
+        if: always()
+        run: npm audit --json > npm-audit.json || true
+
+      - name: Upload dependency audit
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-audit-${{ github.run_id }}
+          path: npm-audit.json
+          retention-days: 14
 
   docker:
     name: Build and publish linux/amd64 image
