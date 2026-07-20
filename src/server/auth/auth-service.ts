@@ -205,9 +205,13 @@ export async function login(
       sessionId: session.id,
       userId: principal.userId,
       displayName: principal.displayName,
+      membershipId: membership.membershipId,
+      departmentId: membership.departmentId,
       organizationId: membership.organizationId,
       organizationCode: membership.organizationCode,
       organizationName: membership.organizationName,
+      roleKeys: membership.roleKeys,
+      permissions: membership.permissions,
       expiresAt,
     },
   };
@@ -268,9 +272,13 @@ export async function getAuthenticatedContext(
     sessionId: principal.sessionId,
     userId: principal.userId,
     displayName: principal.displayName,
+    membershipId: principal.membership.membershipId,
+    departmentId: principal.membership.departmentId,
     organizationId: principal.membership.organizationId,
     organizationCode: principal.membership.organizationCode,
     organizationName: principal.membership.organizationName,
+    roleKeys: principal.membership.roleKeys,
+    permissions: principal.membership.permissions,
     expiresAt: principal.expiresAt,
   };
 }

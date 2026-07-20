@@ -1,10 +1,16 @@
+import type { PermissionKey } from "@/domain/permission";
+
 export type AuthenticatedContext = {
   sessionId: string;
   userId: string;
   displayName: string;
+  membershipId: string;
+  departmentId: string | null;
   organizationId: string;
   organizationCode: string;
   organizationName: string;
+  roleKeys: string[];
+  permissions: PermissionKey[];
   expiresAt: Date;
 };
 
@@ -16,6 +22,7 @@ export type SessionUserDto = {
     code: string;
     name: string;
   };
+  capabilities: PermissionKey[];
   expiresAt: string;
 };
 
@@ -30,6 +37,7 @@ export function toSessionUserDto(
       code: context.organizationCode,
       name: context.organizationName,
     },
+    capabilities: [...context.permissions].sort(),
     expiresAt: context.expiresAt.toISOString(),
   };
 }

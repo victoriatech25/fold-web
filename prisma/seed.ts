@@ -6,6 +6,10 @@ import {
   PrismaClient,
   RevisionStatus,
 } from "../src/generated/prisma/client";
+import {
+  permissionCatalog,
+  systemRoleDefinitions,
+} from "../src/domain/permission";
 
 const connectionString =
   process.env.DATABASE_URL ??
@@ -14,26 +18,6 @@ const connectionString =
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
-
-const permissions = [
-  "customer.read",
-  "customer.write",
-  "material.read",
-  "material.write",
-  "material.approve",
-  "template.fold.read",
-  "template.fold.edit",
-  "template.fold.publish",
-  "order.read",
-  "order.edit",
-  "order.calculate",
-  "order.approve",
-  "cutting.optimize",
-  "cutting.approve",
-  "output.print",
-  "machine.transfer",
-  "admin.manage",
-] as const;
 
 async function seed() {
   const organizationCode = process.env.SEED_ORGANIZATION_CODE ?? "LOCAL_DEV";
@@ -51,52 +35,69 @@ async function seed() {
     });
 
     const permissionRows = await Promise.all(
-      permissions.map((key) =>
+      permissionCatalog.map(({ key, description }) =>
         tx.permission.upsert({
           where: { key },
-          update: {},
-          create: { key },
+          update: { description },
+          create: { key, description },
         }),
       ),
     );
+    const permissionByKey = new Map(
+      permissionRows.map((permission) => [permission.key, permission]),
+    );
 
-    const administratorRole = await tx.role.upsert({
-      where: {
-        organizationId_key: {
-          organizationId: organization.id,
-          key: "ADMINISTRATOR",
+    for (const definition of systemRoleDefinitions) {
+      const role = await tx.role.upsert({
+        where: {
+          organizationId_key: {
+            organizationId: organization.id,
+            key: definition.key,
+          },
         },
-      },
-      update: {
-        name: "관리자",
-        active: true,
-      },
-      create: {
-        organizationId: organization.id,
-        key: "ADMINISTRATOR",
-        name: "관리자",
-        description: "조직의 모든 초기 업무 권한",
-        system: true,
-      },
-    });
-
-    await Promise.all(
-      permissionRows.map((permission) =>
-        tx.rolePermission.upsert({
-          where: {
-            roleId_permissionId: {
-              roleId: administratorRole.id,
-              permissionId: permission.id,
+        update: {
+          name: definition.name,
+          description: definition.description,
+          system: true,
+          active: true,
+        },
+        create: {
+          organizationId: organization.id,
+          key: definition.key,
+          name: definition.name,
+          description: definition.description,
+          system: true,
+        },
+      });
+      const allowedPermissionIds = definition.permissions.map((key) => {
+        const permission = permissionByKey.get(key);
+        if (!permission) throw new Error(`Seed permission is missing: ${key}`);
+        return permission.id;
+      });
+      await tx.rolePermission.deleteMany({
+        where: {
+          roleId: role.id,
+          permissionId: { notIn: allowedPermissionIds },
+        },
+      });
+      await Promise.all(
+        allowedPermissionIds.map((permissionId) =>
+          tx.rolePermission.upsert({
+            where: {
+              roleId_permissionId: {
+                roleId: role.id,
+                permissionId,
+              },
             },
-          },
-          update: {},
-          create: {
-            roleId: administratorRole.id,
-            permissionId: permission.id,
-          },
-        }),
-      ),
-    );
+            update: {},
+            create: {
+              roleId: role.id,
+              permissionId,
+            },
+          }),
+        ),
+      );
+    }
 
     await tx.machineIntegrationConfig.upsert({
       where: { organizationId: organization.id },

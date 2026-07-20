@@ -5,8 +5,22 @@ import type {
   Prisma,
   PrismaClient,
 } from "@/generated/prisma/client";
+import {
+  permissionUnion,
+  type PermissionKey,
+} from "@/domain/permission";
 
-type DatabaseClient = PrismaClient | Prisma.TransactionClient;
+export type DatabaseClient = PrismaClient | Prisma.TransactionClient;
+
+export type PrincipalMembership = {
+  membershipId: string;
+  departmentId: string | null;
+  organizationId: string;
+  organizationCode: string;
+  organizationName: string;
+  roleKeys: string[];
+  permissions: PermissionKey[];
+};
 
 export type LoginPrincipal = {
   userId: string;
@@ -14,11 +28,7 @@ export type LoginPrincipal = {
   status: "INVITED" | "ACTIVE" | "SUSPENDED" | "DISABLED";
   passwordAlgorithm: string | null;
   passwordHash: string | null;
-  membership: {
-    organizationId: string;
-    organizationCode: string;
-    organizationName: string;
-  } | null;
+  membership: PrincipalMembership | null;
 };
 
 export type SessionPrincipal = {
@@ -30,12 +40,55 @@ export type SessionPrincipal = {
   lastSeenAt: Date | null;
   revokedAt: Date | null;
   createdAt: Date;
-  membership: {
-    organizationId: string;
-    organizationCode: string;
-    organizationName: string;
-  } | null;
+  membership: PrincipalMembership | null;
 };
+
+type MembershipRow = {
+  id: string;
+  departmentId: string | null;
+  organization: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  roles: Array<{
+    role: {
+      organizationId: string;
+      key: string;
+      permissions: Array<{
+        permission: { key: string };
+      }>;
+    };
+  }>;
+};
+
+function toPrincipalMembership(
+  memberships: MembershipRow[],
+): PrincipalMembership | null {
+  if (memberships.length !== 1) return null;
+  const membership = memberships[0];
+  const roles = membership.roles
+    .map(({ role }) => role)
+    .filter(
+      ({ organizationId }) => organizationId === membership.organization.id,
+    );
+
+  return {
+    membershipId: membership.id,
+    departmentId: membership.departmentId,
+    organizationId: membership.organization.id,
+    organizationCode: membership.organization.code,
+    organizationName: membership.organization.name,
+    roleKeys: roles.map(({ key }) => key).sort(),
+    permissions: permissionUnion(
+      roles.map((role) => ({
+        permissions: role.permissions.map(
+          ({ permission }) => permission.key,
+        ),
+      })),
+    ),
+  };
+}
 
 export async function findLoginPrincipal(
   database: DatabaseClient,
@@ -59,13 +112,31 @@ export async function findLoginPrincipal(
           organization: { status: "ACTIVE" },
         },
         orderBy: { joinedAt: "asc" },
-        take: 1,
+        take: 2,
         select: {
+          id: true,
+          departmentId: true,
           organization: {
             select: {
               id: true,
               code: true,
               name: true,
+            },
+          },
+          roles: {
+            where: { role: { active: true } },
+            select: {
+              role: {
+                select: {
+                  organizationId: true,
+                  key: true,
+                  permissions: {
+                    select: {
+                      permission: { select: { key: true } },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -74,20 +145,14 @@ export async function findLoginPrincipal(
   });
   if (!user) return null;
 
-  const membership = user.memberships[0]?.organization;
+  const membership = toPrincipalMembership(user.memberships);
   return {
     userId: user.id,
     displayName: user.displayName,
     status: user.status,
     passwordAlgorithm: user.passwordCredential?.algorithm ?? null,
     passwordHash: user.passwordCredential?.passwordHash ?? null,
-    membership: membership
-      ? {
-          organizationId: membership.id,
-          organizationCode: membership.code,
-          organizationName: membership.name,
-        }
-      : null,
+    membership,
   };
 }
 
@@ -114,13 +179,31 @@ export async function findSessionPrincipal(
               organization: { status: "ACTIVE" },
             },
             orderBy: { joinedAt: "asc" },
-            take: 1,
+            take: 2,
             select: {
+              id: true,
+              departmentId: true,
               organization: {
                 select: {
                   id: true,
                   code: true,
                   name: true,
+                },
+              },
+              roles: {
+                where: { role: { active: true } },
+                select: {
+                  role: {
+                    select: {
+                      organizationId: true,
+                      key: true,
+                      permissions: {
+                        select: {
+                          permission: { select: { key: true } },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -131,7 +214,7 @@ export async function findSessionPrincipal(
   });
   if (!session) return null;
 
-  const membership = session.user.memberships[0]?.organization;
+  const membership = toPrincipalMembership(session.user.memberships);
   return {
     sessionId: session.id,
     userId: session.userId,
@@ -141,13 +224,7 @@ export async function findSessionPrincipal(
     lastSeenAt: session.lastSeenAt,
     revokedAt: session.revokedAt,
     createdAt: session.createdAt,
-    membership: membership
-      ? {
-          organizationId: membership.id,
-          organizationCode: membership.code,
-          organizationName: membership.name,
-        }
-      : null,
+    membership,
   };
 }
 
