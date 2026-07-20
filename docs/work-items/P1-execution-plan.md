@@ -16,7 +16,7 @@
 >
 > MFC 참조 루트: `/Users/kyhoon/Library/Mobile Documents/com~apple~CloudDocs/회사/hicomtech/도면`
 
-> 현재 작업: `P1-03 감사 로그 상세계획`
+> 현재 작업: [P1-03 감사 로그](./P1-03-audit-log.md)
 
 ## 1. 목표
 
@@ -178,3 +178,4 @@ P1-02의 권장안과 상세 근거는 [P1-02 조직·사용자·RBAC](./P1-02-o
 | 2026-07-19 | P1-02 권장안 승인 | 완료 | D1-02-A~L 전체 승인, 구현 착수 |
 | 2026-07-19 | P1-02 구현·자동 검증 | 검수 중 | RBAC·관리 API/UI·PostgreSQL·Playwright 완료, Chrome·Edge 사용자 검수 대기 |
 | 2026-07-20 | P1-02 사용자 검수 | 완료 | 사용자 검수 승인, P1-02 종료와 P1-03 진행 결정 |
+| 2026-07-20 | P1-03 상세 계획 | 승인 대기 | 감사 v2·append-only·조회 권한·UI 권장안 D1-03-A~L |
