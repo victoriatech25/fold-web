@@ -1,6 +1,6 @@
 # P1-02 — 조직·사용자·RBAC
 
-> 상태: `VERIFYING`
+> 상태: `DONE`
 >
 > 우선순위: `P1`
 >
@@ -333,7 +333,7 @@ metadata에는 비밀번호·token·hash를 넣지 않는다. P1-03에서 전후
 | `07` | `DONE` | 사용자 초대·상태·reset API | 30분 hash token·session revoke 통합 시험 |
 | `08` | `DONE` | 부서·custom role API | system role·reserved permission·낙관적 충돌 방어 |
 | `09` | `DONE` | 관리자 UI·navigation | 3개 관리 화면·cursor 검색·1회 URL·위험 변경 확인 |
-| `10` | `VERIFYING` | Playwright·CI·Chrome·Edge 검수 | 자동 검증 완료, 사용자 Chrome·Edge 검수 대기 |
+| `10` | `DONE` | Playwright·CI·Chrome·Edge 검수 | 2026-07-20 사용자 검수 승인 |
 
 ## 14. D1-02 권장 결정안
 
@@ -367,7 +367,7 @@ metadata에는 비밀번호·token·hash를 넣지 않는다. P1-03에서 전후
 - [x] custom role·부서 변경이 안전하게 반영된다.
 - [x] hard delete 없이 상태와 감사 이력을 유지한다.
 - [x] 단위·PostgreSQL·API·Playwright·필수 CI가 통과한다.
-- [ ] Chrome·Edge 사용자 직접 검수가 승인된다.
+- [x] Chrome·Edge 사용자 직접 검수가 승인된다.
 
 ## 16. 사용자 결정 게이트
 
@@ -419,4 +419,4 @@ npm run dev
 7. 관리자가 일반 계정을 정지한 뒤 기존 일반 계정 화면을 새로고침하면 로그인으로 이동하는지 확인한다.
 8. 1366×768 이상에서 사용자·부서·역할 화면의 입력과 버튼이 겹치지 않는지 확인한다.
 
-Chrome·Edge 결과가 승인되면 상태를 `DONE`으로 변경하고 P1-03 상세계획으로 넘어간다.
+2026-07-20 사용자가 검수 완료와 다음 단계 진행을 승인했다. P1-02를 `DONE`으로 종료하고 P1-03 상세계획으로 넘어간다.
