@@ -16,6 +16,7 @@ export const permissionCatalog = [
   { key: "output.print", description: "출력·인쇄" },
   { key: "machine.transfer", description: "기계 전송 예정 권한" },
   { key: "admin.manage", description: "조직·사용자·권한 관리" },
+  { key: "audit.read", description: "감사 로그 조회" },
 ] as const;
 
 export type PermissionKey = (typeof permissionCatalog)[number]["key"];
@@ -109,4 +110,15 @@ export function permissionUnion(
     .sort();
 }
 
-export const reservedAdministratorPermission: PermissionKey = "admin.manage";
+export const reservedAdministratorPermissions = [
+  "admin.manage",
+  "audit.read",
+] as const satisfies readonly PermissionKey[];
+
+export function isReservedAdministratorPermission(
+  permission: PermissionKey,
+): boolean {
+  return (reservedAdministratorPermissions as readonly PermissionKey[]).includes(
+    permission,
+  );
+}

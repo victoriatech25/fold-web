@@ -2,6 +2,7 @@ import type {
   Prisma,
   PrismaClient,
 } from "@/generated/prisma/client";
+import { writeAuditEvent } from "@/server/audit/audit-writer";
 
 export async function findOrganizationIdByCode(
   transaction: Prisma.TransactionClient,
@@ -22,15 +23,12 @@ export async function createDatabaseSmokeAudit(
     mode: "commit" | "rollback";
   },
 ): Promise<void> {
-  await transaction.auditEvent.create({
-    data: {
-      organizationId: input.organizationId,
-      action: "platform.database_smoke",
-      entityType: "Platform",
-      requestId: input.requestId,
-      metadata: {
-        mode: input.mode,
-      },
+  await writeAuditEvent(transaction, {
+    organizationId: input.organizationId,
+    action: "platform.database_smoke",
+    requestId: input.requestId,
+    metadata: {
+      mode: input.mode,
     },
   });
 }

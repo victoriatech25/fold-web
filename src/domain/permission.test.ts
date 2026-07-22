@@ -10,7 +10,7 @@ import {
 
 describe("permission catalog", () => {
   it("contains stable unique permission and system role keys", () => {
-    expect(new Set(permissionCatalog.map(({ key }) => key)).size).toBe(17);
+    expect(new Set(permissionCatalog.map(({ key }) => key)).size).toBe(18);
     expect(new Set(systemRoleDefinitions.map(({ key }) => key)).size).toBe(4);
     expect(isPermissionKey("admin.manage")).toBe(true);
     expect(isPermissionKey("unknown")).toBe(false);
@@ -27,10 +27,15 @@ describe("permission catalog", () => {
     ).toEqual(["customer.read", "order.read"]);
   });
 
-  it("reserves admin management for the administrator system role", () => {
-    const rolesWithAdmin = systemRoleDefinitions.filter(({ permissions }) =>
-      (permissions as readonly string[]).includes("admin.manage"),
-    );
-    expect(rolesWithAdmin.map(({ key }) => key)).toEqual(["ADMINISTRATOR"]);
+  it("reserves administration and audit read for the administrator role", () => {
+    for (const reservedPermission of ["admin.manage", "audit.read"]) {
+      const rolesWithPermission = systemRoleDefinitions.filter(
+        ({ permissions }) =>
+          (permissions as readonly string[]).includes(reservedPermission),
+      );
+      expect(rolesWithPermission.map(({ key }) => key)).toEqual([
+        "ADMINISTRATOR",
+      ]);
+    }
   });
 });

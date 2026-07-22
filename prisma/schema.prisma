@@ -77,6 +77,28 @@ enum MachineIntegrationStatus {
   DISABLED
 }
 
+enum AuditCategory {
+  AUTHENTICATION
+  ADMINISTRATION
+  DATA_CHANGE
+  APPROVAL
+  OUTPUT
+  MACHINE
+  SYSTEM
+}
+
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+  FAILURE
+}
+
+enum AuditSource {
+  WEB
+  CLI
+  SYSTEM
+}
+
 model Organization {
   id                       String                    @id @default(uuid()) @db.Uuid
   code                     String                    @unique @db.VarChar(50)
@@ -517,21 +539,33 @@ model MachineIntegrationConfig {
 }
 
 model AuditEvent {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
-  actorUserId    String?      @db.Uuid
-  action         String       @db.VarChar(150)
-  entityType     String       @db.VarChar(100)
-  entityId       String?      @db.VarChar(100)
-  requestId      String?      @db.VarChar(100)
-  occurredAt     DateTime     @default(now()) @db.Timestamptz(6)
-  metadata       Json?        @db.JsonB
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  actor          User?        @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  id                 String        @id @default(uuid()) @db.Uuid
+  organizationId     String        @db.Uuid
+  category           AuditCategory
+  outcome            AuditOutcome
+  source             AuditSource
+  schemaVersion      Int           @default(2) @db.SmallInt
+  actorUserId        String?       @db.Uuid
+  actorDisplayName   String?       @db.VarChar(100)
+  actorEmail         String?       @db.VarChar(320)
+  subjectFingerprint String?       @db.Char(64)
+  sourceFingerprint  String?       @db.Char(64)
+  action             String        @db.VarChar(150)
+  entityType         String        @db.VarChar(100)
+  entityId           String?       @db.VarChar(100)
+  requestId          String?       @db.VarChar(100)
+  occurredAt         DateTime      @default(now()) @db.Timestamptz(6)
+  before             Json?         @db.JsonB
+  after              Json?         @db.JsonB
+  metadata           Json?         @db.JsonB
+  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor              User?         @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
-  @@index([organizationId, occurredAt])
-  @@index([organizationId, entityType, entityId, occurredAt])
-  @@index([actorUserId, occurredAt])
+  @@index([organizationId, occurredAt, id])
+  @@index([organizationId, category, occurredAt, id])
+  @@index([organizationId, action, occurredAt, id])
+  @@index([organizationId, actorUserId, occurredAt, id])
+  @@index([organizationId, entityType, entityId, occurredAt, id])
   @@index([requestId])
 }
 

@@ -202,7 +202,6 @@ export function UserAdminPanel({
   departments: AdminDepartmentDto[];
   roles: AdminRoleDto[];
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [oneTimeUrl, setOneTimeUrl] = useState<{
@@ -245,7 +244,8 @@ export function UserAdminPanel({
 
   function invite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setError("");
     startTransition(async () => {
       try {
@@ -262,9 +262,12 @@ export function UserAdminPanel({
           }),
         });
         setOneTimeUrl({ title: "사용자 초대 주소", url: data.invitationUrl });
+        setVisibleUsers((current) => [
+          data.user,
+          ...current.filter(({ id }) => id !== data.user.id),
+        ]);
         setRoleIds([]);
-        (event.target as HTMLFormElement).reset();
-        router.refresh();
+        formElement.reset();
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "초대 실패");
       }

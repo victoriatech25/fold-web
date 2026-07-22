@@ -19,6 +19,7 @@ function run(command, arguments_, environment = process.env) {
 }
 
 run("npm", ["run", "db:test:reset"]);
+run("node", ["scripts/verify-audit-migration.mjs"]);
 run("node", ["scripts/verify-auth-cli.mjs"], {
   ...process.env,
   TEST_DATABASE_URL: applicationUrl,
@@ -33,6 +34,7 @@ run(
     "src/server/platform/database-smoke.integration.test.ts",
     "src/server/auth/auth.integration.test.ts",
     "src/server/admin/admin.integration.test.ts",
+    "src/server/audit/audit.integration.test.ts",
   ],
   {
     ...process.env,

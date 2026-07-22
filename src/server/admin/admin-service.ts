@@ -7,15 +7,15 @@ import type {
 } from "@/generated/prisma/client";
 import {
   isPermissionKey,
+  isReservedAdministratorPermission,
   isSystemRoleKey,
   permissionCatalog,
-  reservedAdministratorPermission,
   type PermissionKey,
 } from "@/domain/permission";
 import { AdminServiceError } from "@/server/admin/admin-error";
+import { writeAuditEvent } from "@/server/audit/audit-writer";
 import {
   countActiveAdministrators,
-  createAdminAudit,
   findOrganizationUser,
   listOrganizationDepartments,
   listOrganizationRoles,
@@ -282,16 +282,18 @@ export async function inviteOrganizationUser(
         },
         select: { id: true },
       });
-      await createAdminAudit(transaction, {
+      await writeAuditEvent(transaction, {
         organizationId: context.organizationId,
         actorUserId: context.userId,
         action: "admin.user_invited",
-        entityType: "User",
         entityId: user.id,
         requestId: input.requestId,
-        metadata: {
+        after: {
+          status: "INVITED",
           departmentId: input.departmentId,
           roleKeys: roles.map(({ key }) => key).sort(),
+        },
+        metadata: {
           expiresAt: expiresAt.toISOString(),
         },
       });
@@ -360,14 +362,13 @@ export async function issueOrganizationUserPasswordReset(
         expiresAt,
       },
     });
-    await createAdminAudit(transaction, {
+    await writeAuditEvent(transaction, {
       organizationId: context.organizationId,
       actorUserId: context.userId,
       action: "admin.password_reset_issued",
-      entityType: "User",
       entityId: target.id,
       requestId: input.requestId,
-      metadata: { expiresAt: expiresAt.toISOString() },
+      after: { expiresAt: expiresAt.toISOString() },
     });
   });
 
@@ -497,48 +498,49 @@ export async function updateOrganizationUser(
         data: { revokedAt: now },
       });
     }
-    await createAdminAudit(transaction, {
-      organizationId: context.organizationId,
-      actorUserId: context.userId,
-      action: "admin.user_updated",
-      entityType: "User",
-      entityId: target.id,
-      requestId: input.requestId,
-      metadata: {
-        previousStatus: target.status,
-        nextStatus,
-        previousRoleKeys: currentRoleKeys,
-        nextRoleKeys,
-        departmentChanged: input.departmentId !== undefined,
-        displayNameChanged: input.displayName !== undefined,
-      },
-    });
-    if (target.status !== nextStatus) {
-      await createAdminAudit(transaction, {
+    if (
+      input.departmentId !== undefined ||
+      input.displayName !== undefined
+    ) {
+      await writeAuditEvent(transaction, {
         organizationId: context.organizationId,
         actorUserId: context.userId,
-        action: "admin.user_status_changed",
-        entityType: "User",
+        action: "admin.user_updated",
         entityId: target.id,
         requestId: input.requestId,
-        metadata: {
-          previousStatus: target.status,
-          nextStatus,
+        before: {
+          displayName: target.displayName,
+          departmentId: membership.department?.id ?? null,
+        },
+        after: {
+          displayName: input.displayName?.trim() ?? target.displayName,
+          departmentId:
+            input.departmentId !== undefined
+              ? input.departmentId
+              : membership.department?.id ?? null,
         },
       });
     }
+    if (target.status !== nextStatus) {
+      await writeAuditEvent(transaction, {
+        organizationId: context.organizationId,
+        actorUserId: context.userId,
+        action: "admin.user_status_changed",
+        entityId: target.id,
+        requestId: input.requestId,
+        before: { status: target.status },
+        after: { status: nextStatus },
+      });
+    }
     if (currentRoleKeys.join("\0") !== nextRoleKeys.join("\0")) {
-      await createAdminAudit(transaction, {
+      await writeAuditEvent(transaction, {
         organizationId: context.organizationId,
         actorUserId: context.userId,
         action: "admin.user_roles_changed",
-        entityType: "OrganizationMembership",
         entityId: membership.id,
         requestId: input.requestId,
-        metadata: {
-          previousRoleKeys: currentRoleKeys,
-          nextRoleKeys,
-        },
+        before: { roleKeys: currentRoleKeys },
+        after: { roleKeys: nextRoleKeys },
       });
     }
     },
@@ -579,13 +581,17 @@ export async function createOrganizationDepartment(
           name: input.name.trim(),
         },
       });
-      await createAdminAudit(transaction, {
+      await writeAuditEvent(transaction, {
         organizationId: context.organizationId,
         actorUserId: context.userId,
         action: "admin.department_created",
-        entityType: "Department",
         entityId: created.id,
         requestId: input.requestId,
+        after: {
+          code: created.code,
+          name: created.name,
+          active: created.active,
+        },
       });
       return created;
     });
@@ -642,16 +648,19 @@ export async function updateOrganizationDepartment(
         updatedAt: now,
       },
     });
-    await createAdminAudit(transaction, {
+    await writeAuditEvent(transaction, {
       organizationId: context.organizationId,
       actorUserId: context.userId,
       action: "admin.department_updated",
-      entityType: "Department",
       entityId: updated.id,
       requestId: input.requestId,
-      metadata: {
-        previousActive: department.active,
-        nextActive: updated.active,
+      before: {
+        name: department.name,
+        active: department.active,
+      },
+      after: {
+        name: updated.name,
+        active: updated.active,
       },
     });
     return {
@@ -669,10 +678,10 @@ async function resolveCustomRolePermissions(
   permissionKeys: PermissionKey[],
 ) {
   const uniqueKeys = uniqueValues(permissionKeys).filter(isPermissionKey);
-  if (uniqueKeys.includes(reservedAdministratorPermission)) {
+  if (uniqueKeys.some(isReservedAdministratorPermission)) {
     throw new AdminServiceError(
       "FORBIDDEN",
-      "조직 관리 권한은 관리자 system role에만 부여할 수 있습니다.",
+      "예약된 관리 권한은 관리자 system role에만 부여할 수 있습니다.",
     );
   }
   const permissions = await database.permission.findMany({
@@ -728,15 +737,17 @@ export async function createOrganizationRole(
         },
         select: { id: true },
       });
-      await createAdminAudit(transaction, {
+      await writeAuditEvent(transaction, {
         organizationId: context.organizationId,
         actorUserId: context.userId,
         action: "admin.role_created",
-        entityType: "Role",
         entityId: role.id,
         requestId: input.requestId,
-        metadata: {
+        after: {
           key,
+          name: input.name.trim(),
+          description: input.description?.trim() || null,
+          active: true,
           permissions: permissions.map(({ key: permissionKey }) => permissionKey),
         },
       });
@@ -781,8 +792,16 @@ export async function updateOrganizationRole(
       select: {
         id: true,
         key: true,
+        name: true,
+        description: true,
+        active: true,
         system: true,
         updatedAt: true,
+        permissions: {
+          select: {
+            permission: { select: { key: true } },
+          },
+        },
       },
     });
     if (!role) {
@@ -832,16 +851,30 @@ export async function updateOrganizationRole(
         });
       }
     }
-    await createAdminAudit(transaction, {
+    await writeAuditEvent(transaction, {
       organizationId: context.organizationId,
       actorUserId: context.userId,
       action: "admin.role_updated",
-      entityType: "Role",
       entityId: role.id,
       requestId: input.requestId,
-      metadata: {
-        active: input.active,
-        permissions: permissions?.map(({ key }) => key),
+      before: {
+        name: role.name,
+        description: role.description,
+        active: role.active,
+        permissions: role.permissions
+          .map(({ permission }) => permission.key)
+          .sort(),
+      },
+      after: {
+        name: input.name?.trim() ?? role.name,
+        description:
+          input.description === undefined
+            ? role.description
+            : input.description?.trim() || null,
+        active: input.active ?? role.active,
+        permissions:
+          permissions?.map(({ key }) => key).sort() ??
+          role.permissions.map(({ permission }) => permission.key).sort(),
       },
     });
   });

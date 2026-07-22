@@ -5,6 +5,7 @@ import { readAuthRuntimeConfig } from "@/server/auth/auth-config";
 import { getAuthenticatedContext } from "@/server/auth/auth-service";
 import type { AuthenticatedContext } from "@/server/auth/auth-types";
 import { readSessionCookie } from "@/server/auth/session-cookie";
+import { writeDeniedAuditBestEffort } from "@/server/audit/audit-writer";
 import { hasPermission } from "@/server/authorization/authorization";
 import { getPrisma } from "@/server/db/prisma";
 import { apiErrorResponse } from "@/server/http/api-response";
@@ -36,6 +37,14 @@ export async function authorizeApiRequest(
     };
   }
   if (!hasPermission(context, permission)) {
+    await writeDeniedAuditBestEffort(getPrisma(), {
+      organizationId: context.organizationId,
+      actorUserId: context.userId,
+      action: "authorization.permission_denied",
+      entityId: permission,
+      requestId,
+      metadata: { reason: "MISSING_PERMISSION" },
+    });
     return {
       ok: false,
       response: apiErrorResponse(

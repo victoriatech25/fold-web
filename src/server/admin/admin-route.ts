@@ -3,6 +3,8 @@ import "server-only";
 import { AdminServiceError } from "@/server/admin/admin-error";
 import { readAuthRuntimeConfig } from "@/server/auth/auth-config";
 import { hasAllowedMutationOrigin } from "@/server/auth/request-security";
+import { writeDeniedAuditBestEffort } from "@/server/audit/audit-writer";
+import { getPrisma } from "@/server/db/prisma";
 import {
   apiErrorResponse,
   type ApiErrorCode,
@@ -17,10 +19,24 @@ export async function authorizeAdminRequest(
   requestId: string,
   mutation: boolean,
 ): Promise<ApiAuthorizationResult> {
+  const authorization = await authorizeApiRequest(
+    request,
+    requestId,
+    "admin.manage",
+  );
+  if (!authorization.ok) return authorization;
   if (
     mutation &&
     !hasAllowedMutationOrigin(request, readAuthRuntimeConfig())
   ) {
+    await writeDeniedAuditBestEffort(getPrisma(), {
+      organizationId: authorization.context.organizationId,
+      actorUserId: authorization.context.userId,
+      action: "authorization.permission_denied",
+      entityId: "admin.manage",
+      requestId,
+      metadata: { reason: "INVALID_MUTATION_ORIGIN" },
+    });
     return {
       ok: false,
       response: apiErrorResponse(
@@ -31,7 +47,7 @@ export async function authorizeAdminRequest(
       ),
     };
   }
-  return authorizeApiRequest(request, requestId, "admin.manage");
+  return authorization;
 }
 
 export function adminRouteErrorResponse(

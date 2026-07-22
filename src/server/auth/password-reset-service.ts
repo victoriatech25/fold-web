@@ -1,13 +1,13 @@
 import "server-only";
 
 import type { PrismaClient } from "@/generated/prisma/client";
+import { writeAuditEvent } from "@/server/audit/audit-writer";
 import {
   hashPassword,
   passwordHashAlgorithm,
   validatePasswordPolicy,
   type PasswordPolicyResult,
 } from "@/server/auth/password";
-import { createAuthAudit } from "@/server/auth/auth-repository";
 import { hashOpaqueToken, isOpaqueToken } from "@/server/auth/token";
 
 export type CompletePasswordResetResult =
@@ -113,12 +113,17 @@ export async function completePasswordReset(
       },
       data: { revokedAt: now },
     });
-    await createAuthAudit(transaction, {
+    await writeAuditEvent(transaction, {
       organizationId: membership.organizationId,
       actorUserId: reset.user.id,
       action: "auth.password_reset_completed",
       entityId: reset.user.id,
       requestId: input.requestId,
+      before: { status: reset.user.status },
+      after: {
+        status: reset.user.status === "INVITED" ? "ACTIVE" : reset.user.status,
+        sessionsRevoked: true,
+      },
     });
     return true;
   });

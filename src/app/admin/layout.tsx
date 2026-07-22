@@ -33,6 +33,7 @@ export default async function AdminLayout({
           <Link className="block rounded px-3 py-2 text-sm font-bold hover:bg-slate-100" href="/admin/users">사용자</Link>
           <Link className="block rounded px-3 py-2 text-sm font-bold hover:bg-slate-100" href="/admin/departments">부서</Link>
           <Link className="block rounded px-3 py-2 text-sm font-bold hover:bg-slate-100" href="/admin/roles">역할과 권한</Link>
+          <Link className="block rounded px-3 py-2 text-sm font-bold hover:bg-slate-100" href="/admin/audit-logs">감사 로그</Link>
           <div className="my-2 border-t border-slate-200" />
           <Link className="block rounded px-3 py-2 text-sm text-slate-600 hover:bg-slate-100" href="/">편집기로 돌아가기</Link>
         </nav>
