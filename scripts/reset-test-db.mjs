@@ -52,6 +52,7 @@ try {
   await client.query(`
     GRANT USAGE ON SCHEMA public TO fold_web_app, fold_web_readonly;
     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fold_web_app;
+    REVOKE UPDATE, DELETE ON TABLE "AuditEvent" FROM fold_web_app;
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO fold_web_readonly;
     GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO fold_web_app;
     GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO fold_web_readonly;

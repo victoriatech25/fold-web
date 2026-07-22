@@ -1,10 +1,13 @@
 import "server-only";
 
 import type { PrismaClient } from "@/generated/prisma/client";
+import {
+  writeAuditEvent,
+  writeDeniedAuditBestEffort,
+} from "@/server/audit/audit-writer";
 import type { AuthRuntimeConfig } from "@/server/auth/auth-config";
 import {
   clearThrottle,
-  createAuthAudit,
   findDefaultOrganizationId,
   findLoginPrincipal,
   findSessionPrincipal,
@@ -115,6 +118,20 @@ export async function login(
     isBlocked(throttle, now),
   );
   if (activeBlock?.blockedUntil) {
+    const organizationId = await findDefaultOrganizationId(
+      prisma,
+      input.config.defaultOrganizationCode,
+    );
+    if (organizationId) {
+      await writeDeniedAuditBestEffort(prisma, {
+        organizationId,
+        action: "auth.login_failed",
+        requestId: input.requestId,
+        subjectFingerprint: accountKeyHash,
+        sourceFingerprint: sourceKeyHash,
+        metadata: { reason: "RATE_LIMITED" },
+      });
+    }
     return {
       ok: false,
       reason: "RATE_LIMITED",
@@ -147,13 +164,18 @@ export async function login(
         input.config.defaultOrganizationCode,
       ));
     if (organizationId) {
-      await createAuthAudit(prisma, {
+      await writeDeniedAuditBestEffort(prisma, {
         organizationId,
         actorUserId: principal?.userId,
         action: "auth.login_failed",
         entityId: principal?.userId,
         requestId: input.requestId,
-        metadata: { throttled: throttle.blockedUntil !== null },
+        subjectFingerprint: accountKeyHash,
+        sourceFingerprint: sourceKeyHash,
+        metadata: {
+          reason: throttle.blockedUntil ? "RATE_LIMITED" : "INVALID_CREDENTIALS",
+          throttled: throttle.blockedUntil !== null,
+        },
       });
     }
 
@@ -188,12 +210,13 @@ export async function login(
       data: { lastLoginAt: now },
     });
     await clearThrottle(transaction, "ACCOUNT", accountKeyHash);
-    await createAuthAudit(transaction, {
+    await writeAuditEvent(transaction, {
       organizationId: membership.organizationId,
       actorUserId: principal.userId,
       action: "auth.login_succeeded",
       entityId: principal.userId,
       requestId: input.requestId,
+      sourceFingerprint: sourceKeyHash,
     });
     return created;
   });
@@ -306,7 +329,7 @@ export async function logout(
       data: { revokedAt: now },
     });
     if (principal.membership) {
-      await createAuthAudit(transaction, {
+      await writeAuditEvent(transaction, {
         organizationId: principal.membership.organizationId,
         actorUserId: principal.userId,
         action: "auth.logout",

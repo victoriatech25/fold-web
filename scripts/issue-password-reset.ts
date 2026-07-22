@@ -12,6 +12,7 @@ import {
   createOpaqueToken,
   hashOpaqueToken,
 } from "../src/server/auth/token-core";
+import { writeAuditEvent } from "../src/server/audit/audit-writer";
 
 const argumentsSchema = z.object({
   email: z.email().max(320),
@@ -78,15 +79,12 @@ async function main(): Promise<void> {
           expiresAt,
         },
       });
-      await transaction.auditEvent.create({
-        data: {
-          organizationId: membership.organizationId,
-          action: "auth.password_reset_issued",
-          entityType: "User",
-          entityId: user.id,
-          requestId: "auth-cli",
-          metadata: { expiresAt: expiresAt.toISOString() },
-        },
+      await writeAuditEvent(transaction, {
+        organizationId: membership.organizationId,
+        action: "auth.password_reset_issued",
+        entityId: user.id,
+        requestId: "auth-cli",
+        after: { expiresAt: expiresAt.toISOString() },
       });
     });
 

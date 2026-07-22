@@ -305,6 +305,14 @@ integration.sequential("organization user and RBAC integration", () => {
         requestId: "reserve-admin",
       }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      updateOrganizationRole(prisma, adminContext, {
+        roleId: custom.id,
+        permissions: ["audit.read"],
+        expectedUpdatedAt: new Date(custom.updatedAt),
+        requestId: "reserve-audit-read",
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("allows only one of two concurrent last-administrator removals", async () => {

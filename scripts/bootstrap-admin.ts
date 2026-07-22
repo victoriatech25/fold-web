@@ -14,6 +14,7 @@ import {
   passwordHashAlgorithm,
   validatePasswordPolicy,
 } from "../src/server/auth/password-core";
+import { writeAuditEvent } from "../src/server/audit/audit-writer";
 
 const argumentsSchema = z.object({
   email: z.email().max(320),
@@ -103,14 +104,19 @@ async function main(): Promise<void> {
         },
         select: { id: true },
       });
-      await transaction.auditEvent.create({
-        data: {
-          organizationId: organization.id,
-          actorUserId: user.id,
-          action: "auth.admin_bootstrapped",
-          entityType: "User",
-          entityId: user.id,
-          requestId: "auth-cli",
+      await writeAuditEvent(transaction, {
+        organizationId: organization.id,
+        actorUserId: user.id,
+        actorSnapshot: {
+          displayName: input.name,
+          email: input.email.trim(),
+        },
+        action: "auth.admin_bootstrapped",
+        entityId: user.id,
+        requestId: "auth-cli",
+        after: {
+          status: "ACTIVE",
+          roleKeys: ["ADMINISTRATOR"],
         },
       });
       return user;

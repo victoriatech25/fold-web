@@ -51,6 +51,7 @@ test("관리자 UI에서 조직 설정과 사용자 수명주기를 완료한다
   browser,
   page,
 }) => {
+  test.setTimeout(60_000);
   await loginAsAdministrator(page);
   await expect(
     page.getByRole("link", { name: "조직 관리" }),
@@ -125,6 +126,12 @@ test("관리자 UI에서 조직 설정과 사용자 수명주기를 완료한다
   expect(deniedPage?.status()).toBe(404);
   const deniedApi = await viewerPage.request.get("/api/v1/admin/users");
   expect(deniedApi.status()).toBe(403);
+  const deniedAuditPage = await viewerPage.goto("/admin/audit-logs");
+  expect(deniedAuditPage?.status()).toBe(404);
+  const deniedAuditApi = await viewerPage.request.get(
+    "/api/v1/admin/audit-events",
+  );
+  expect(deniedAuditApi.status()).toBe(403);
 
   const usersResponse = await page.request.get(
     "/api/v1/admin/users?query=e2e-viewer&limit=25",
@@ -147,6 +154,22 @@ test("관리자 UI에서 조직 설정과 사용자 수명주기를 완료한다
     },
   );
   expect(suspendResponse.ok()).toBe(true);
+
+  await page.getByRole("link", { name: "감사 로그" }).click();
+  await expect(page).toHaveURL(/\/admin\/audit-logs$/);
+  await expect(
+    page.getByRole("heading", { name: "감사 로그" }),
+  ).toBeVisible();
+  await expect(page.getByText("admin.user_invited", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("authorization.permission_denied", { exact: true }).first(),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "사용자 초대" }).first().click();
+  await expect(
+    page.getByRole("heading", { name: "사용자 초대", level: 2 }),
+  ).toBeVisible();
+  await expect(page.getByText(/"status": "INVITED"/)).toBeVisible();
+
   await viewerPage.goto("/");
   await expect(viewerPage).toHaveURL(/\/login$/);
   await viewerContext.close();

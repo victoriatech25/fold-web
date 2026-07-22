@@ -286,32 +286,6 @@ export function countActiveAdministrators(
   });
 }
 
-export function createAdminAudit(
-  database: DatabaseClient,
-  input: {
-    organizationId: string;
-    actorUserId: string;
-    action: string;
-    entityType: string;
-    entityId: string;
-    requestId: string;
-    metadata?: Prisma.InputJsonValue;
-  },
-): Promise<unknown> {
-  return database.auditEvent.create({
-    data: {
-      organizationId: input.organizationId,
-      actorUserId: input.actorUserId,
-      action: input.action,
-      entityType: input.entityType,
-      entityId: input.entityId,
-      requestId: input.requestId,
-      metadata: input.metadata,
-    },
-    select: { id: true },
-  });
-}
-
 export function mapPermissionKeys(
   permissions: Array<{ permission: { key: string } }>,
 ): PermissionKey[] {

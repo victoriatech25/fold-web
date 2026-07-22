@@ -343,28 +343,3 @@ export function clearThrottle(
     where: { scope, keyHash },
   });
 }
-
-export function createAuthAudit(
-  database: DatabaseClient,
-  input: {
-    organizationId: string;
-    actorUserId?: string;
-    action: string;
-    entityId?: string;
-    requestId: string;
-    metadata?: Prisma.InputJsonValue;
-  },
-): Promise<unknown> {
-  return database.auditEvent.create({
-    data: {
-      organizationId: input.organizationId,
-      actorUserId: input.actorUserId,
-      action: input.action,
-      entityType: "User",
-      entityId: input.entityId,
-      requestId: input.requestId,
-      metadata: input.metadata,
-    },
-    select: { id: true },
-  });
-}
