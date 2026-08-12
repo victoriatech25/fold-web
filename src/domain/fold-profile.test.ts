@@ -17,7 +17,7 @@ import { validateFoldProfile } from "./fold-profile-validation";
 describe("fold profile model", () => {
   it("creates a versioned profile with stable defaults", () => {
     const profile = createFoldProfile({ id: "profile-1", now: "2026-07-11T00:00:00.000Z" });
-    expect(profile.schemaVersion).toBe(3);
+    expect(profile.schemaVersion).toBe(4);
     expect(profile.profileType).toBe("normal");
     expect(profile.blocks).toHaveLength(1);
     expect(profile.product).toEqual({ length: 0, quantity: 1 });
@@ -72,13 +72,13 @@ describe("serialization and calculation adapter", () => {
 
   it("rejects malformed and unsupported documents", () => {
     expect(() => deserializeFoldProfile("not-json")).toThrow(FoldProfileParseError);
-    expect(() => deserializeFoldProfile('{"schemaVersion":4}')).toThrow(
+    expect(() => deserializeFoldProfile('{"schemaVersion":5}')).toThrow(
       "지원하지 않는 도면 버전",
     );
     expect(() =>
       deserializeFoldProfile(
         JSON.stringify({
-          schemaVersion: 3,
+          schemaVersion: 4,
           id: "broken",
           name: "broken",
           material: {},
@@ -103,7 +103,7 @@ describe("serialization and calculation adapter", () => {
     delete legacy.blocks;
     delete legacy.profileType;
     const restored = deserializeFoldProfile(JSON.stringify(legacy));
-    expect(restored.schemaVersion).toBe(3);
+    expect(restored.schemaVersion).toBe(4);
     expect(restored.profileType).toBe("normal");
     expect(restored.blocks[0].segments).toHaveLength(1);
   });
@@ -115,7 +115,17 @@ describe("serialization and calculation adapter", () => {
     delete material.insideBendRadius;
 
     const restored = deserializeFoldProfile(JSON.stringify(legacy));
-    expect(restored.schemaVersion).toBe(3);
+    expect(restored.schemaVersion).toBe(4);
     expect(restored.material.insideBendRadius).toBe(3);
+  });
+
+  it("defaults older version 3 profiles to the standard elongation option", () => {
+    const legacy = createFoldProfile({ id: "legacy-v3" }) as unknown as Record<string, unknown>;
+    legacy.schemaVersion = 3;
+    const calculation = legacy.calculation as Record<string, unknown>;
+    delete calculation.elongationOption;
+
+    const restored = deserializeFoldProfile(JSON.stringify(legacy));
+    expect(restored.calculation.elongationOption).toBe("standard");
   });
 });

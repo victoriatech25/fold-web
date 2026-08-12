@@ -21,9 +21,10 @@ export const DevelopedPatternPreview = observer(function DevelopedPatternPreview
   const available = isBox
     ? boxPattern && boxPattern.width > 0 && boxPattern.height > 0
     : normalPattern && normalPattern.width > 0 && normalPattern.length > 0;
+  const fixedHeight = height ?? (compact ? 300 : undefined);
 
   if (!available) {
-    return <div style={{ height: height ?? (compact ? 300 : 620) }} className="flex items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-500">{isBox ? "교차하는 두 단면을 완성하면 박스 전개도가 표시됩니다." : "단면과 제품 길이를 입력하면 전개도가 표시됩니다."}</div>;
+    return <div style={fixedHeight === undefined ? undefined : { height: fixedHeight }} className={`flex items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-500 ${fixedHeight === undefined ? "h-full min-h-[240px] xl:min-h-0" : ""}`}>{isBox ? "교차하는 두 단면을 완성하면 박스 전개도가 표시됩니다." : "단면과 제품 길이를 입력하면 전개도가 표시됩니다."}</div>;
   }
 
   return isBox
@@ -33,6 +34,7 @@ export const DevelopedPatternPreview = observer(function DevelopedPatternPreview
 
 function NormalPattern({ pattern, compact, height }: { pattern: DevelopedPattern; compact: boolean; height?: number }) {
   const viewport = usePatternViewport();
+  const fixedHeight = height ?? (compact ? 300 : undefined);
   const viewWidth = 1000;
   const viewHeight = 620;
   const padding = 60;
@@ -43,7 +45,7 @@ function NormalPattern({ pattern, compact, height }: { pattern: DevelopedPattern
   const originY = (viewHeight - drawingHeight) / 2;
 
   return (
-    <section style={{ height: height ?? (compact ? 300 : 620) }} className={`relative overflow-hidden bg-slate-100 ${viewport.dragging ? "cursor-grabbing" : "cursor-grab"}`} aria-label="일반 절곡 전개도">
+    <section style={fixedHeight === undefined ? undefined : { height: fixedHeight }} className={`relative overflow-hidden bg-slate-100 ${fixedHeight === undefined ? "h-full min-h-[240px] xl:min-h-0" : ""} ${viewport.dragging ? "cursor-grabbing" : "cursor-grab"}`} aria-label="일반 절곡 전개도">
       <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-3 rounded border border-slate-300 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-600 shadow-sm">
         <span className="text-slate-900">전개도 {pattern.length.toFixed(1)} × {pattern.width.toFixed(1)} mm</span>
         <Legend color="#111827" label="재단선" />
@@ -91,6 +93,7 @@ function NormalPattern({ pattern, compact, height }: { pattern: DevelopedPattern
 
 function BoxPattern({ pattern, compact, height }: { pattern: BoxDevelopedPattern; compact: boolean; height?: number }) {
   const viewport = usePatternViewport();
+  const fixedHeight = height ?? (compact ? 300 : undefined);
   const viewWidth = 1000;
   const viewHeight = 620;
   const padding = 90;
@@ -102,7 +105,7 @@ function BoxPattern({ pattern, compact, height }: { pattern: BoxDevelopedPattern
   const point = (value: { x: number; y: number }) => `${originX + value.x * scale},${originY + value.y * scale}`;
 
   return (
-    <section style={{ height: height ?? (compact ? 300 : 620) }} className={`relative overflow-hidden bg-slate-100 ${viewport.dragging ? "cursor-grabbing" : "cursor-grab"}`} aria-label="박스 절곡 전개도">
+    <section style={fixedHeight === undefined ? undefined : { height: fixedHeight }} className={`relative overflow-hidden bg-slate-100 ${fixedHeight === undefined ? "h-full min-h-[240px] xl:min-h-0" : ""} ${viewport.dragging ? "cursor-grabbing" : "cursor-grab"}`} aria-label="박스 절곡 전개도">
       <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-3 rounded border border-slate-300 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-600 shadow-sm">
         <span className="text-slate-900">박스 전개도 {pattern.width.toFixed(1)} × {pattern.height.toFixed(1)} mm</span>
         <Legend color="#111827" label="재단선·코너 절개" />

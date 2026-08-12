@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
 
 import { adminRequest } from "@/components/admin/admin-api";
+import { useCommonPopup } from "@/components/ui/common-popup";
 import type {
   AdminPermissionDto,
   AdminRoleDto,
@@ -57,6 +58,7 @@ function CustomRoleEditor({
   permissions: AdminPermissionDto[];
 }) {
   const router = useRouter();
+  const { confirm: confirmPopup } = useCommonPopup();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState(role.name);
   const [description, setDescription] = useState(role.description ?? "");
@@ -64,14 +66,17 @@ function CustomRoleEditor({
   const [selected, setSelected] = useState<string[]>(role.permissions);
   const [error, setError] = useState("");
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
       role.active &&
       !active &&
-      !window.confirm(
-        `${role.name} 역할을 비활성화합니다. 계속하시겠습니까?`,
-      )
+      !(await confirmPopup({
+        title: "역할 비활성화",
+        message: `${role.name} 역할을 비활성화합니다. 이 역할을 통한 권한 부여가 중단됩니다.`,
+        confirmText: "비활성화",
+        variant: "danger",
+      }))
     ) {
       return;
     }

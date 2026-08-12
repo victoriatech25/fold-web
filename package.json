@@ -12,6 +12,7 @@
     "test:integration": "node scripts/run-integration-tests.mjs",
     "test:e2e": "node scripts/prepare-e2e.mjs && playwright test",
     "auth:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
+    "auth:ensure-local-screen-test-account": "tsx scripts/ensure-local-screen-test-account.ts",
     "auth:issue-password-reset": "tsx scripts/issue-password-reset.ts",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",

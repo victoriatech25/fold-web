@@ -1,5 +1,6 @@
 import { createFoldModelInput, type FoldModelInput, type FoldModelIssue } from "./fold-model-input";
 import type { FoldProfile } from "../fold-profile";
+import { diagnoseModelGeometry } from "./model-diagnostics";
 
 export type Bounds3D = {
   min: [number, number, number];
@@ -43,6 +44,12 @@ export type ModelGeometryWarning = {
   segmentId: string;
   requestedRadius: number;
   appliedRadius: number;
+} | {
+  code: "PROFILE_SELF_INTERSECTION";
+  message: string;
+  blockId: string;
+  segmentId: string;
+  otherSegmentId: string;
 };
 
 const modelY = (value: number) => value === 0 ? 0 : -value;
@@ -109,7 +116,7 @@ export function createFoldSurfaceModel(profile: FoldProfile): FoldSurfaceModel {
     profileId: profile.id,
     valid: result.valid,
     issues: result.issues,
-    warnings: [],
+    warnings: diagnoseModelGeometry(result.input),
     blocks,
     bounds: boundsFromPositions(positions),
   };

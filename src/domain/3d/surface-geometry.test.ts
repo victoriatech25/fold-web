@@ -18,6 +18,20 @@ const createProfile = () => {
 };
 
 describe("3D model input", () => {
+  it("samples a source arc while retaining its selection id", () => {
+    const profile = createProfile();
+    profile.blocks[0].segments = [
+      createFoldSegment({ x: 0, y: 0 }, { x: 100, y: 0 }, {
+        id: "arc-segment",
+        geometry: { kind: "arc", side: "left", sagitta: 25 },
+      }),
+    ];
+    const result = createFoldModelInput(profile);
+    expect(result.valid).toBe(true);
+    expect(result.input.blocks[0].segments.length).toBeGreaterThan(2);
+    expect(new Set(result.input.blocks[0].segments.map((item) => item.id))).toEqual(new Set(["arc-segment"]));
+    expect(result.input.blocks[0].segments.some((item) => Math.abs(item.end.y) > 0.01)).toBe(true);
+  });
   it("normalizes profile data without sharing mutable points", () => {
     const profile = createProfile();
     const result = createFoldModelInput(profile);

@@ -1,8 +1,8 @@
 # fold_web 현재 구현 현황
 
-> 기준일: 2026-07-19
+> 기준일: 2026-08-12
 >
-> 기준 브랜치/PR: `main@9d90f4c` / `#4`
+> 기준: P1·P2-A01~P2-A05 사용자 검수 완료, P2-A06 1차 화면 구현·자동 검증 및 사용자 검수 완료
 >
 > MFC 참조 프로젝트: `/Users/kyhoon/Library/Mobile Documents/com~apple~CloudDocs/회사/hicomtech/도면`
 >
@@ -10,22 +10,40 @@
 
 ## 1. 요약
 
-`fold_web`은 알루미늄 절곡 단면을 2D로 작성하고, 재질별 연신 보정을 적용해 전개 폭을 계산한 뒤 전개도와 3D 판재 모델로 검토하는 클라이언트 중심의 Next.js 프로토타입이다.
+`fold_web`은 알루미늄 절곡 단면을 작성·저장하고 재질별 연신 보정을 적용해 전개 폭을 계산한 뒤, 전개도·3D·제작 DXF로 검토하는 PostgreSQL 서버 기반 Next.js 웹서비스다.
 
 현재 핵심 편집 흐름은 실제로 동작하도록 연결되어 있다.
 
 - 일반/박스 단면 작성과 편집
 - 선 길이, 절곡 방향, 컷 타입, 각도 편집
-- 재질 프리셋과 선별 수동 연신 보정
+- 서버 발행 재질·두께·계산 기준과 선별 수동 연신 적용 제외
 - 전개 폭, 면적, 수량 계산
 - 일반/박스 전개도 생성
 - 판 두께와 내부 절곡 반경을 반영한 3D 미리보기
 - Undo/Redo와 2D·3D·전개도 선택 동기화
 - PostgreSQL 기반 독자 로그인·DB session·비밀번호 재설정
 - 단일 조직의 사용자 초대·상태·부서·역할·권한 관리
+- 회사 기본정보와 복수 사업장, 기본 사업장 단일성·비활성·검색·감사 관리
+- 조직별 거래처 자동 코드·통합 검색, 복수 담당자·고객 현장·기본 지정·비활성·감사 관리
+- 조직별 재질·두께 검색·등록·비활성·낙관적 잠금·감사, 계산 기준 필요/발행 상태 관리
+- 두께별 연신·컷 계산 규칙 개정, FIX/RATIO·네 옵션·Decimal·유효기간, 비교·검토·게시·예약·취소·감사 관리
+- 두께별 원판 규격·마감·방향·trim·중량·잔재 기준, 기본·비활성 수명주기와 설계 선택 관리
+- Zod strict 절곡 문서 v3, v1·v2 migration, 원판 물리 snapshot, Decimal 문자열, canonical JSON·checksum, 브라우저 v4 adapter
+- PostgreSQL 절곡 초안 CRUD, 1초 자동 저장, 낙관적 잠금, IndexedDB 장애 복구
+- 절곡 템플릿 분류·검색·복사, 검토·게시·폐기, 새 개정·이력·비교 화면
+- BigInt 고정 소수점 `decimal-v1`, canonical 계산 결과와 0~6자리 화면 정책
+- 16개 각 타입, FIX/RATIO, 네 연신 옵션, V-CUT 전환과 절곡별 계산 제외
+- `fold-expression-v1` 변수·계산 변수, 구간·제품 수식과 명시적 오류 안내
+- 원호 계산·Konva 편집, 교차 직선 자동 판정 박스, 내장 패널과 제품 두 번째 치수
+- 게시 패널 템플릿 snapshot·provenance와 고유 ID 적용
+- 화면과 분리된 제작 geometry, 원호 3D와 자기 교차 경고
+- DXF R2000·mm·제작 layer·SHA-256·FileAsset·출력 감사·다운로드
+- 기존 승인 20건과 파생 100건, 합계 120건 계산 회귀 기준선
 - Docker 이미지 빌드, 태그 기반 배포, 실패 시 롤백
 
-다만 아직 업무용 완성 제품보다는 계산 및 시각화 프로토타입에 가깝다. 인증·조직 권한은 서버에 연결됐지만 도면 저장/불러오기와 제작 파일 출력은 없고, 일부 도메인 기능은 코드와 단위 테스트만 존재하며 화면에서는 사용할 수 없다.
+P1 구현 기준선은 완료됐다. 운영 인프라, binary object storage, Windows 현장 프로그램 DXF 검수와 생산 업무 연결은 P2 범위이며, 실제 기계 통신은 P3 범위다.
+
+`P2-A01 회사·사업장`, `P2-A02 거래처·담당자·고객 현장`, `P2-A03 재질·두께 기준정보`, [P2-A04 연신·컷 규칙](./work-items/P2-A04-material-calculation-rules.md), [P2-A05 원판 품목](./work-items/P2-A05-sheet-items.md)은 사용자 검수까지 완료했다. [P2-A06 가격 규칙](./work-items/P2-A06-price-rules.md)은 가격등급·세 범위 가격표·게시 개정·가격 엔진·관리/미리보기 화면의 1차 구현과 자동 검증을 완료하고 사용자 화면 검수도 완료해 2026-08-12 기준으로 `P2-A06 화면 검수 완료` 상태입니다.
 
 ### 확정된 재구축 범위
 
@@ -48,14 +66,22 @@ MFC 코드, 화면과 계산 결과는 비교 근거로 사용하지만 1:1 복�
 |---|---|---|
 | 2D 단면 편집 | 구현됨 | 연속 선, 스냅, 관절 이동, 길이 수정, 닫기 지원 |
 | 일반/박스 도면 | 구현됨 | 박스는 서로 독립된 두 단면을 사용 |
-| 절곡·연신 계산 | 구현됨 | 고정/비율 엔진 존재, 현재 UI는 사실상 고정 방식만 사용 |
+| 절곡·연신 계산 | P1-10 완료 | 전체 각 타입·FIX/RATIO·네 옵션·V-CUT·양쪽 계산 제외 구현·검수 완료 |
+| 변수·수식 | P1-11 완료 | 버전 parser, 의존성·순환 검증, 구간·제품 수식, DB 왕복 구현·사용자 검수 완료 |
+| 곡선·박스·패널 | 완료 | 원호 계산·직접 편집, 교차 직선 자동 바닥 판정, 내장 패널·두 번째 치수와 문서 v3 저장 구현 |
 | 전개도 | 구현됨 | 일반 직사각형, 박스 십자형 전개도 |
 | 3D 모델 | 구현됨 | 두께 솔리드, 반경 원호, 박스 직교 모델 |
 | 재질 프리셋 | 구현됨 | 브라우저 `localStorage`에만 저장 |
-| 도면 저장/불러오기 | 도메인만 구현 | JSON 직렬화·마이그레이션은 있으나 UI와 연결되지 않음 |
-| 백엔드/DB/인증 | P1-02 완료 | PostgreSQL·Prisma 기반 독자 인증, DB session, 조직 membership, RBAC와 관리자 UI 구현 |
-| STEP/DXF/PDF 출력 | 미구현 | 화면 검토 기능만 제공 |
-| 자동 검증 | 양호 | 단위 111건, PostgreSQL 통합 17건, Playwright 4개 시나리오와 lint/typecheck/build 통과 |
+| 도면 저장/불러오기 | P1-07 완료 | PostgreSQL CRUD·자동 저장·새로고침 복원·동시 편집 충돌·IndexedDB 복구 구현·사용자 검수 완료 |
+| 템플릿 라이브러리 | P1-08 완료 | 분류·검색·복사·검토·게시·폐기·새 개정·이력·비교 구현 및 사용자 검수 완료 |
+| 공통 팝업 | 구현됨 | 전역 알림·확인·문자 입력·기능 모달, 위험 variant·초점·키보드·queue 지원 |
+| 백엔드/DB/인증 | P1-03 자동 구현 완료 | PostgreSQL·Prisma 기반 독자 인증, DB session, 조직·RBAC·감사 로그 구현 |
+| 회사·사업장 | P2-A01 완료 | 회사 프로필, 복수 사업장, 기본 사업장 단일성·비활성·검색·권한·감사 구현·검수 완료 |
+| 거래처·고객 현장 | P2-A02 완료 | 자동 코드, 통합 검색, 복수 담당자·현장, 기본 지정·비활성·권한·감사 구현·검수 완료 |
+| 원판 품목 | P2-A05 완료 | 규격·trim·면적·중량·기본/비활성, 설계 선택과 문서 v3 snapshot 구현·자동 검증·사용자 검수 완료 |
+| 가격 규칙 | P2-A06 화면 검수 완료 | 가격등급·세 scope 가격표·개정·Decimal 엔진·할증·trace·관리/미리보기 UI 구현, 사용자 검수와 20건 가격 기준선 확정 완료 |
+| 출력 | DXF 구현, STEP·PDF 미구현 | 제작 DXF 직접 다운로드 가능; PDF·파일 object storage는 P2 후속 |
+| 자동 검증 | 양호 | 단위 316건, PostgreSQL 통합 52건, Playwright 25개 시나리오와 lint/typecheck/build 통과 |
 | 배포 | 구현됨 | Docker Hub 태그 이미지와 self-hosted runner 사용 |
 
 ## 2. 시스템 구성
@@ -79,7 +105,9 @@ MFC 코드, 화면과 계산 결과는 비교 근거로 사용하지만 1:1 복�
 ```mermaid
 flowchart LR
   UI["2D 편집기 / 속성 패널"] --> STORE["MobX FoldEditorStore"]
-  STORE --> PROFILE["FoldProfile schema v3"]
+  STORE --> PROFILE["FoldProfile schema v4"]
+  PROFILE --> EXPR["fold-expression-v1"]
+  EXPR --> CALC
   PROFILE --> CALC["절곡·제품 계산"]
   PROFILE --> DEV["일반/박스 전개도 생성"]
   PROFILE --> MODEL["3D 입력 검증·반경·솔리드 생성"]
@@ -88,7 +116,12 @@ flowchart LR
   MODEL --> THREE["Three.js 미리보기"]
   SVG -->|선 선택| STORE
   THREE -->|면 선택| STORE
-  PRESET["localStorage 재질 프리셋"] <--> UI
+  PG --> RULEAPI["발행 재질 기준 API"]
+  RULEAPI --> UI
+  STORE --> ADAPTER["브라우저 v4 ↔ 서버 문서 v3"]
+  ADAPTER --> AUTOSAVE["자동 저장·IndexedDB 복구"]
+  AUTOSAVE --> API["절곡 초안 API"]
+  API --> PG["PostgreSQL / Prisma"]
 ```
 
 도면의 단일 원본은 `FoldEditorStore.profile`이다. 계산 결과, 전개도, 3D geometry는 저장하지 않고 현재 프로필에서 매 렌더링 시 파생한다. 따라서 한 화면에서 선이나 재질을 바꾸면 다른 표현도 별도 저장 과정 없이 갱신된다.
@@ -114,7 +147,7 @@ flowchart LR
 
 웹 구현과 MFC 원본을 대조할 때는 위 디렉터리를 기준 루트로 사용한다. 세부 계산 해석은 [절곡 계산 명세](./fold-calculation-spec.md)에 정리되어 있다.
 
-현재 도면 스키마 버전은 3이다. 핵심 구조는 다음과 같다.
+현재 브라우저 도면 스키마 버전은 4이고 서버 저장 문서는 v3다. 핵심 구조는 다음과 같다.
 
 ```text
 FoldProfile
@@ -125,25 +158,44 @@ FoldProfile
 │  ├─ cutAngle
 │  ├─ elongation[V-CUT | A-CUT | NO-CUT]
 │  └─ cutDepth[V-CUT | A-CUT | NO-CUT]
+├─ sheetItemSnapshot? (원판 ID·규격·마감·방향·trim·면적·중량)
 ├─ product
 │  ├─ length
-│  └─ quantity
+│  ├─ quantity
+│  ├─ formula?
+│  └─ formulaEnabled?
+├─ variables[]
+│  ├─ name
+│  ├─ value
+│  └─ formula?
 ├─ calculation
 │  ├─ mode: fixed | ratio
+│  ├─ elongationOption: standard | two-line | diagonal | ext1
 │  ├─ vCutEnabled
 │  ├─ decimalPlaces
 │  └─ decimalOperation
-└─ blocks[]
-   └─ segments[]
-      ├─ start / end
-      ├─ inputLength
-      ├─ bendAfter
-      │  ├─ direction: front | back
-      │  ├─ cutType
-      │  └─ angle
-      ├─ elongationOverride?
-      ├─ calculateElongation?
-      └─ formula?
+├─ blocks[]
+│  └─ segments[]
+│     ├─ start / end
+│     ├─ inputLength
+│     ├─ geometry: line | arc(side, sagitta)
+│     ├─ bendAfter
+│     │  ├─ direction: front | back
+│     │  ├─ form: standard | a | zero | u
+│     │  ├─ secondaryOperation? (복합 절곡)
+│     │  ├─ cutType
+│     │  └─ angle
+│     ├─ elongationOverride?
+│     ├─ calculateElongation?
+│     └─ formula?
+├─ boxDefinition? (과거 문서 읽기 호환 전용, 신규 저장·계산에는 미사용)
+│  ├─ widthBaseSegmentId
+│  └─ depthBaseSegmentId
+└─ panelAttachments[]
+   ├─ hostBlockId / hostSegmentId
+   ├─ direction
+   ├─ dimensionRole
+   └─ panel block snapshot
 ```
 
 - 일반 도면은 `block` 1개를 사용한다.
@@ -154,7 +206,7 @@ FoldProfile
 
 도메인 검증기는 빈 이름, 잘못된 재질/제품 값, 빈 도면, 중복 선 ID, 0 이하 길이, 비정상 좌표, 끊어진 선, 잘못된 절곡 각도 등을 검사한다. 빈 도면은 오류가 아니라 경고로 취급한다.
 
-JSON 직렬화와 역직렬화도 구현되어 있다. 스키마 v1의 최상위 `segments`는 v2의 첫 번째 블록으로, v2 재질은 두께를 기본 내부 절곡 반경으로 사용해 v3로 마이그레이션한다. 그러나 현재 화면에는 JSON 내보내기나 가져오기 버튼이 없다.
+브라우저 JSON 직렬화와 v1→v4 순차 migration도 구현되어 있다. 서버 문서는 strict v1·v2 입력을 v3로 올리고 원호·패널·선택 원판 물리 snapshot을 PostgreSQL JSONB에 저장한다. 과거 `boxDefinition`은 읽기 호환만 제공하고 신규 저장에서는 제거한다. 현재 화면에는 JSON 파일 내보내기나 가져오기 버튼이 없다.
 
 ## 4. 구현된 사용자 기능
 
@@ -168,6 +220,8 @@ JSON 직렬화와 역직렬화도 구현되어 있다. 스키마 v1의 최상위
 - 제품 길이 2,400 mm, 수량 10개
 
 상단에서 `절곡(2D)`, `3D`, `전개도`, `분할` 화면을 전환할 수 있다. 분할 모드는 XL 화면에서만 버튼이 보이며 2D와 3D의 가로 비율, 상단 영역과 전개도의 세로 비율을 드래그로 조정할 수 있다. 구분선을 더블 클릭하면 기본 비율로 돌아간다.
+
+작업 화면은 특정 모니터 해상도에 고정하지 않는다. XL 이상에서는 동적 viewport 높이(`dvh`)에서 헤더·초안 도구·편집 도구·계산 요약이 사용한 공간을 제외한 나머지를 도면과 속성 패널이 함께 채운다. Konva 캔버스는 `ResizeObserver`로 실제 컨테이너 폭·높이를 추적하고, 3D·전개도·분할 화면도 같은 가용 높이를 사용한다. 작은 노트북·태블릿·모바일 폭에서는 고정 viewport 모드를 해제하고 `clamp()` 기반 도면 높이와 자연 스크롤, 속성 패널 재배치를 사용한다.
 
 ### 4.2 2D 단면 편집
 
@@ -207,9 +261,9 @@ Undo 이력은 JSON 스냅샷으로 최대 50개까지 유지되며 페이지를
 
 박스 모드의 두 단면은 같은 2D 좌표 공간에 보이지만 데이터상 독립적이다. 활성 면은 실선, 비활성 면은 점선으로 표시한다. 일반 모드로 돌아가면 면 1만 유지되고 면 2 데이터는 제거되며, 이 전환 자체는 Undo할 수 있다.
 
-박스 바닥 기준선은 두 단면에서 서로 교차하는 선 후보 중 가장 긴 선으로 선택한다. 교차 후보가 없으면 각 단면의 가장 긴 선을 사용한다. 두 기준선의 실제 입력 길이가 완성 바닥 가로·세로가 된다.
+박스 바닥은 두 단면에서 서로 교차하는 직선 쌍 중 합산 길이가 가장 긴 쌍으로 자동 판정한다. 교차 쌍이 없으면 임의의 최장선을 대체 사용하지 않고 명시적 오류를 표시한다. 선택된 두 직선의 실제 입력 길이가 완성 바닥 가로·세로가 된다.
 
-### 4.4 선 속성, 재질, 포인트 정보
+### 4.4 선 속성, 변수·수식, 재질, 포인트 정보
 
 선 속성 패널에서 다음 항목을 편집한다.
 
@@ -219,20 +273,23 @@ Undo 이력은 JSON 스냅샷으로 최대 50개까지 유지되며 페이지를
 - V-CUT/A-CUT/NO-CUT
 - 절곡 각도
 - 자동 연신 보정 또는 선택 선 전용 수동 보정값
+- 직접 길이 또는 `fold-expression-v1` 구간 수식
 
-연신율 설정 패널은 다음 항목을 제공한다.
+변수·수식 패널은 대문자 문서 변수, 직접값·계산 변수, 제품 길이 수식을 제공한다. 변수명 변경은 참조 수식을 함께 바꾸고, 구문 오류·미정의 변수·0 나눗셈·순환 참조를 해당 입력 근처에 표시한다. 오류 수식 원문은 보존하고 계산 화면은 마지막 직접값/스냅샷을 사용한다. 변수 삭제 확인은 공통 팝업으로 처리한다.
 
-- 알루미늄 1T/2T/3T 기본 프리셋
+연신율 설정 패널은 서버 발행 개정의 다음 항목을 읽기 전용으로 제공한다.
+
+- 발행된 알루미늄 1T/2T/3T 기준
 - 재질명과 두께
 - 컷별 연신율
 - 내부 절곡 반경
 - 기본 컷 깊이
 - 적용 제한 각도
-- 계산 소수점 0~4자리
-- 처리 안 함/반올림/버림/올림
-- 현재 재질값을 프리셋에 저장
+- 계산 소수점 0~6자리
+- 처리 안 함/반올림(절반은 0에서 멀리)/버림(0 방향)/올림(0에서 먼 방향)
+- `decimal-v1` 정책과 최종 구간 처리 경계 안내
 
-프리셋은 `fold-web:material-presets:v1` 키로 브라우저 `localStorage`에 저장된다. 동일 ID의 프리셋은 갱신되고 새로운 ID는 추가된다. 현재 UI에는 새 프리셋 ID를 만드는 기능이 없으므로, 보통 선택된 기본 프리셋을 덮어쓰는 형태다.
+로그인 서비스에서는 `fold-web:material-presets:v1` 브라우저 프리셋을 더 이상 불러오거나 저장하지 않는다. 재질 변경은 초안 도구의 서버 발행 기준 선택으로 수행하고, 규칙 값 작성·검토·게시는 P2-A04에서 제공한다.
 
 포인트 탭은 면별 P1, P2… 목록과 좌표, 진입/진출 길이, 절곡 방향, 컷 타입, 각도를 보여준다. 닫힌 도형은 시작점과 끝점을 중복 표시하지 않는다. 행을 선택하면 대응 선도 선택된다.
 
@@ -249,7 +306,9 @@ Undo 이력은 JSON 스냅샷으로 최대 50개까지 유지되며 페이지를
 계산 길이 = 입력 길이 - 적용 보정
 ```
 
-레거시 MFC의 정수 변환은 절댓값 1 미만의 FIX 보정을 소실시키므로 `LEGACY_DEFECT`로 판정했다. 현재 웹 엔진은 합산 보정값을 소수 5자리까지 안정화해 보존하고, 최종 구간 길이에만 설정된 소수 처리 규칙을 적용한다.
+레거시 MFC의 정수 변환은 절댓값 1 미만의 FIX 보정을 소실시키므로 `LEGACY_DEFECT`로 판정했다. 현재 웹 엔진은 BigInt 기반 `decimal-v1`으로 합산 보정값을 mm 소수 6자리까지 정확히 보존하고, 최종 구간 길이에만 설정된 소수 처리 규칙을 적용한다. 계산 결과에는 화면 호환 `number`와 승인 기준 canonical Decimal 문자열을 함께 제공한다.
+
+구간 또는 제품 길이에 수식이 활성화되면 `fold-expression-v1`이 먼저 변수 의존성을 계산한다. `+-*/()`와 괄호, 대문자 변수만 실행하며 `eval`은 사용하지 않는다. 중간값은 BigInt 유리수로 정확히 계산하고 최종 mm 값은 소수 6자리로 정규화한 뒤 위의 절곡 Decimal 계산에 전달한다.
 
 #### 비율 방식
 
@@ -259,9 +318,9 @@ Undo 이력은 JSON 스냅샷으로 최대 50개까지 유지되며 페이지를
 계산 길이 = 입력 길이 - 이전 기여 - 다음 기여
 ```
 
-비율 방식은 절곡 각도가 재질의 적용 제한 각도보다 작을 때만 적용한다. 경계값과 같거나 큰 각도에는 적용하지 않는 규칙이 사용자 승인됐다. 엔진과 테스트는 구현되어 있지만 현재 UI에는 계산 방식을 고정/비율로 바꾸는 컨트롤이 없어 기본값인 `fixed`로만 사용된다.
+비율 방식은 절곡 각도가 재질의 적용 제한 각도보다 작을 때만 적용한다. 경계값과 같거나 큰 각도에는 적용하지 않는 규칙이 사용자 승인됐다. `연신율 설정`에서 FIX/RATIO를 선택할 수 있고 RATIO에서는 연신 옵션과 무관하게 이 제한각 규칙을 적용한다.
 
-선에 `elongationOverride`가 있으면 자동값 대신 수동값을 사용한다. `calculateElongation === false`이면 해당 선 끝 절곡의 기여를 절곡 양쪽 구간에서 모두 제외한다. 이 옵션은 현재 UI에 노출되지 않으며, 후속 모델·UI에서 절곡 단위 의미가 분명한 이름으로 바꿀 예정이다.
+선에 `elongationOverride`가 있으면 자동값 대신 수동값을 사용한다. `calculateElongation === false`이면 해당 선 끝 절곡의 기여를 절곡 양쪽 구간에서 모두 제외한다. 화면의 `이 절곡의 연신 계산 적용` 체크박스로 이 값을 변경할 수 있다.
 
 최종 제품 계산은 다음과 같다.
 
@@ -270,6 +329,8 @@ Undo 이력은 JSON 스냅샷으로 최대 50개까지 유지되며 페이지를
 개당 면적(m²) = 전개 폭 × 제품 길이 ÷ 1,000,000
 총면적(m²) = 개당 면적 × 수량
 ```
+
+제품 계산 결과는 MFC `IDD_WORK03_DIALOG`의 주 작업 그리드에서 폭·길이·수량을 도면보다 먼저 배치한 정보 우선순위를 참고했다. 웹에서는 표를 복제하지 않고 편집 도구 바로 아래의 가로형 `제품 크기 계산` 요약으로 재구성했다. 최종 전개 폭을 주 결과로 강조하고 제품 길이·수량 입력, 개별 크기·개당 면적·총면적을 한 줄에 모아 일반 데스크톱 화면에서 스크롤 없이 확인하고 즉시 수정할 수 있다.
 
 박스 모드는 두 단면의 전개 폭을 각각 표시하고 바닥 가로·세로와 수량을 보여준다. 전체 면적 계산은 화면에 노출하지 않는다.
 
@@ -294,7 +355,7 @@ Undo 이력은 JSON 스냅샷으로 최대 50개까지 유지되며 페이지를
 
 내부 절곡 반경이 0보다 크고 관절에 절곡 정보가 있으면 중심선 반경 `내부 반경 + 두께/2`의 접선 원호로 모서리를 치환한다. 원호 분할 간격은 최대 5°다. 인접 선이 짧아 요청 반경을 만들 수 없으면 각 선 길이의 45% 안에서 반경을 제한하고 화면에 경고한다.
 
-박스 3D는 두 기준선 길이로 바닥 가로·세로를 정하고 두 단면을 서로 직교 압출한다. 중복되는 두 번째 바닥 면은 제거한다. 박스 형상 자체에는 제품 길이를 사용하지 않는다.
+박스 3D는 자동 판정한 두 교차 직선 길이로 바닥 가로·세로를 정하고 두 단면을 서로 직교 압출한다. 중복되는 두 번째 바닥 면은 제거하며 제품 길이가 0이어도 생성된다.
 
 3D 검토 도구는 다음과 같다.
 
@@ -312,17 +373,19 @@ Undo 이력은 JSON 스냅샷으로 최대 50개까지 유지되며 페이지를
 
 ## 5. 상태 관리와 영속성
 
-현재 도면은 모듈 단위의 `FoldEditorStore` 싱글턴에만 존재한다.
+현재 편집 중 도면의 단일 상태는 모듈 단위 `FoldEditorStore` 싱글턴에 존재하고, 열린 서버 초안의 canonical 문서는 PostgreSQL에 저장한다.
 
 | 데이터 | 저장 위치 | 새로고침 후 유지 |
 |---|---|---|
-| 현재 도면과 선택 상태 | 브라우저 메모리 | 아니요 |
+| 저장된 현재 도면 | PostgreSQL `FoldRevision.document` JSONB | 예 |
+| 저장 전 복구본 | 사용자·조직·초안별 IndexedDB | 장애·새로고침 시 복구 제안 |
+| 선택 상태 | 브라우저 메모리 | 아니요 |
 | Undo/Redo 이력 | 브라우저 메모리 | 아니요 |
 | 2D/3D/전개도 카메라 | 각 React 컴포넌트 로컬 상태 | 아니요 |
 | 화면 모드와 분할 비율 | 작업 영역 로컬 상태 | 아니요 |
 | 재질 프리셋 | `localStorage` | 예 |
 
-따라서 새로고침하면 도면은 초기 예제로 돌아가고 재질 프리셋만 복원된다. 서버 전송, 사용자별 저장, 자동 저장은 없다.
+서버 초안을 열면 변경 후 1초 debounce로 전체 문서를 저장하고, 새로고침하면 같은 초안을 복원한다. 선택·Undo/Redo·카메라·분할 비율은 화면 세션에만 존재한다. 서버 저장이 끝나지 않은 변경은 IndexedDB에 보존하고 복구 여부를 묻는다. 초기 예제는 `새 초안`을 만들기 전에는 서버에 저장하지 않는다.
 
 ## 6. 서버·운영 구성
 
@@ -337,10 +400,13 @@ Undo 이력은 JSON 스냅샷으로 최대 50개까지 유지되며 페이지를
 | `/admin/roles` | 보호된 동적 화면 | system role 조회·custom role 관리 |
 | `/api/v1/auth/*` | Node.js Route Handler | session 생성·조회·폐기와 비밀번호 설정 |
 | `/api/v1/admin/*` | Node.js Route Handler | `admin.manage` 기반 사용자·부서·역할 관리 |
+| `/api/v1/fold-drafts` | Node.js Route Handler | 조직 범위 최근 초안 목록·생성 |
+| `/api/v1/fold-drafts/:draftId` | Node.js Route Handler | 초안 상세·전체 문서 저장·soft delete |
+| `/api/v1/fold-material-options` | Node.js Route Handler | 게시된 조직 재질 규칙 선택 목록 |
 | `/api/health` | 동적 Route Handler | `{ "status": "ok" }`, 캐시 금지 |
 | `/api/internal/database-smoke` | 동적 Node.js Route Handler | 기본 비활성인 PostgreSQL transaction 통합 검증 |
 
-PostgreSQL 16용 Prisma Schema·migration·비식별 seed, DB runtime 설정, singleton pool과 transaction 경계가 구현됐다. 인증은 Argon2id credential과 hash 저장 opaque session/reset token을 사용한다. 활성 membership의 활성 role permission 합집합을 요청마다 다시 읽고, 관리자 API와 application service가 `admin.manage`와 session의 `organizationId`를 모두 검사한다. 도면 저장 API와 파일 저장소는 아직 없다.
+PostgreSQL 16용 Prisma Schema·migration·비식별 seed, DB runtime 설정, singleton pool과 transaction 경계가 구현됐다. 인증은 Argon2id credential과 hash 저장 opaque session/reset token을 사용한다. 활성 membership의 활성 role permission 합집합을 요청마다 다시 읽고, 관리자 API와 application service가 `admin.manage`와 session의 `organizationId`를 모두 검사한다. 절곡 초안 API는 `template.fold.read/edit` 권한과 조직 경계를 강제하고, 생성·저장·삭제와 최소 감사 이벤트를 같은 transaction에서 처리한다. 제작 파일 저장소는 아직 없다.
 
 ### Docker
 
@@ -378,16 +444,19 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 | 경로 | 역할 |
 |---|---|
 | `src/app/page.tsx` | 단일 편집기 페이지 셸 |
+| `src/components/fold-draft-workspace.tsx` | 초안 생성·목록·자동 저장 상태·충돌·복구 UI |
 | `src/components/canvas-workspace.tsx` | 도면 타입, 도구, 화면 모드, 속성/결과 패널 통합 |
 | `src/components/konva-stage.tsx` | 2D 작성·선택·관절 편집·카메라 |
 | `src/components/developed-pattern-preview.tsx` | 일반/박스 SVG 전개도와 뷰포트 |
 | `src/components/model-3d/fold-model-preview.tsx` | Three.js 장면, 카메라, 표시 모드, 선택 |
 | `src/stores/fold-editor-store.ts` | 현재 프로필, 선택, 편집 명령, Undo/Redo |
+| `src/client/fold-draft/*` | 초안 API client, 자동 저장 queue, IndexedDB 복구본 |
 | `src/stores/material-preset-store.ts` | 재질 프리셋 `localStorage` 영속화 |
 | `src/domain/fold-profile.ts` | 스키마 v3와 생성 유틸리티 |
 | `src/domain/fold-profile-validation.ts` | 도면 유효성 검사 |
 | `src/domain/fold-profile-serialization.ts` | JSON 저장 형식과 v1/v2 마이그레이션 |
 | `src/domain/fold-calculation.ts` | MFC 호환 절곡 및 제품 계산 |
+| `src/domain/fold-expression.ts` | 버전 수식 parser, 정확 평가, 변수 의존성·순환·오류 검증 |
 | `src/domain/developed-pattern.ts` | 일반/박스 전개 형상 계산 |
 | `src/domain/fold-point-info.ts` | 면별 포인트 목록 생성 |
 | `src/domain/3d/fold-model-input.ts` | 3D 입력 정규화와 기본 검증 |
@@ -399,11 +468,16 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 | `src/app/admin/*` | 사용자·부서·역할 관리자 화면 |
 | `src/app/api/v1/auth/*` | 인증 session·비밀번호 설정 API |
 | `src/app/api/v1/admin/*` | 조직 관리자 API |
+| `src/app/api/v1/fold-drafts/*` | 절곡 초안 목록·생성·상세·저장·삭제 API |
+| `src/app/api/v1/fold-material-options/*` | 조직 게시 재질 규칙 조회 API |
 | `src/server/auth/*` | 독자 인증, DB session, token, 비밀번호와 요청 제한 |
 | `src/server/authorization/*` | permission·조직 경계 guard |
 | `src/server/admin/*` | 조직 범위 repository·관리 application service |
+| `src/server/company-settings/*` | 회사·사업장 규칙·서비스·권한·감사·API 계약 |
+| `src/server/fold-draft/*` | 조직 범위 초안 repository·service·route 계약 |
 | `prisma/schema.prisma` | PostgreSQL 16용 Prisma Schema v1 |
 | `prisma/seed.ts` | 사용자·개인정보가 없는 최소 기준정보 seed |
+| `scripts/ensure-local-screen-test-account.ts` | loopback 개발 DB 전용 고정 화면 검수 관리자 계정 보장 |
 | `src/server/config/database-env.ts` | DB URL·pool·timeout 런타임 검증 |
 | `src/server/db/prisma.ts` | 서버 전용 Prisma singleton과 PostgreSQL adapter |
 | `src/server/platform/database-smoke.ts` | transaction commit·rollback application 예제 |
@@ -414,59 +488,58 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 
 ## 8. 자동 검증 결과
 
-2026-07-19 현재 아래 명령을 로컬에서 직접 실행했다.
+2026-08-01 P2-A06 화면 검수 준비 기준으로 아래 명령을 로컬에서 직접 실행했다.
 
 | 명령 | 결과 |
 |---|---|
-| `npm test` | 성공: 17개 테스트 파일, 단위 테스트 111건 통과; DB 통합 17건은 기본 실행에서 제외 |
-| `npm run test:integration` | 성공: test DB reset·migration·seed 후 PostgreSQL 통합 테스트 17건 통과 |
-| `npm run test:e2e` | 성공: Playwright Chromium 4개 시나리오 통과 |
+| `npm test` | 성공: 단위 테스트 316건 통과; DB 통합 테스트는 기본 실행에서 제외 |
+| `npm run test:integration` | 성공: test DB reset·12개 migration·seed 후 PostgreSQL 통합 테스트 52건 통과 |
+| `npm run test:e2e` | 성공: 가격 적용·개정·공통 팝업을 포함한 Playwright Chromium 25개 시나리오 통과 |
 | `npm run lint` | 성공: ESLint 오류 없음 |
-| `npx tsc --noEmit` | 성공: TypeScript 오류 없음 |
+| `npm run typecheck` | 성공: TypeScript 오류 없음 |
 | `npm run build` | 성공: DB 환경변수 없이 Prisma generate·Next.js production build·TypeScript 검사 통과 |
+| `npm run db:validate`, `npm run db:migrate:check` | 성공: Prisma schema 유효, migration 차이 없음 |
 
 테스트가 다루는 주요 범위는 다음과 같다.
 
 - 도면 생성, 검증, 직렬화, v1/v2 마이그레이션
 - 고정/비율 연신 계산과 레거시 반올림
+- 변수 parser, 계산 변수 의존성·순환/오류, 구간·제품 수식과 계산 반영
+- 1280×720 화면의 제품 계산 요약 무스크롤 노출, 길이·수량 변경 즉시 반영, 박스 요약 전환
 - 편집 명령, 연결 유지, Undo/Redo, 도형 닫기, 박스 두 면
 - 재질 프리셋 영속화
 - 포인트 정보
 - 일반/박스 전개도
 - 3D 입력, 표면, 두께 솔리드, 박스 솔리드, 절곡 반경
 
-기본 테스트는 도메인·MobX 스토어, 인증·permission 정책과 서버 환경 검증을 다룬다. PostgreSQL 통합 테스트는 transaction, 인증 수명주기, 조직 격리, role 즉시 반영, 정지 session 폐기, 마지막 관리자 동시 변경을 확인한다. Playwright는 미인증 차단, 인증 수명주기, 관리자 UI, 초대 계정 활성화, 일반 사용자 권한 거부를 검증한다. 편집기 드래그·WebGL·반응형 시각 회귀와 배포 롤백 E2E는 아직 없다.
+기본 테스트는 도메인·MobX 스토어, 인증·permission 정책, 거래처 정규화·자동 코드·cursor, 절곡 문서 계약, 편집 정밀도, 수식 parser·의존성·오류, 자동 저장 queue와 서버 환경 검증을 다룬다. PostgreSQL 통합 테스트는 transaction, 인증 수명주기, 조직 격리, role 즉시 반영, 정지 session 폐기, 마지막 관리자 동시 변경, 거래처·담당자·고객 현장 기본값·낙관적 잠금·비활성·감사, 수식 원문·스냅샷을 포함한 절곡 문서 JSONB 왕복, 초안 CRUD·멱등·동시성·감사 불변조건을 확인한다. Playwright는 미인증 차단, 인증 수명주기, 관리자 UI, 거래처·담당자·현장 수명주기, 초안·템플릿 수명주기, 변수·구간·제품 수식 계산과 오류 표시, 390~1,920px 폭의 반응형 배치, 2D·3D·전개도·분할 높이 연동을 검증한다. 편집기 드래그·분할 리사이즈·키보드 조작의 상세 E2E, 픽셀 단위 시각 회귀와 배포 롤백 E2E는 아직 없다.
 
 ## 9. 현재 한계와 주의사항
 
 ### 우선순위 높음
 
-1. **도면이 저장되지 않는다.** 새로고침, 탭 종료, 브라우저 오류 시 현재 작업이 사라진다. JSON 직렬화 로직을 파일 저장/불러오기 또는 서버 저장 UI와 연결해야 한다.
-2. **실제 제작 기준 대조가 완료되지 않았다.** `WEB-REFERENCE-V1` 20건은 사용자 승인됐지만, 실제 제작 결과와 측정 가능한 허용 오차를 정한 확대 회귀 검증은 별도 작업이다.
-3. **편집기 시각 E2E가 없다.** 인증·관리 E2E는 있으나 드래그, 분할 리사이즈, 키보드, WebGL, 모바일 UI는 수동 테스트 계획만 있다.
-4. **박스 기준선 판별이 휴리스틱이다.** 복잡하거나 여러 번 교차하는 단면에서는 “가장 긴 교차 선”이 사용자가 의도한 바닥 선이 아닐 수 있다. 명시적 기준선 선택 기능이 필요하다.
+1. **현장 DXF 수동 검수가 남아 있다.** Windows 실행 환경이 없어 실제 현장 프로그램의 열기·원점·레이어 검증은 사용자가 수행한다.
+2. **실제 제작 공차 표본이 부족하다.** 120건 계산 회귀는 확보했지만 제작 측정값과 장비별 허용 오차는 P2에서 축적한다.
+3. **WebGL 픽셀 회귀는 제한적이다.** 3D 도메인 좌표·선택 시험은 있으나 GPU별 픽셀 동일성을 합격 조건으로 두지 않았다.
 
 ### 기능 노출 불일치
 
-- `ratio` 계산 엔진은 있지만 UI에서 선택할 수 없다.
-- `vCutEnabled`를 끄는 엔진/전개도 로직은 있지만 UI 컨트롤이 없다.
-- 선별 `calculateElongation=false`와 `formula` 필드는 있으나 UI와 연결되지 않는다.
-- JSON 저장/불러오기와 스키마 마이그레이션은 화면에서 접근할 수 없다.
+- 직접 JSON 파일 가져오기·내보내기와 과거 파일 schema migration UI는 없다. 서버 초안 저장·불러오기는 화면에서 사용할 수 있다.
 - 컷 깊이는 도메인상 컷별 값이지만 UI의 “기본 컷 깊이”를 바꾸면 세 컷 타입에 같은 값을 기록한다.
-- 프로필 이름, ID, 생성/수정 시각은 모델에 있으나 관리 UI가 없다.
+- 프로필 이름과 최근 초안 수정시각은 화면에 노출된다. 내부 ID와 상세 개정 이력 관리는 P1-08 범위다.
 
 ### 편집 및 상태 제약
 
 - 제품 길이와 수량 변경은 Undo 체크포인트를 만들지 않는다.
-- “새 도면”은 새 프로필 ID를 만드는 것이 아니라 기존 프로필의 선 블록만 비우며 재질·제품·계산 설정을 유지한다.
+- `내용 초기화`는 현재 초안의 선 블록만 비우며 재질·제품·계산 설정을 유지한다. 별도 `새 초안`은 새 서버 초안을 만든다.
 - 모든 편집 상태가 전역 싱글턴 하나에 있어 여러 도면을 동시에 열 수 없다.
-- 재질 프리셋은 브라우저와 기기에 종속되며 공유·백업되지 않는다.
-- 박스 3D는 형상 계산에 제품 길이를 쓰지 않지만 공통 3D 입력 검증이 `product.length > 0`을 요구한다. 길이 0인 외부 도면을 향후 불러오면 박스 3D도 유효하지 않게 판정될 수 있다.
+- 재질과 계산 기준은 서버 발행 개정만 사용한다. 브라우저 `localStorage` 재질 프리셋 편집 UI는 제거했으며 규칙 작성·비교·검토·게시 UI는 P2-A04에서 구현했다.
+- 박스는 두 단면의 교차 직선으로 바닥 가로·세로를 자동 판정하며 제품 길이가 0이어도 3D·전개·제조 형상을 계산한다. 교차 직선이 없으면 임의 기준선으로 대체하지 않고 오류를 표시한다.
 
 ### 3D 및 출력 제약
 
-- STEP, DXF, SVG, PDF 등 제작/교환 파일 출력이 없다.
-- 자기 교차 단면이나 두께 오프셋 충돌을 별도로 탐지하지 않는다.
+- DXF는 직접 다운로드할 수 있다. STEP·SVG·PDF와 DXF binary 재보관은 아직 없다.
+- 중심선 자기 교차는 경고하지만 모든 두께 offset 국부 충돌까지 판정하지 않는다.
 - miter는 단순 길이 제한 방식이며 실제 가공 조인트 규칙과 다를 수 있다.
 - 절곡 반경은 중심선 원호를 다각형으로 근사한 시각 검토용 구현이다.
 - 3D는 GPU/WebGL 환경에 의존한다.
@@ -479,19 +552,35 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 
 ## 10. 권장 다음 작업
 
-1. P1-03에서 관리·인증·출력의 append-only 감사 조회와 전후 비교 형식을 완성한다.
-2. P1-04에서 실제 전송 없이 기계 연동 `planned` 항목과 읽기 계약을 노출한다.
-3. P1-05~07에서 절곡 필드 계약과 Prisma 기반 도면 저장·자동 저장·복원을 연결한다.
-4. 계산 방식, V-CUT 적용 여부, 선별 계산 제외를 UI에 노출하고 설정별 회귀 테스트를 추가한다.
-5. Playwright로 핵심 편집 흐름과 2D/3D/전개도 선택 동기화를 자동화한다.
-6. 박스 기준선을 사용자가 직접 지정할 수 있게 하고 복잡 형상 검증을 추가한다.
-7. 합의된 MFC 기준 샘플로 전개 폭과 절곡 반경 치수를 대조한다.
-8. 제작 출력은 P1-14~16의 geometry·DXF 순서로 구현한다.
+1. WEB-REFERENCE 기반 가격 20건 기대 금액을 확정하고 자동 회귀 fixture로 고정한다.
+2. 가격 규칙의 서버 전용 bulk/resolve/calculate-sheet·DRAFT preview와 게시 전 coverage·diff 계약을 보강한다.
+3. [P2-A07 수주 기본정보 상세계획](./work-items/P2-A07-order-header.md)의 수주번호·초기 상태·취소·담당자·복사 규칙을 승인한 뒤 구현한다.
+4. 이후 `P2-A08` 불변 절곡 작업 snapshot, `P2-A09` 계산·가격 snapshot, `P2-A10` 승인·생산 상태, `P2-A11` 검색·이력을 순서대로 연결한다. 운영 인프라는 필요한 작업 직전에 결정하고 실제 기계 통신은 P3에서 구현한다.
 
 ## 11. 관련 문서
 
 - [MFC 도면Pro 웹 재구축 종합 설계](./web-rebuild-architecture.md)
 - [전체 프로젝트 작업계획서](./project-work-plan.md)
+- [P2 실행계획](./work-items/P2-execution-plan.md)
+- [P2-A01 회사·사업장 상세계획](./work-items/P2-A01-company-and-business-sites.md)
+- [P2-A01 화면 테스트 가이드](./P2-A01-screen-test-guide.md)
+- [P2-A02 거래처·담당자·고객 현장 상세계획](./work-items/P2-A02-customer-contacts-sites.md)
+- [P2-A02 화면 테스트 가이드](./P2-A02-screen-test-guide.md)
+- [P2-A03 재질·두께 상세계획](./work-items/P2-A03-materials-thickness.md)
+- [P2-A03 화면 테스트 가이드](./P2-A03-screen-test-guide.md)
+- [P2-A04 연신·컷 규칙 상세계획](./work-items/P2-A04-material-calculation-rules.md)
+- [P2-A04 화면 테스트 가이드](./P2-A04-screen-test-guide.md)
+- [P2-A05 원판 품목 상세계획](./work-items/P2-A05-sheet-items.md)
+- [P2-A05 화면 테스트 가이드](./P2-A05-screen-test-guide.md)
+- [P2-A06 가격 규칙 상세계획](./work-items/P2-A06-price-rules.md)
+- [P2-A06 가격 규칙 화면 테스트 가이드](./P2-A06-screen-test-guide.md)
+- [P1-07 절곡 초안 저장](./work-items/P1-07-fold-draft-persistence.md)
+- [P1-08 절곡 템플릿 라이브러리](./work-items/P1-08-fold-template-library.md)
+- [P1-09 Decimal 계산 정책](./work-items/P1-09-decimal-policy.md)
+- [P1-10 전체 각 타입·연신](./work-items/P1-10-bend-types-and-elongation.md)
+- [P1-11 변수·수식](./work-items/P1-11-variables-and-formulas.md)
+- [P1-12 곡선·박스·패널](./work-items/P1-12-curves-box-panels.md)
+- [로컬 화면 테스트 계정](./local-screen-test-account.md)
 - [세부 작업계획 템플릿](./work-item-template.md)
 - [절곡 계산 명세](./fold-calculation-spec.md)
 - [3D 모델 설계 및 단계 기록](./threejs-model-plan.md)

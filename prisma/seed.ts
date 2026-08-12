@@ -10,6 +10,8 @@ import {
   permissionCatalog,
   systemRoleDefinitions,
 } from "../src/domain/permission";
+import { calculateMaterialRuleChecksum } from "../src/server/material-rules/material-rule-policy";
+import { calculatePriceRevisionChecksum } from "../src/server/pricing/pricing-policy";
 
 const connectionString =
   process.env.DATABASE_URL ??
@@ -33,6 +35,40 @@ async function seed() {
         companyProfile: { create: {} },
       },
     });
+
+    await tx.companyProfile.upsert({
+      where: { organizationId: organization.id },
+      update: {},
+      create: { organizationId: organization.id },
+    });
+
+    const existingDefaultSite = await tx.businessSite.findFirst({
+      where: {
+        organizationId: organization.id,
+        isDefault: true,
+        active: true,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!existingDefaultSite) {
+      await tx.businessSite.upsert({
+        where: {
+          organizationId_code: {
+            organizationId: organization.id,
+            code: "MAIN",
+          },
+        },
+        update: { active: true, isDefault: true, deletedAt: null },
+        create: {
+          organizationId: organization.id,
+          code: "MAIN",
+          name: "본사",
+          type: "HEAD_OFFICE",
+          isDefault: true,
+        },
+      });
+    }
 
     const permissionRows = await Promise.all(
       permissionCatalog.map(({ key, description }) =>
@@ -122,12 +158,14 @@ async function seed() {
       },
       update: {
         name: "알루미늄",
+        normalizedName: "알루미늄",
         active: true,
       },
       create: {
         organizationId: organization.id,
         code: "AL",
         name: "알루미늄",
+        normalizedName: "알루미늄",
         densityKgPerM3: "2700",
       },
     });
@@ -138,7 +176,14 @@ async function seed() {
       { code: "AL-3T", name: "알루미늄 3T", thickness: "3", v: "1.8", a: "1.2", noCut: "3" },
     ] as const;
 
-    for (const preset of presets) {
+    const pricingVariants: Array<{ id: string; code: string; material: string; bend: string; vCut: string; sheetItemId: string }> = [];
+    const localPriceRates = [
+      { material: "20000", bend: "1000", vCut: "500" },
+      { material: "30000", bend: "1200", vCut: "600" },
+      { material: "40000", bend: "1500", vCut: "800" },
+    ] as const;
+
+    for (const [index, preset] of presets.entries()) {
       const variant = await tx.materialVariant.upsert({
         where: {
           organizationId_code: {
@@ -160,6 +205,23 @@ async function seed() {
         },
       });
 
+      const ruleFields = {
+        calculationMode: "FIXED" as const,
+        elongationOption: "STANDARD" as const,
+        vCutEnabled: true,
+        decimalPlaces: 1,
+        decimalOperation: "ROUND" as const,
+        cutAngleDeg: "135",
+        insideBendRadiusMm: preset.thickness,
+        elongationVCutMm: preset.v,
+        elongationACutMm: preset.a,
+        elongationNoCutMm: preset.noCut,
+        cutDepthVCutMm: "0.5",
+        cutDepthACutMm: "0.5",
+        cutDepthNoCutMm: "0",
+        changeSummary: "로컬 기준 계산 규칙",
+      };
+      const contentChecksumSha256 = calculateMaterialRuleChecksum(ruleFields);
       await tx.materialRuleRevision.upsert({
         where: {
           materialVariantId_revisionNumber: {
@@ -167,27 +229,144 @@ async function seed() {
             revisionNumber: 1,
           },
         },
-        update: {},
+        update: { elongationOption: "STANDARD", contentChecksumSha256 },
         create: {
           organizationId: organization.id,
           materialVariantId: variant.id,
           revisionNumber: 1,
           status: RevisionStatus.PUBLISHED,
-          calculationMode: "FIXED",
-          vCutEnabled: true,
-          decimalPlaces: 1,
-          decimalOperation: "ROUND",
-          cutAngleDeg: "135",
-          elongationVCutMm: preset.v,
-          elongationACutMm: preset.a,
-          elongationNoCutMm: preset.noCut,
-          cutDepthVCutMm: "0.5",
-          cutDepthACutMm: "0.5",
-          cutDepthNoCutMm: "0",
+          ...ruleFields,
+          contentChecksumSha256,
           publishedAt: new Date("2026-07-19T00:00:00.000Z"),
         },
       });
+
+      const sheetCode = `${preset.code}-SHEET-1220X2440`;
+      const existingDefaultSheet = await tx.sheetItem.findFirst({
+        where: { organizationId: organization.id, materialVariantId: variant.id, isDefault: true, active: true, deletedAt: null },
+        select: { code: true },
+      });
+      const keepSeedSheetAsDefault = !existingDefaultSheet || existingDefaultSheet.code === sheetCode;
+      const sheetItem = await tx.sheetItem.upsert({
+        where: {
+          organizationId_code: {
+            organizationId: organization.id,
+            code: sheetCode,
+          },
+        },
+        update: {
+          name: `${preset.name} 1220×2440 기본 원판`,
+          finishName: "평판",
+          normalizedFinishName: "평판",
+          active: true,
+          isDefault: keepSeedSheetAsDefault,
+          deletedAt: null,
+        },
+        create: {
+          organizationId: organization.id,
+          materialVariantId: variant.id,
+          code: sheetCode,
+          name: `${preset.name} 1220×2440 기본 원판`,
+          finishName: "평판",
+          normalizedFinishName: "평판",
+          widthMm: "1220",
+          lengthMm: "2440",
+          isDefault: keepSeedSheetAsDefault,
+        },
+      });
+      const localRates = localPriceRates[index]!;
+      pricingVariants.push({ id: variant.id, code: variant.code, ...localRates, sheetItemId: sheetItem.id });
     }
+
+    const defaultTier = await tx.priceTier.upsert({
+      where: { organizationId_code: { organizationId: organization.id, code: "BASIC" } },
+      update: { name: "기본", description: "로컬 화면 검수용 기본 가격등급", isDefault: true, active: true, deletedAt: null },
+      create: { organizationId: organization.id, code: "BASIC", name: "기본", description: "로컬 화면 검수용 기본 가격등급", isDefault: true },
+    });
+    const preferredTier = await tx.priceTier.upsert({
+      where: { organizationId_code: { organizationId: organization.id, code: "SCREEN_PREFERRED" } },
+      update: { name: "화면검수 우대", description: "LOCAL TEST ONLY / 운영 사용 금지", active: true, deletedAt: null },
+      create: { organizationId: organization.id, code: "SCREEN_PREFERRED", name: "화면검수 우대", description: "LOCAL TEST ONLY / 운영 사용 금지", sortOrder: 10 },
+    });
+    const testCustomer = await tx.customer.upsert({
+      where: { organizationId_code: { organizationId: organization.id, code: "SCREEN-PRICE" } },
+      update: { name: "화면검수 가격 거래처", normalizedName: "화면검수가격거래처", priceTierId: preferredTier.id, active: true, deletedAt: null },
+      create: { organizationId: organization.id, code: "SCREEN-PRICE", name: "화면검수 가격 거래처", normalizedName: "화면검수가격거래처", type: "SALES", priceTierId: preferredTier.id, memo: "LOCAL TEST ONLY / 운영 사용 금지" },
+    });
+
+    async function ensurePublishedPriceBook(input: {
+      code: string;
+      name: string;
+      scopeType: "STANDARD" | "TIER" | "CUSTOMER";
+      priceTierId?: string;
+      customerId?: string;
+      rates: Array<{ materialVariantId: string; material: string; bend: string; vCut: string }>;
+      includeSheetRates?: boolean;
+      includeSurcharge?: boolean;
+    }) {
+      const book = await tx.priceBook.upsert({
+        where: { organizationId_code: { organizationId: organization.id, code: input.code } },
+        update: { name: input.name, active: true, deletedAt: null },
+        create: { organizationId: organization.id, code: input.code, name: input.name, scopeType: input.scopeType, priceTierId: input.priceTierId, customerId: input.customerId },
+      });
+      const foldRates = input.rates.map((item) => ({ materialVariantId: item.materialVariantId, materialRatePerM2Krw: item.material, bendRatePerOperationKrw: item.bend, vCutRatePerMeterKrw: item.vCut }));
+      const sheetRates = input.includeSheetRates
+        ? pricingVariants.map((item, index) => ({ sheetItemId: item.sheetItemId, materialPricePerSheetKrw: ["47000", "65000", "88000"][index], processingPricePerSheetKrw: ["18000", "22000", "28000"][index] }))
+        : [];
+      const surchargePolicy = input.includeSurcharge ? { minimumBendOperations: 3, ratePercent: "10", baseType: "PROCESSING_ONLY" as const } : null;
+      const fields = { changeSummary: "LOCAL TEST ONLY / 운영 사용 금지", foldRates, sheetRates, surchargePolicy };
+      const revision = await tx.priceBookRevision.upsert({
+        where: { priceBookId_revisionNumber: { priceBookId: book.id, revisionNumber: 1 } },
+        update: { contentChecksumSha256: calculatePriceRevisionChecksum(fields), status: "PUBLISHED", effectiveFrom: new Date("2026-07-19T00:00:00.000Z") },
+        create: { organizationId: organization.id, priceBookId: book.id, revisionNumber: 1, status: "PUBLISHED", changeSummary: fields.changeSummary, contentChecksumSha256: calculatePriceRevisionChecksum(fields), effectiveFrom: new Date("2026-07-19T00:00:00.000Z"), publishedAt: new Date("2026-07-19T00:00:00.000Z") },
+      });
+      for (const item of foldRates) {
+        await tx.foldPriceRate.upsert({
+          where: { priceBookRevisionId_materialVariantId: { priceBookRevisionId: revision.id, materialVariantId: item.materialVariantId } },
+          update: item,
+          create: { organizationId: organization.id, priceBookRevisionId: revision.id, ...item },
+        });
+      }
+      for (const item of sheetRates) {
+        await tx.sheetPriceRate.upsert({
+          where: { priceBookRevisionId_sheetItemId: { priceBookRevisionId: revision.id, sheetItemId: item.sheetItemId } },
+          update: item,
+          create: { organizationId: organization.id, priceBookRevisionId: revision.id, ...item },
+        });
+      }
+      if (surchargePolicy) {
+        await tx.surchargePolicy.upsert({
+          where: { priceBookRevisionId: revision.id },
+          update: surchargePolicy,
+          create: { organizationId: organization.id, priceBookRevisionId: revision.id, ...surchargePolicy },
+        });
+      }
+    }
+
+    await ensurePublishedPriceBook({
+      code: "STANDARD",
+      name: "기본 가격표 · LOCAL TEST ONLY",
+      scopeType: "STANDARD",
+      rates: pricingVariants.map((item) => ({ materialVariantId: item.id, material: item.material, bend: item.bend, vCut: item.vCut })),
+      includeSheetRates: true,
+      includeSurcharge: true,
+    });
+    await ensurePublishedPriceBook({
+      code: "TIER-SCREEN-PREFERRED",
+      name: "화면검수 우대 가격표",
+      scopeType: "TIER",
+      priceTierId: preferredTier.id,
+      rates: [{ materialVariantId: pricingVariants[0]!.id, material: "18000", bend: "900", vCut: "450" }],
+    });
+    await ensurePublishedPriceBook({
+      code: "CUSTOMER-SCREEN-PRICE",
+      name: "화면검수 거래처 전용 가격표",
+      scopeType: "CUSTOMER",
+      customerId: testCustomer.id,
+      rates: [{ materialVariantId: pricingVariants[0]!.id, material: "17000", bend: "800", vCut: "400" }],
+    });
+
+    void defaultTier;
 
     await tx.foldCategory.upsert({
       where: {

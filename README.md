@@ -1,3 +1,7 @@
+# FOLD WEB
+
+절곡 업무 플랫폼의 로컬 실행과 화면 검수 문서는 [수동 화면 테스트 가이드](./docs/manual-screen-test-guide.md)를 참고한다. 해당 문서에는 서버 주소, 테스트 계정, 메뉴 위치, 재현 단계, 기대 결과, 실패 기록 양식이 정리되어 있다.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

@@ -32,13 +32,13 @@ test("동일한 로그인 오류를 표시한다", async ({ page }) => {
 test("로그인, 새로고침 유지, 로그아웃 수명주기를 완료한다", async ({ page }) => {
   await loginAsAdministrator(page);
   await expect(
-    page.getByRole("heading", { name: "절곡 단면 편집기" }),
+    page.getByRole("heading", { name: "업무 홈" }),
   ).toBeVisible();
-  await expect(page.getByText("브라우저 검증 관리자")).toBeVisible();
+  await expect(page.getByText("브라우저 검증 관리자").first()).toBeVisible();
 
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "절곡 단면 편집기" }),
+    page.getByRole("heading", { name: "업무 홈" }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "로그아웃" }).click();
@@ -80,7 +80,7 @@ test("관리자 UI에서 조직 설정과 사용자 수명주기를 완료한다
   await page.getByRole("button", { name: "역할 추가" }).click();
   await expect(page.getByText("E2E_SUPPORT", { exact: true })).toBeVisible();
 
-  await page.getByRole("link", { name: "사용자" }).click();
+  await page.getByRole("link", { name: "조직 관리" }).click();
   await page.getByLabel("이메일").fill("e2e-viewer@example.test");
   await page.locator('input[name="displayName"]').fill("E2E 조회자");
   await page
@@ -160,9 +160,14 @@ test("관리자 UI에서 조직 설정과 사용자 수명주기를 완료한다
   await expect(
     page.getByRole("heading", { name: "감사 로그" }),
   ).toBeVisible();
-  await expect(page.getByText("admin.user_invited", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("authorization.permission_denied", { exact: true }).first(),
+    page.getByRole("table").getByText("admin.user_invited", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("table")
+      .getByText("authorization.permission_denied", { exact: true })
+      .first(),
   ).toBeVisible();
   await page.getByRole("button", { name: "사용자 초대" }).first().click();
   await expect(

@@ -1,5 +1,6 @@
 import type { FoldProfile } from "../fold-profile";
 import { createRoundedFoldModelInput } from "./bend-radius";
+import { diagnoseModelGeometry } from "./model-diagnostics";
 import { createFoldModelInput, type FoldModelBlockInput, type FoldModelInput } from "./fold-model-input";
 import {
   boundsFromPositions,
@@ -130,7 +131,7 @@ export function createFoldSolidModel(profile: FoldProfile): FoldSurfaceModel {
     profileId: profile.id,
     valid: result.valid,
     issues: result.issues,
-    warnings: rounded.warnings,
+    warnings: [...diagnoseModelGeometry(result.input), ...rounded.warnings],
     blocks,
     bounds: boundsFromPositions(blocks.flatMap((block) => block.positions)),
   };

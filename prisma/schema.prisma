@@ -56,6 +56,28 @@ enum DecimalOperation {
   CEIL
 }
 
+enum MaterialElongationOption {
+  STANDARD
+  TWO_LINE
+  DIAGONAL
+  EXT1
+}
+
+enum SheetRotationPolicy {
+  FREE
+  KEEP_GRAIN
+}
+
+enum SheetGrainAxis {
+  NONE
+  WIDTH
+  LENGTH
+}
+
+enum SheetInventoryUnit {
+  SHEET
+}
+
 enum FileAssetKind {
   FOLD_DOCUMENT
   PREVIEW
@@ -75,6 +97,36 @@ enum FileAssetStatus {
 enum MachineIntegrationStatus {
   PLANNED
   DISABLED
+}
+
+enum BusinessSiteType {
+  HEAD_OFFICE
+  FACTORY
+  BRANCH
+  OTHER
+}
+
+enum CustomerType {
+  SALES
+  PURCHASE
+  TEMPORARY
+  INTERNAL
+  OTHER
+}
+
+enum PriceScopeType {
+  STANDARD
+  TIER
+  CUSTOMER
+}
+
+enum SalesOrderStatus {
+  DRAFT
+  CANCELLED
+}
+
+enum SurchargeBaseType {
+  PROCESSING_ONLY
 }
 
 enum AuditCategory {
@@ -104,18 +156,30 @@ model Organization {
   code                     String                    @unique @db.VarChar(50)
   name                     String                    @db.VarChar(200)
   status                   OrganizationStatus        @default(ACTIVE)
+  lockVersion              Int                       @default(1)
   createdAt                DateTime                  @default(now()) @db.Timestamptz(6)
   updatedAt                DateTime                  @updatedAt @db.Timestamptz(6)
   companyProfile           CompanyProfile?
+  customerCodeCounter      CustomerCodeCounter?
+  businessSites            BusinessSite[]
   memberships              OrganizationMembership[]
   departments              Department[]
   roles                    Role[]
   customers                Customer[]
   customerContacts         CustomerContact[]
-  sites                    Site[]
+  customerSites            CustomerSite[]
+  salesOrders              SalesOrder[]
+  salesOrderNumberCounters SalesOrderNumberCounter[]
+  priceTiers               PriceTier[]
+  priceBooks               PriceBook[]
+  priceBookRevisions       PriceBookRevision[]
+  foldPriceRates           FoldPriceRate[]
+  sheetPriceRates          SheetPriceRate[]
+  surchargePolicies        SurchargePolicy[]
   materials                Material[]
   materialVariants         MaterialVariant[]
   materialRuleRevisions    MaterialRuleRevision[]
+  sheetItems               SheetItem[]
   foldCategories           FoldCategory[]
   foldTemplates            FoldTemplate[]
   foldRevisions            FoldRevision[]
@@ -136,30 +200,68 @@ model CompanyProfile {
   postalCode                 String?      @db.VarChar(20)
   addressLine1               String?      @db.VarChar(300)
   addressLine2               String?      @db.VarChar(300)
+  lockVersion                Int          @default(1)
   createdAt                  DateTime     @default(now()) @db.Timestamptz(6)
   updatedAt                  DateTime     @updatedAt @db.Timestamptz(6)
   organization               Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
+model BusinessSite {
+  id                         String           @id @default(uuid()) @db.Uuid
+  organizationId             String           @db.Uuid
+  code                       String           @db.VarChar(50)
+  name                       String           @db.VarChar(200)
+  type                       BusinessSiteType @default(OTHER)
+  businessRegistrationNumber String?          @db.VarChar(20)
+  representativeName         String?          @db.VarChar(100)
+  phone                      String?          @db.VarChar(30)
+  email                      String?          @db.VarChar(320)
+  postalCode                 String?          @db.VarChar(20)
+  addressLine1               String?          @db.VarChar(300)
+  addressLine2               String?          @db.VarChar(300)
+  isDefault                  Boolean          @default(false)
+  active                     Boolean          @default(true)
+  lockVersion                Int              @default(1)
+  deletedAt                  DateTime?        @db.Timestamptz(6)
+  createdAt                  DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime         @updatedAt @db.Timestamptz(6)
+  organization               Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, code])
+  @@index([organizationId, active, name])
+  @@index([organizationId, isDefault])
+}
+
 model User {
-  id                             String                   @id @default(uuid()) @db.Uuid
-  email                          String                   @unique @db.VarChar(320)
-  normalizedEmail                String                   @unique @db.VarChar(320)
-  displayName                    String                   @db.VarChar(100)
-  status                         UserStatus               @default(INVITED)
-  lastLoginAt                    DateTime?                @db.Timestamptz(6)
-  createdAt                      DateTime                 @default(now()) @db.Timestamptz(6)
-  updatedAt                      DateTime                 @updatedAt @db.Timestamptz(6)
-  passwordCredential             PasswordCredential?
-  sessions                       AuthSession[]
-  passwordResetTokens            PasswordResetToken[]
-  memberships                    OrganizationMembership[]
-  createdMaterialRuleRevisions   MaterialRuleRevision[]   @relation("MaterialRuleCreatedBy")
-  publishedMaterialRuleRevisions MaterialRuleRevision[]   @relation("MaterialRulePublishedBy")
-  createdFoldRevisions           FoldRevision[]           @relation("FoldRevisionCreatedBy")
-  publishedFoldRevisions         FoldRevision[]           @relation("FoldRevisionPublishedBy")
-  uploadedFileAssets             FileAsset[]              @relation("FileAssetUploadedBy")
-  auditEvents                    AuditEvent[]             @relation("AuditActor")
+  id                              String                   @id @default(uuid()) @db.Uuid
+  email                           String                   @unique @db.VarChar(320)
+  normalizedEmail                 String                   @unique @db.VarChar(320)
+  displayName                     String                   @db.VarChar(100)
+  status                          UserStatus               @default(INVITED)
+  lastLoginAt                     DateTime?                @db.Timestamptz(6)
+  createdAt                       DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt                       DateTime                 @updatedAt @db.Timestamptz(6)
+  passwordCredential              PasswordCredential?
+  sessions                        AuthSession[]
+  passwordResetTokens             PasswordResetToken[]
+  memberships                     OrganizationMembership[]
+  createdMaterialRuleRevisions    MaterialRuleRevision[]   @relation("MaterialRuleCreatedBy")
+  updatedMaterialRuleRevisions    MaterialRuleRevision[]   @relation("MaterialRuleUpdatedBy")
+  statusChangedMaterialRules      MaterialRuleRevision[]   @relation("MaterialRuleStatusChangedBy")
+  deletedMaterialRuleRevisions    MaterialRuleRevision[]   @relation("MaterialRuleDeletedBy")
+  publishedMaterialRuleRevisions  MaterialRuleRevision[]   @relation("MaterialRulePublishedBy")
+  createdPriceBookRevisions       PriceBookRevision[]      @relation("PriceBookRevisionCreatedBy")
+  updatedPriceBookRevisions       PriceBookRevision[]      @relation("PriceBookRevisionUpdatedBy")
+  statusChangedPriceBookRevisions PriceBookRevision[]      @relation("PriceBookRevisionStatusChangedBy")
+  deletedPriceBookRevisions       PriceBookRevision[]      @relation("PriceBookRevisionDeletedBy")
+  publishedPriceBookRevisions     PriceBookRevision[]      @relation("PriceBookRevisionPublishedBy")
+  createdFoldRevisions            FoldRevision[]           @relation("FoldRevisionCreatedBy")
+  updatedFoldRevisions            FoldRevision[]           @relation("FoldRevisionUpdatedBy")
+  statusChangedFoldRevisions      FoldRevision[]           @relation("FoldRevisionStatusChangedBy")
+  deletedFoldRevisions            FoldRevision[]           @relation("FoldRevisionDeletedBy")
+  publishedFoldRevisions          FoldRevision[]           @relation("FoldRevisionPublishedBy")
+  uploadedFileAssets              FileAsset[]              @relation("FileAssetUploadedBy")
+  auditEvents                     AuditEvent[]             @relation("AuditActor")
 
   @@index([status])
   @@index([displayName])
@@ -242,6 +344,8 @@ model OrganizationMembership {
   user           User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   department     Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   roles          MembershipRole[]
+  ownedSalesOrders SalesOrder[] @relation("SalesOrderOwner")
+  cancelledSalesOrders SalesOrder[] @relation("SalesOrderCanceller")
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -298,67 +402,146 @@ model RolePermission {
 }
 
 model Customer {
+  id                         String            @id @default(uuid()) @db.Uuid
+  organizationId             String            @db.Uuid
+  priceTierId                String?           @db.Uuid
+  code                       String            @db.VarChar(50)
+  type                       CustomerType      @default(SALES)
+  name                       String            @db.VarChar(200)
+  normalizedName             String            @db.VarChar(200)
+  businessRegistrationNumber String?           @db.VarChar(20)
+  representativeName         String?           @db.VarChar(100)
+  phone                      String?           @db.VarChar(30)
+  fax                        String?           @db.VarChar(30)
+  email                      String?           @db.VarChar(320)
+  website                    String?           @db.VarChar(500)
+  postalCode                 String?           @db.VarChar(20)
+  addressLine1               String?           @db.VarChar(300)
+  addressLine2               String?           @db.VarChar(300)
+  taxInvoiceEnabled          Boolean           @default(true)
+  memo                       String?           @db.Text
+  active                     Boolean           @default(true)
+  lockVersion                Int               @default(1)
+  deletedAt                  DateTime?         @db.Timestamptz(6)
+  createdAt                  DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime          @updatedAt @db.Timestamptz(6)
+  organization               Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  priceTier                  PriceTier?        @relation(fields: [priceTierId], references: [id], onDelete: SetNull)
+  contacts                   CustomerContact[]
+  sites                      CustomerSite[]
+  priceBooks                 PriceBook[]
+  salesOrders                SalesOrder[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, normalizedName])
+  @@index([organizationId, type, active, deletedAt])
+  @@index([organizationId, active, deletedAt])
+  @@index([priceTierId])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Customer_name_trgm_idx")
+  @@index([code(ops: raw("gin_trgm_ops"))], type: Gin, map: "Customer_code_trgm_idx")
+}
+
+model CustomerCodeCounter {
+  organizationId String       @id @db.Uuid
+  nextValue      Int          @default(1)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model CustomerContact {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  customerId     String        @db.Uuid
+  customerSiteId String?       @db.Uuid
+  name           String        @db.VarChar(100)
+  department     String?       @db.VarChar(100)
+  title          String?       @db.VarChar(100)
+  phone          String?       @db.VarChar(30)
+  mobile         String?       @db.VarChar(30)
+  email          String?       @db.VarChar(320)
+  isPrimary      Boolean       @default(false)
+  active         Boolean       @default(true)
+  lockVersion    Int           @default(1)
+  deletedAt      DateTime?     @db.Timestamptz(6)
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(6)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer       Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerSite   CustomerSite? @relation(fields: [customerSiteId], references: [id], onDelete: Restrict)
+  salesOrders    SalesOrder[]
+
+  @@index([organizationId, customerId, active, deletedAt])
+  @@index([customerSiteId])
+}
+
+model CustomerSite {
   id             String            @id @default(uuid()) @db.Uuid
   organizationId String            @db.Uuid
+  customerId     String            @db.Uuid
   code           String            @db.VarChar(50)
   name           String            @db.VarChar(200)
-  normalizedName String            @db.VarChar(200)
-  businessNumber String?           @db.VarChar(20)
   phone          String?           @db.VarChar(30)
-  email          String?           @db.VarChar(320)
+  postalCode     String?           @db.VarChar(20)
+  addressLine1   String?           @db.VarChar(300)
+  addressLine2   String?           @db.VarChar(300)
   memo           String?           @db.Text
+  isDefault      Boolean           @default(false)
   active         Boolean           @default(true)
+  lockVersion    Int               @default(1)
   deletedAt      DateTime?         @db.Timestamptz(6)
   createdAt      DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime          @updatedAt @db.Timestamptz(6)
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer       Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
   contacts       CustomerContact[]
-  sites          Site[]
-
-  @@unique([organizationId, code])
-  @@index([organizationId, normalizedName])
-  @@index([organizationId, active, deletedAt])
-}
-
-model CustomerContact {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
-  customerId     String       @db.Uuid
-  name           String       @db.VarChar(100)
-  title          String?      @db.VarChar(100)
-  phone          String?      @db.VarChar(30)
-  mobile         String?      @db.VarChar(30)
-  email          String?      @db.VarChar(320)
-  primary        Boolean      @default(false)
-  active         Boolean      @default(true)
-  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime     @updatedAt @db.Timestamptz(6)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
-
-  @@index([organizationId, customerId, active])
-}
-
-model Site {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
-  customerId     String       @db.Uuid
-  code           String       @db.VarChar(50)
-  name           String       @db.VarChar(200)
-  postalCode     String?      @db.VarChar(20)
-  addressLine1   String?      @db.VarChar(300)
-  addressLine2   String?      @db.VarChar(300)
-  memo           String?      @db.Text
-  active         Boolean      @default(true)
-  deletedAt      DateTime?    @db.Timestamptz(6)
-  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime     @updatedAt @db.Timestamptz(6)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  salesOrders    SalesOrder[]
 
   @@unique([organizationId, customerId, code])
   @@index([organizationId, name])
+  @@index([organizationId, customerId, isDefault])
   @@index([customerId, active, deletedAt])
+}
+
+model SalesOrderNumberCounter {
+  organizationId String       @db.Uuid
+  sequenceYear   Int
+  nextValue      Int          @default(1)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, sequenceYear])
+}
+
+model SalesOrder {
+  id                        String           @id @default(uuid()) @db.Uuid
+  organizationId            String           @db.Uuid
+  orderNumber               String           @db.VarChar(50)
+  sequenceYear              Int
+  status                    SalesOrderStatus @default(DRAFT)
+  customerId                String           @db.Uuid
+  customerSiteId            String?          @db.Uuid
+  customerContactId         String?          @db.Uuid
+  ownerMembershipId         String?          @db.Uuid
+  orderedAt                 DateTime         @default(now()) @db.Date
+  dueDate                   DateTime?        @db.Date
+  externalReference         String?          @db.VarChar(200)
+  memo                      String?          @db.Text
+  cancelledAt               DateTime?        @db.Timestamptz(6)
+  cancelledByMembershipId   String?          @db.Uuid
+  cancellationReason        String?          @db.VarChar(500)
+  lockVersion               Int              @default(1)
+  createdAt                 DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt                 DateTime         @updatedAt @db.Timestamptz(6)
+  organization              Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer                  Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerSite              CustomerSite?    @relation(fields: [customerSiteId], references: [id], onDelete: Restrict)
+  customerContact           CustomerContact? @relation(fields: [customerContactId], references: [id], onDelete: Restrict)
+  ownerMembership           OrganizationMembership? @relation("SalesOrderOwner", fields: [ownerMembershipId], references: [id], onDelete: Restrict)
+  cancelledByMembership     OrganizationMembership? @relation("SalesOrderCanceller", fields: [cancelledByMembershipId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, orderNumber])
+  @@index([organizationId, status, updatedAt])
+  @@index([organizationId, customerId, updatedAt])
 }
 
 model Material {
@@ -366,8 +549,12 @@ model Material {
   organizationId String            @db.Uuid
   code           String            @db.VarChar(50)
   name           String            @db.VarChar(100)
+  normalizedName String            @db.VarChar(100)
   densityKgPerM3 Decimal?          @db.Decimal(18, 6)
+  sortOrder      Int               @default(0)
+  memo           String?           @db.Text
   active         Boolean           @default(true)
+  lockVersion    Int               @default(1)
   deletedAt      DateTime?         @db.Timestamptz(6)
   createdAt      DateTime          @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime          @updatedAt @db.Timestamptz(6)
@@ -375,6 +562,8 @@ model Material {
   variants       MaterialVariant[]
 
   @@unique([organizationId, code])
+  @@unique([organizationId, normalizedName])
+  @@index([organizationId, sortOrder, normalizedName])
   @@index([organizationId, name])
   @@index([organizationId, active, deletedAt])
 }
@@ -387,55 +576,262 @@ model MaterialVariant {
   name                  String                 @db.VarChar(100)
   thicknessMm           Decimal                @db.Decimal(18, 6)
   defaultInsideRadiusMm Decimal                @db.Decimal(18, 6)
+  sortOrder             Int                    @default(0)
   active                Boolean                @default(true)
+  lockVersion           Int                    @default(1)
   deletedAt             DateTime?              @db.Timestamptz(6)
   createdAt             DateTime               @default(now()) @db.Timestamptz(6)
   updatedAt             DateTime               @updatedAt @db.Timestamptz(6)
   organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   material              Material               @relation(fields: [materialId], references: [id], onDelete: Restrict)
   ruleRevisions         MaterialRuleRevision[]
+  sheetItems            SheetItem[]
+  foldPriceRates        FoldPriceRate[]
 
   @@unique([organizationId, code])
   @@unique([materialId, thicknessMm])
   @@index([organizationId, active, deletedAt])
   @@index([materialId])
+  @@index([materialId, sortOrder, thicknessMm])
+}
+
+model SheetItem {
+  id                      String              @id @default(uuid()) @db.Uuid
+  organizationId          String              @db.Uuid
+  materialVariantId       String              @db.Uuid
+  code                    String              @db.VarChar(50)
+  name                    String              @db.VarChar(100)
+  finishName              String?             @db.VarChar(100)
+  normalizedFinishName    String              @default("") @db.VarChar(100)
+  widthMm                 Decimal             @db.Decimal(18, 6)
+  lengthMm                Decimal             @db.Decimal(18, 6)
+  rotationPolicy          SheetRotationPolicy @default(FREE)
+  grainAxis               SheetGrainAxis      @default(NONE)
+  trimTopMm               Decimal             @default(0) @db.Decimal(18, 6)
+  trimRightMm             Decimal             @default(0) @db.Decimal(18, 6)
+  trimBottomMm            Decimal             @default(0) @db.Decimal(18, 6)
+  trimLeftMm              Decimal             @default(0) @db.Decimal(18, 6)
+  weightOverrideKg        Decimal?            @db.Decimal(18, 6)
+  weightOverrideReason    String?             @db.VarChar(500)
+  standardPurchaseCostKrw Decimal?            @db.Decimal(20, 2)
+  minRemnantWidthMm       Decimal?            @db.Decimal(18, 6)
+  minRemnantLengthMm      Decimal?            @db.Decimal(18, 6)
+  minRemnantAreaM2        Decimal?            @db.Decimal(18, 6)
+  inventoryUnit           SheetInventoryUnit  @default(SHEET)
+  isDefault               Boolean             @default(false)
+  active                  Boolean             @default(true)
+  sortOrder               Int                 @default(0)
+  memo                    String?             @db.Text
+  lockVersion             Int                 @default(1)
+  deletedAt               DateTime?           @db.Timestamptz(6)
+  createdAt               DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime            @updatedAt @db.Timestamptz(6)
+  organization            Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  materialVariant         MaterialVariant     @relation(fields: [materialVariantId], references: [id], onDelete: Restrict)
+  priceRates              SheetPriceRate[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, active, deletedAt])
+  @@index([materialVariantId, active, sortOrder])
+  @@index([materialVariantId, widthMm, lengthMm])
+  @@index([organizationId, name])
+}
+
+model PriceTier {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  code           String       @db.VarChar(50)
+  name           String       @db.VarChar(100)
+  description    String?      @db.VarChar(500)
+  isDefault      Boolean      @default(false)
+  active         Boolean      @default(true)
+  sortOrder      Int          @default(0)
+  lockVersion    Int          @default(1)
+  deletedAt      DateTime?    @db.Timestamptz(6)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customers      Customer[]
+  priceBooks     PriceBook[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, active, deletedAt])
+  @@index([organizationId, isDefault])
+}
+
+model PriceBook {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @db.Uuid
+  scopeType      PriceScopeType
+  priceTierId    String?             @db.Uuid
+  customerId     String?             @db.Uuid
+  code           String              @db.VarChar(50)
+  name           String              @db.VarChar(150)
+  active         Boolean             @default(true)
+  lockVersion    Int                 @default(1)
+  deletedAt      DateTime?           @db.Timestamptz(6)
+  createdAt      DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @db.Timestamptz(6)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  priceTier      PriceTier?          @relation(fields: [priceTierId], references: [id], onDelete: Restrict)
+  customer       Customer?           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  revisions      PriceBookRevision[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, scopeType, active, deletedAt])
+  @@index([priceTierId])
+  @@index([customerId])
+}
+
+model PriceBookRevision {
+  id                    String           @id @default(uuid()) @db.Uuid
+  organizationId        String           @db.Uuid
+  priceBookId           String           @db.Uuid
+  revisionNumber        Int
+  status                RevisionStatus   @default(DRAFT)
+  currency              String           @default("KRW") @db.Char(3)
+  taxIncluded           Boolean          @default(false)
+  changeSummary         String?          @db.VarChar(500)
+  contentChecksumSha256 String?          @db.Char(64)
+  effectiveFrom         DateTime?        @db.Timestamptz(6)
+  effectiveTo           DateTime?        @db.Timestamptz(6)
+  lockVersion           Int              @default(1)
+  createdByUserId       String?          @db.Uuid
+  updatedByUserId       String?          @db.Uuid
+  statusChangedByUserId String?          @db.Uuid
+  deletedByUserId       String?          @db.Uuid
+  publishedByUserId     String?          @db.Uuid
+  statusChangedAt       DateTime         @default(now()) @db.Timestamptz(6)
+  deletedAt             DateTime?        @db.Timestamptz(6)
+  publishedAt           DateTime?        @db.Timestamptz(6)
+  createdAt             DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime         @updatedAt @db.Timestamptz(6)
+  organization          Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  priceBook             PriceBook        @relation(fields: [priceBookId], references: [id], onDelete: Restrict)
+  createdBy             User?            @relation("PriceBookRevisionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy             User?            @relation("PriceBookRevisionUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  statusChangedBy       User?            @relation("PriceBookRevisionStatusChangedBy", fields: [statusChangedByUserId], references: [id], onDelete: SetNull)
+  deletedBy             User?            @relation("PriceBookRevisionDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+  publishedBy           User?            @relation("PriceBookRevisionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
+  foldRates             FoldPriceRate[]
+  sheetRates            SheetPriceRate[]
+  surchargePolicy       SurchargePolicy?
+
+  @@unique([priceBookId, revisionNumber])
+  @@index([organizationId, status])
+  @@index([priceBookId, status, effectiveFrom])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+  @@index([statusChangedByUserId])
+  @@index([deletedByUserId])
+  @@index([publishedByUserId])
+}
+
+model FoldPriceRate {
+  id                      String            @id @default(uuid()) @db.Uuid
+  organizationId          String            @db.Uuid
+  priceBookRevisionId     String            @db.Uuid
+  materialVariantId       String            @db.Uuid
+  materialRatePerM2Krw    Decimal           @db.Decimal(20, 4)
+  bendRatePerOperationKrw Decimal           @db.Decimal(20, 4)
+  vCutRatePerMeterKrw     Decimal           @db.Decimal(20, 4)
+  createdAt               DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime          @updatedAt @db.Timestamptz(6)
+  organization            Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  priceBookRevision       PriceBookRevision @relation(fields: [priceBookRevisionId], references: [id], onDelete: Cascade)
+  materialVariant         MaterialVariant   @relation(fields: [materialVariantId], references: [id], onDelete: Restrict)
+
+  @@unique([priceBookRevisionId, materialVariantId])
+  @@index([organizationId, materialVariantId])
+  @@index([materialVariantId])
+}
+
+model SheetPriceRate {
+  id                         String            @id @default(uuid()) @db.Uuid
+  organizationId             String            @db.Uuid
+  priceBookRevisionId        String            @db.Uuid
+  sheetItemId                String            @db.Uuid
+  materialPricePerSheetKrw   Decimal           @db.Decimal(20, 4)
+  processingPricePerSheetKrw Decimal?          @db.Decimal(20, 4)
+  createdAt                  DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime          @updatedAt @db.Timestamptz(6)
+  organization               Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  priceBookRevision          PriceBookRevision @relation(fields: [priceBookRevisionId], references: [id], onDelete: Cascade)
+  sheetItem                  SheetItem         @relation(fields: [sheetItemId], references: [id], onDelete: Restrict)
+
+  @@unique([priceBookRevisionId, sheetItemId])
+  @@index([organizationId, sheetItemId])
+  @@index([sheetItemId])
+}
+
+model SurchargePolicy {
+  id                    String            @id @default(uuid()) @db.Uuid
+  organizationId        String            @db.Uuid
+  priceBookRevisionId   String            @unique @db.Uuid
+  minimumBendOperations Int
+  ratePercent           Decimal           @db.Decimal(9, 4)
+  baseType              SurchargeBaseType @default(PROCESSING_ONLY)
+  createdAt             DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime          @updatedAt @db.Timestamptz(6)
+  organization          Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  priceBookRevision     PriceBookRevision @relation(fields: [priceBookRevisionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 model MaterialRuleRevision {
-  id                String           @id @default(uuid()) @db.Uuid
-  organizationId    String           @db.Uuid
-  materialVariantId String           @db.Uuid
-  revisionNumber    Int
-  status            RevisionStatus   @default(DRAFT)
-  calculationMode   CalculationMode  @default(FIXED)
-  vCutEnabled       Boolean          @default(true)
-  decimalPlaces     Int              @default(1)
-  decimalOperation  DecimalOperation @default(ROUND)
-  cutAngleDeg       Decimal          @db.Decimal(9, 4)
-  elongationVCutMm  Decimal          @db.Decimal(18, 6)
-  elongationACutMm  Decimal          @db.Decimal(18, 6)
-  elongationNoCutMm Decimal          @db.Decimal(18, 6)
-  cutDepthVCutMm    Decimal          @db.Decimal(18, 6)
-  cutDepthACutMm    Decimal          @db.Decimal(18, 6)
-  cutDepthNoCutMm   Decimal          @db.Decimal(18, 6)
-  options           Json?            @db.JsonB
-  effectiveFrom     DateTime?        @db.Timestamptz(6)
-  effectiveTo       DateTime?        @db.Timestamptz(6)
-  createdByUserId   String?          @db.Uuid
-  publishedByUserId String?          @db.Uuid
-  publishedAt       DateTime?        @db.Timestamptz(6)
-  createdAt         DateTime         @default(now()) @db.Timestamptz(6)
-  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  materialVariant   MaterialVariant  @relation(fields: [materialVariantId], references: [id], onDelete: Restrict)
-  createdBy         User?            @relation("MaterialRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  publishedBy       User?            @relation("MaterialRulePublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
-  foldRevisions     FoldRevision[]
+  id                    String                   @id @default(uuid()) @db.Uuid
+  organizationId        String                   @db.Uuid
+  materialVariantId     String                   @db.Uuid
+  revisionNumber        Int
+  status                RevisionStatus           @default(DRAFT)
+  calculationMode       CalculationMode          @default(FIXED)
+  elongationOption      MaterialElongationOption @default(STANDARD)
+  vCutEnabled           Boolean                  @default(true)
+  decimalPlaces         Int                      @default(1)
+  decimalOperation      DecimalOperation         @default(ROUND)
+  cutAngleDeg           Decimal                  @db.Decimal(9, 4)
+  insideBendRadiusMm    Decimal                  @db.Decimal(18, 6)
+  elongationVCutMm      Decimal                  @db.Decimal(18, 6)
+  elongationACutMm      Decimal                  @db.Decimal(18, 6)
+  elongationNoCutMm     Decimal                  @db.Decimal(18, 6)
+  cutDepthVCutMm        Decimal                  @db.Decimal(18, 6)
+  cutDepthACutMm        Decimal                  @db.Decimal(18, 6)
+  cutDepthNoCutMm       Decimal                  @db.Decimal(18, 6)
+  options               Json?                    @db.JsonB
+  changeSummary         String?                  @db.VarChar(500)
+  contentChecksumSha256 String?                  @db.Char(64)
+  effectiveFrom         DateTime?                @db.Timestamptz(6)
+  effectiveTo           DateTime?                @db.Timestamptz(6)
+  lockVersion           Int                      @default(1)
+  createdByUserId       String?                  @db.Uuid
+  updatedByUserId       String?                  @db.Uuid
+  statusChangedByUserId String?                  @db.Uuid
+  deletedByUserId       String?                  @db.Uuid
+  publishedByUserId     String?                  @db.Uuid
+  statusChangedAt       DateTime                 @default(now()) @db.Timestamptz(6)
+  deletedAt             DateTime?                @db.Timestamptz(6)
+  publishedAt           DateTime?                @db.Timestamptz(6)
+  createdAt             DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime                 @updatedAt @db.Timestamptz(6)
+  organization          Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  materialVariant       MaterialVariant          @relation(fields: [materialVariantId], references: [id], onDelete: Restrict)
+  createdBy             User?                    @relation("MaterialRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy             User?                    @relation("MaterialRuleUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  statusChangedBy       User?                    @relation("MaterialRuleStatusChangedBy", fields: [statusChangedByUserId], references: [id], onDelete: SetNull)
+  deletedBy             User?                    @relation("MaterialRuleDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+  publishedBy           User?                    @relation("MaterialRulePublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
+  foldRevisions         FoldRevision[]
 
   @@unique([materialVariantId, revisionNumber])
   @@index([organizationId, status])
   @@index([materialVariantId, status, effectiveFrom])
   @@index([createdByUserId])
+  @@index([updatedByUserId])
+  @@index([statusChangedByUserId])
+  @@index([deletedByUserId])
   @@index([publishedByUserId])
+  @@index([materialVariantId, effectiveFrom, effectiveTo], map: "MaterialRuleRevision_effective_period_idx")
 }
 
 model FoldCategory {
@@ -445,6 +841,8 @@ model FoldCategory {
   name           String         @db.VarChar(100)
   active         Boolean        @default(true)
   sortOrder      Int            @default(0)
+  lockVersion    Int            @default(1)
+  deletedAt      DateTime?      @db.Timestamptz(6)
   createdAt      DateTime       @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime       @updatedAt @db.Timestamptz(6)
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -462,6 +860,7 @@ model FoldTemplate {
   name           String           @db.VarChar(200)
   documentType   FoldDocumentType @default(NORMAL)
   active         Boolean          @default(true)
+  lockVersion    Int              @default(1)
   deletedAt      DateTime?        @db.Timestamptz(6)
   createdAt      DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime         @updatedAt @db.Timestamptz(6)
@@ -473,6 +872,9 @@ model FoldTemplate {
   @@index([organizationId, name])
   @@index([organizationId, active, deletedAt])
   @@index([categoryId])
+  @@index([organizationId, categoryId, updatedAt(sort: Desc), id(sort: Desc)], map: "FoldTemplate_library_cursor_idx")
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "FoldTemplate_name_trgm_idx")
+  @@index([code(ops: raw("gin_trgm_ops"))], type: Gin, map: "FoldTemplate_code_trgm_idx")
 }
 
 model FoldRevision {
@@ -486,8 +888,14 @@ model FoldRevision {
   documentSchemaVersion  Int
   document               Json                  @db.JsonB
   documentChecksumSha256 String                @db.Char(64)
+  lockVersion            Int                   @default(1)
   createdByUserId        String?               @db.Uuid
+  updatedByUserId        String?               @db.Uuid
+  statusChangedByUserId  String?               @db.Uuid
+  deletedByUserId        String?               @db.Uuid
   publishedByUserId      String?               @db.Uuid
+  statusChangedAt        DateTime              @default(now()) @db.Timestamptz(6)
+  deletedAt              DateTime?             @db.Timestamptz(6)
   publishedAt            DateTime?             @db.Timestamptz(6)
   createdAt              DateTime              @default(now()) @db.Timestamptz(6)
   updatedAt              DateTime              @updatedAt @db.Timestamptz(6)
@@ -495,6 +903,9 @@ model FoldRevision {
   template               FoldTemplate          @relation(fields: [templateId], references: [id], onDelete: Restrict)
   materialRuleRevision   MaterialRuleRevision? @relation(fields: [materialRuleRevisionId], references: [id], onDelete: Restrict)
   createdBy              User?                 @relation("FoldRevisionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy              User?                 @relation("FoldRevisionUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  statusChangedBy        User?                 @relation("FoldRevisionStatusChangedBy", fields: [statusChangedByUserId], references: [id], onDelete: SetNull)
+  deletedBy              User?                 @relation("FoldRevisionDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
   publishedBy            User?                 @relation("FoldRevisionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([templateId, revisionNumber])
@@ -502,7 +913,12 @@ model FoldRevision {
   @@index([templateId, status])
   @@index([materialRuleRevisionId])
   @@index([createdByUserId])
+  @@index([updatedByUserId])
+  @@index([statusChangedByUserId])
+  @@index([deletedByUserId])
   @@index([publishedByUserId])
+  @@index([templateId, revisionNumber(sort: Desc)], map: "FoldRevision_template_history_idx")
+  @@index([organizationId, status, updatedAt(sort: Desc), id(sort: Desc)], map: "FoldRevision_status_cursor_idx")
 }
 
 model FileAsset {

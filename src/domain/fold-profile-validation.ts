@@ -1,4 +1,5 @@
 import type { FoldProfile, PointMm } from "./fold-profile";
+import { arcMetrics } from "./fold-geometry";
 
 export type ProfileIssueCode =
   | "EMPTY_NAME"
@@ -11,7 +12,10 @@ export type ProfileIssueCode =
   | "INVALID_ELONGATION_OVERRIDE"
   | "INVALID_POINT"
   | "DISCONNECTED_SEGMENT"
-  | "INVALID_BEND_ANGLE";
+  | "INVALID_BEND_ANGLE"
+  | "INVALID_ARC"
+  | "INVALID_BOX_BASE"
+  | "INVALID_PANEL_ATTACHMENT";
 
 export type ProfileIssue = {
   code: ProfileIssueCode;
@@ -105,6 +109,14 @@ export function validateFoldProfile(profile: FoldProfile, tolerance = 0.001): Pr
         severity: "error",
       });
     }
+    if (segment.geometry?.kind === "arc" && !arcMetrics(segment.inputLength, segment.geometry.sagitta)) {
+      add({
+        code: "INVALID_ARC",
+        message: "원호의 현 길이와 곡 깊이는 0보다 큰 유한한 값이어야 합니다.",
+        path: `${path}.geometry`,
+        severity: "error",
+      });
+    }
     if (segment.elongationOverride !== undefined && !Number.isFinite(segment.elongationOverride)) {
       add({
         code: "INVALID_ELONGATION_OVERRIDE",
@@ -130,6 +142,33 @@ export function validateFoldProfile(profile: FoldProfile, tolerance = 0.001): Pr
       });
     }
   }));
+
+  const allBlockIds = new Set(profile.blocks.map((block) => block.id));
+  const allSegmentIds = new Set(profile.blocks.flatMap((block) => block.segments.map((segment) => segment.id)));
+  let secondaryRoleCount = 0;
+  const panelIds = new Set<string>();
+  profile.panelAttachments.forEach((panel, index) => {
+    const hostBlock = profile.blocks.find((block) => block.id === panel.hostBlockId);
+    const hostSegmentBelongsToBlock = hostBlock?.segments.some(
+      (segment) => segment.id === panel.hostSegmentId,
+    );
+    if (
+      panelIds.has(panel.id)
+      || !allBlockIds.has(panel.hostBlockId)
+      || !allSegmentIds.has(panel.hostSegmentId)
+      || !hostSegmentBelongsToBlock
+    ) {
+      add({ code: "INVALID_PANEL_ATTACHMENT", message: "패널 연결 대상 또는 ID가 올바르지 않습니다.", path: `panelAttachments[${index}]`, severity: "error" });
+    }
+    panelIds.add(panel.id);
+    if (panel.dimensionRole === "secondary-product-dimension") secondaryRoleCount += 1;
+    if (panel.block.segments.length === 0) {
+      add({ code: "INVALID_PANEL_ATTACHMENT", message: "패널에는 하나 이상의 선이 필요합니다.", path: `panelAttachments[${index}].block`, severity: "warning" });
+    }
+  });
+  if (secondaryRoleCount > 1) {
+    add({ code: "INVALID_PANEL_ATTACHMENT", message: "제품 두 번째 치수 역할 패널은 하나만 지정할 수 있습니다.", path: "panelAttachments", severity: "error" });
+  }
 
   return { valid: issues.every((issue) => issue.severity !== "error"), issues };
 }

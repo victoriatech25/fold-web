@@ -29,7 +29,9 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --hostname 127.0.0.1 --port 3100",
     url: `${baseURL}/api/health`,
-    reuseExistingServer: !process.env.CI,
+    // Never attach the suite to an unrelated local app that happens to own
+    // the test port and expose a health endpoint.
+    reuseExistingServer: false,
     timeout: 120_000,
     env: {
       DATABASE_URL: testDatabaseUrl,

@@ -6,6 +6,43 @@ const segments = (store: FoldEditorStore, blockIndex = 0) =>
   store.profile.blocks[blockIndex].segments;
 
 describe("FoldEditorStore", () => {
+  it("applies a panel template as an independent snapshot with provenance", () => {
+    const store = new FoldEditorStore();
+    store.addPanelToSelected();
+    const panel = store.profile.panelAttachments[0];
+    const source = JSON.parse(JSON.stringify(store.profile.blocks[0]));
+    const sourceBlockId = source.id;
+    const sourceSegmentId = source.segments[0].id;
+
+    store.applyPanelTemplate(panel.id, source, {
+      name: "게시 패널 A",
+      sourceRevisionId: "11111111-1111-4111-8111-111111111111",
+      sourceChecksum: "a".repeat(64),
+    });
+
+    expect(panel).toMatchObject({
+      name: "게시 패널 A",
+      sourceRevisionId: "11111111-1111-4111-8111-111111111111",
+      sourceChecksum: "a".repeat(64),
+    });
+    expect(panel.block.id).not.toBe(sourceBlockId);
+    expect(panel.block.segments[0].id).not.toBe(sourceSegmentId);
+    source.name = "원본 변경";
+    expect(panel.block.name).not.toBe("원본 변경");
+    store.undo();
+    expect(store.profile.panelAttachments[0].sourceRevisionId).toBeUndefined();
+  });
+
+  it("keeps the latest 50 checkpoints during a long editing session", () => {
+    const store = new FoldEditorStore();
+    for (let index = 0; index < 120; index += 1) {
+      store.setProfileName(`장기 편집 ${index}`);
+    }
+    expect(store.history).toHaveLength(50);
+    for (let index = 0; index < 50; index += 1) store.undo();
+    expect(store.profile.name).toBe("장기 편집 69");
+    expect(store.canUndo).toBe(false);
+  });
   it("updates a selected length while preserving downstream connectivity", () => {
     const store = new FoldEditorStore();
     store.selectSegment(segments(store)[0].id);
@@ -110,6 +147,45 @@ describe("FoldEditorStore", () => {
     expect(store.calculation.calculatedWidth).not.toBe(initialWidth);
     store.removeSelectedBend();
     expect(store.selectedSegment?.bendAfter).toBeUndefined();
+  });
+
+  it("updates special and composite operations plus calculation policy", () => {
+    const store = new FoldEditorStore();
+    store.selectSegment(segments(store)[0].id);
+    store.updateSelectedBendOperations(
+      "u",
+      { direction: "back", form: "u" },
+      "front",
+    );
+    store.setSelectedCalculateElongation(false);
+    store.setCalculationPolicy("ratio", "diagonal", false);
+
+    expect(store.selectedSegment?.bendAfter).toMatchObject({
+      direction: "front",
+      form: "u",
+      secondaryOperation: { direction: "back", form: "u" },
+    });
+    expect(store.selectedSegment?.calculateElongation).toBe(false);
+    expect(store.profile.calculation).toMatchObject({
+      mode: "ratio",
+      elongationOption: "diagonal",
+      vCutEnabled: false,
+    });
+  });
+
+  it("edits variables and formulas, renames references, and updates geometry", () => {
+    const store = new FoldEditorStore();
+    store.addVariable();
+    store.updateVariable(0, { name: "W", value: 120 });
+    store.selectSegment(segments(store)[0].id);
+    store.setSelectedFormula("W/2");
+
+    expect(store.expressionResolution.segmentLengths[store.selectedSegment!.id]).toBe("60");
+    expect(store.selectedSegment?.end.x).toBe(60);
+
+    store.updateVariable(0, { name: "WIDTH" });
+    expect(store.selectedSegment?.formula).toBe("WIDTH/2");
+    expect(store.expressionResolution.segmentLengths[store.selectedSegment!.id]).toBe("60");
   });
 
   it("updates material elongation and recalculates the unfolded width", () => {
@@ -234,5 +310,39 @@ describe("FoldEditorStore", () => {
     expect(store.blockCalculations[1].calculatedWidth).toBe(100);
     expect(store.calculation.calculatedWidth).toBe(330);
     expect(store.calculation.areaEachM2).toBeCloseTo(0.792);
+  });
+
+  it("edits an arc with undo support", () => {
+    const store = new FoldEditorStore();
+    const selected = store.selectedSegment!;
+    store.setSelectedGeometry("arc");
+    store.updateSelectedArc("right", 75);
+    expect(selected.geometry).toEqual({ kind: "arc", side: "right", sagitta: 75 });
+    expect(store.selectedSegmentCalculation!.baseLength).toBeGreaterThan(selected.inputLength);
+    store.undo();
+    expect(store.selectedSegment!.geometry).toMatchObject({ kind: "arc", side: "left" });
+  });
+
+  it("keeps box floor inference free from an explicit stored selection", () => {
+    const store = new FoldEditorStore();
+    store.setProfileType("box");
+    store.startSecondBlock();
+    store.addDrawPoint({ x: 50, y: -50 });
+    store.addDrawPoint({ x: 50, y: 50 });
+    expect(store.profile.boxDefinition).toBeUndefined();
+  });
+
+  it("attaches one panel per host and makes the secondary role unique", () => {
+    const store = new FoldEditorStore();
+    store.addPanelToSelected();
+    const first = store.profile.panelAttachments[0];
+    store.updatePanelAttachment(first.id, { spanMm: 320, dimensionRole: "secondary-product-dimension" });
+    expect(store.calculation.panelSpanMm).toBe(320);
+    store.selectSegment(store.profile.blocks[0].segments[1].id);
+    store.addPanelToSelected();
+    const second = store.profile.panelAttachments[1];
+    store.updatePanelAttachment(second.id, { dimensionRole: "secondary-product-dimension" });
+    expect(first.dimensionRole).toBe("none");
+    expect(second.dimensionRole).toBe("secondary-product-dimension");
   });
 });

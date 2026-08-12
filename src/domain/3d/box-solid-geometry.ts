@@ -1,7 +1,7 @@
 import { distanceMm, type FoldBlock, type FoldProfile, type FoldSegment, type PointMm } from "../fold-profile";
 import { createRoundedFoldModelInput } from "./bend-radius";
 import { createFoldModelInput, type FoldModelBlockInput, type FoldModelInput } from "./fold-model-input";
-import { createFoldSolidModel, createSolidGeometry } from "./solid-geometry";
+import { createSolidGeometry } from "./solid-geometry";
 import {
   boundsFromPositions,
   type FoldSurfaceBlock,
@@ -18,6 +18,11 @@ const onSegment = (a: PointMm, b: PointMm, point: PointMm) =>
   point.y >= Math.min(a.y, b.y) - 0.001 && point.y <= Math.max(a.y, b.y) + 0.001;
 
 function segmentsIntersect(left: FoldSegment, right: FoldSegment) {
+  const leftVector = { x: left.end.x - left.start.x, y: left.end.y - left.start.y };
+  const rightVector = { x: right.end.x - right.start.x, y: right.end.y - right.start.y };
+  const lengthProduct = Math.hypot(leftVector.x, leftVector.y) * Math.hypot(rightVector.x, rightVector.y);
+  const directionCross = leftVector.x * rightVector.y - leftVector.y * rightVector.x;
+  if (lengthProduct <= 0.000001 || Math.abs(directionCross) / lengthProduct <= 0.0001) return false;
   const o1 = orientation(left.start, left.end, right.start);
   const o2 = orientation(left.start, left.end, right.end);
   const o3 = orientation(right.start, right.end, left.start);
@@ -29,13 +34,23 @@ function segmentsIntersect(left: FoldSegment, right: FoldSegment) {
     (Math.abs(o4) <= 0.001 && onSegment(right.start, right.end, left.end));
 }
 
-export function findBoxBaseSegments(blocks: FoldBlock[]): [FoldSegment, FoldSegment] | null {
+export function findBoxBaseSegments(
+  blocks: FoldBlock[],
+): [FoldSegment, FoldSegment] | null {
   const [first, second] = blocks;
   if (!first || !second || first.segments.length === 0 || second.segments.length === 0) return null;
-  const firstCandidates = first.segments.filter((segment) => second.segments.some((other) => segmentsIntersect(segment, other)));
-  const secondCandidates = second.segments.filter((segment) => first.segments.some((other) => segmentsIntersect(segment, other)));
-  const longest = (segments: FoldSegment[]) => [...segments].sort((a, b) => b.inputLength - a.inputLength)[0];
-  return [longest(firstCandidates.length ? firstCandidates : first.segments), longest(secondCandidates.length ? secondCandidates : second.segments)];
+  const firstLines = first.segments.filter((segment) => segment.geometry?.kind !== "arc");
+  const secondLines = second.segments.filter((segment) => segment.geometry?.kind !== "arc");
+  const pairs = firstLines.flatMap((width) => secondLines
+    .filter((depth) => segmentsIntersect(width, depth))
+    .map((depth) => ({ width, depth })));
+  pairs.sort((left, right) => {
+    const lengthDifference = right.width.inputLength + right.depth.inputLength
+      - left.width.inputLength - left.depth.inputLength;
+    if (Math.abs(lengthDifference) > 0.000001) return lengthDifference;
+    return `${left.width.id}:${left.depth.id}`.localeCompare(`${right.width.id}:${right.depth.id}`);
+  });
+  return pairs[0] ? [pairs[0].width, pairs[0].depth] : null;
 }
 
 function normalizeBlock(block: FoldModelBlockInput, base: FoldSegment): FoldModelBlockInput {
@@ -114,8 +129,19 @@ function createAxisSolid(
 
 export function createBoxSolidModel(profile: FoldProfile): FoldSurfaceModel {
   const baseSegments = findBoxBaseSegments(profile.blocks);
-  if (!baseSegments) return createFoldSolidModel(profile);
-  const result = createFoldModelInput(profile);
+  if (!baseSegments) return {
+    profileId: profile.id,
+    valid: false,
+    issues: [{
+      code: "MISSING_BOX_INTERSECTION",
+      message: "두 박스 단면에서 서로 교차하는 바닥 가로·세로 직선을 그려 주세요.",
+      path: "blocks",
+    }],
+    warnings: [],
+    blocks: [],
+    bounds: null,
+  };
+  const result = createFoldModelInput(profile, 0.001, { requireProductLength: false });
   if (!result.valid) return { profileId: profile.id, valid: false, issues: result.issues, warnings: [], blocks: [], bounds: null };
   const width = distanceMm(baseSegments[0].start, baseSegments[0].end);
   const depth = distanceMm(baseSegments[1].start, baseSegments[1].end);
@@ -131,4 +157,3 @@ export function createBoxSolidModel(profile: FoldProfile): FoldSurfaceModel {
     bounds: boundsFromPositions(blocks.flatMap((block) => block.positions)),
   };
 }
-

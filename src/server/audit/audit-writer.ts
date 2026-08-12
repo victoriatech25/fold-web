@@ -111,8 +111,188 @@ type AuditPayloadByAction = {
       reason: "MISSING_PERMISSION" | "INVALID_MUTATION_ORIGIN";
     };
   };
+  "master_data.company_profile_updated": {
+    before: CompanyProfileAuditSnapshot;
+    after: CompanyProfileAuditSnapshot;
+  };
+  "master_data.business_site_created": {
+    after: BusinessSiteAuditSnapshot;
+  };
+  "master_data.business_site_updated": {
+    before: BusinessSiteAuditSnapshot;
+    after: BusinessSiteAuditSnapshot;
+  };
+  "master_data.business_site_default_changed": {
+    before: { businessSiteId: string | null };
+    after: { businessSiteId: string };
+  };
+  "customer.created": { after: CustomerAuditSnapshot };
+  "customer.updated": {
+    before: CustomerAuditSnapshot;
+    after: CustomerAuditSnapshot;
+  };
+  "customer.contact_created": { after: CustomerContactAuditSnapshot };
+  "customer.contact_updated": {
+    before: CustomerContactAuditSnapshot;
+    after: CustomerContactAuditSnapshot;
+  };
+  "customer.contact_default_changed": {
+    before: { contactId: string | null };
+    after: { contactId: string };
+  };
+  "customer.site_created": { after: CustomerSiteAuditSnapshot };
+  "customer.site_updated": {
+    before: CustomerSiteAuditSnapshot;
+    after: CustomerSiteAuditSnapshot;
+  };
+  "customer.site_default_changed": {
+    before: { siteId: string | null };
+    after: { siteId: string };
+  };
+  "order.created": { after: SalesOrderAuditSnapshot };
+  "order.updated": { before: SalesOrderAuditSnapshot; after: SalesOrderAuditSnapshot };
+  "order.copied": { after: SalesOrderAuditSnapshot; metadata: { sourceOrderId: string } };
+  "order.cancelled": { before: SalesOrderAuditSnapshot; after: SalesOrderAuditSnapshot };
+  "material.created": { after: MaterialAuditSnapshot };
+  "material.updated": { before: MaterialAuditSnapshot; after: MaterialAuditSnapshot };
+  "material.variant_created": { after: MaterialVariantAuditSnapshot };
+  "material.variant_updated": { before: MaterialVariantAuditSnapshot; after: MaterialVariantAuditSnapshot };
+  "material.rule_created": MaterialRuleCreateAuditPayload;
+  "material.rule_updated": MaterialRuleUpdateAuditPayload;
+  "material.rule_review_requested": MaterialRuleTransitionAuditPayload;
+  "material.rule_returned": MaterialRuleTransitionAuditPayload;
+  "material.rule_published": MaterialRuleTransitionAuditPayload;
+  "material.rule_retired": MaterialRuleTransitionAuditPayload;
+  "material.rule_discarded": MaterialRuleTransitionAuditPayload;
+  "material.sheet_created": { after: SheetItemAuditSnapshot };
+  "material.sheet_updated": { before: SheetItemAuditSnapshot; after: SheetItemAuditSnapshot };
+  "material.sheet_default_set": { before: SheetItemStateAuditSnapshot; after: SheetItemStateAuditSnapshot };
+  "material.sheet_deactivated": { before: SheetItemStateAuditSnapshot; after: SheetItemStateAuditSnapshot };
+  "material.sheet_reactivated": { before: SheetItemStateAuditSnapshot; after: SheetItemStateAuditSnapshot };
+  "pricing.tier_changed": PricingChangeAuditPayload;
+  "pricing.customer_tier_assigned": PricingChangeAuditPayload;
+  "pricing.book_changed": PricingChangeAuditPayload;
+  "pricing.revision_created": PricingRevisionCreateAuditPayload;
+  "pricing.revision_updated": PricingRevisionUpdateAuditPayload;
+  "pricing.revision_review_requested": PricingRevisionTransitionAuditPayload;
+  "pricing.revision_returned": PricingRevisionTransitionAuditPayload;
+  "pricing.revision_published": PricingRevisionTransitionAuditPayload;
+  "pricing.revision_retired": PricingRevisionTransitionAuditPayload;
+  "pricing.revision_discarded": PricingRevisionTransitionAuditPayload;
+  "fold.draft_created": {
+    after: {
+      name: string;
+      documentType: string;
+      lockVersion: number;
+    };
+    metadata: { schemaVersion: number; checksumSha256: string };
+  };
+  "fold.draft_saved": {
+    before: {
+      name: string;
+      documentType: string;
+      lockVersion: number;
+    };
+    after: {
+      name: string;
+      documentType: string;
+      lockVersion: number;
+    };
+    metadata: { schemaVersion: number; checksumSha256: string };
+  };
+  "fold.draft_deleted": {
+    before: { active: boolean; deleted: boolean };
+    after: { active: boolean; deleted: boolean };
+    metadata: { lockVersion: number; checksumSha256: string };
+  };
+  "fold.dxf_exported": {
+    metadata: {
+      sourceRevisionId: string;
+      documentChecksumSha256: string;
+      dxfChecksumSha256: string;
+      geometryVersion: string;
+      writerVersion: string;
+      sizeBytes: number;
+      entityCount: number;
+    };
+  };
+  "fold.category_created": {
+    after: { name: string; sortOrder: number; active: boolean; lockVersion: number };
+  };
+  "fold.category_updated": {
+    before: { name: string; sortOrder: number; active: boolean; lockVersion: number };
+    after: { name: string; sortOrder: number; active: boolean; lockVersion: number };
+  };
+  "fold.template_metadata_updated": {
+    before: { name: string; categoryId: string | null; lockVersion: number };
+    after: { name: string; categoryId: string | null; lockVersion: number };
+  };
+  "fold.template_copied": {
+    after: { name: string; revisionNumber: number; status: string };
+    metadata: { sourceRevisionId: string; checksumSha256: string };
+  };
+  "fold.revision_created": {
+    after: { name: string; revisionNumber: number; status: string; lockVersion: number };
+    metadata: { sourceRevisionId: string; checksumSha256: string };
+  };
+  "fold.revision_review_requested": RevisionTransitionAuditPayload;
+  "fold.revision_returned": RevisionTransitionAuditPayload;
+  "fold.revision_published": RevisionTransitionAuditPayload;
+  "fold.revision_retired": RevisionTransitionAuditPayload;
+  "fold.revision_discarded": RevisionTransitionAuditPayload;
   "platform.database_smoke": {
     metadata?: { mode: "commit" | "rollback" };
+  };
+};
+
+type RevisionTransitionAuditPayload = {
+  before: { status: string; lockVersion: number };
+  after: { status: string; lockVersion: number };
+  metadata: { revisionNumber: number; checksumSha256: string };
+};
+
+type PricingChangeAuditPayload = {
+  before?: { code?: string; name?: string; active?: boolean; isDefault?: boolean; priceTierId?: string | null; lockVersion?: number };
+  after: { code?: string; name?: string; active?: boolean; isDefault?: boolean; priceTierId?: string | null; lockVersion?: number };
+  metadata?: { scopeType?: string; reason?: string | null };
+};
+
+type PricingRevisionCreateAuditPayload = {
+  after: { revisionNumber: number; status: string; lockVersion: number };
+  metadata: { checksumSha256: string; sourceRevisionId: string | null; foldRateCount: number; sheetRateCount: number };
+};
+
+type PricingRevisionUpdateAuditPayload = {
+  before: { status: string; lockVersion: number; checksumSha256: string | null };
+  after: { status: string; lockVersion: number; checksumSha256: string };
+  metadata: { revisionNumber: number; foldRateCount: number; sheetRateCount: number };
+};
+
+type PricingRevisionTransitionAuditPayload = {
+  before: { status: string; lockVersion: number };
+  after: { status: string; lockVersion: number };
+  metadata: { revisionNumber: number; checksumSha256: string; reason: string | null; effectiveFrom: string | null };
+};
+
+type MaterialRuleCreateAuditPayload = {
+  after: { revisionNumber: number; status: string; lockVersion: number };
+  metadata: { checksumSha256: string; sourceRuleRevisionId: string | null };
+};
+
+type MaterialRuleUpdateAuditPayload = {
+  before: { status: string; lockVersion: number; checksumSha256: string | null };
+  after: { status: string; lockVersion: number; checksumSha256: string };
+  metadata: { revisionNumber: number };
+};
+
+type MaterialRuleTransitionAuditPayload = {
+  before: { status: string; lockVersion: number };
+  after: { status: string; lockVersion: number };
+  metadata: {
+    revisionNumber: number;
+    checksumSha256: string;
+    reason: string | null;
+    effectiveFrom: string | null;
   };
 };
 
@@ -121,6 +301,95 @@ export type WriteAuditEventInput = {
     { action: Action } &
     AuditPayloadByAction[Action];
 }[AuditAction];
+
+type CompanyProfileAuditSnapshot = {
+  name: string;
+  businessRegistrationNumber: string | null;
+  representativeName: string | null;
+  phone: string | null;
+  email: string | null;
+  postalCode: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  organizationLockVersion: number;
+  profileLockVersion: number;
+};
+
+type BusinessSiteAuditSnapshot = {
+  code: string;
+  name: string;
+  type: string;
+  businessRegistrationNumber: string | null;
+  representativeName: string | null;
+  phone: string | null;
+  email: string | null;
+  postalCode: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  isDefault: boolean;
+  active: boolean;
+  lockVersion: number;
+};
+
+type CustomerAuditSnapshot = {
+  code: string;
+  type: string;
+  name: string;
+  businessRegistrationNumber: string | null;
+  active: boolean;
+  lockVersion: number;
+};
+
+type CustomerContactAuditSnapshot = {
+  customerId: string;
+  customerSiteId: string | null;
+  name: string;
+  isPrimary: boolean;
+  active: boolean;
+  lockVersion: number;
+};
+
+type CustomerSiteAuditSnapshot = {
+  customerId: string;
+  code: string;
+  name: string;
+  isDefault: boolean;
+  active: boolean;
+  lockVersion: number;
+};
+type SalesOrderAuditSnapshot = { orderNumber: string; status: string; customerId: string; customerSiteId: string | null; customerContactId: string | null; ownerMembershipId: string | null; dueDate: string | null; lockVersion: number };
+
+type MaterialAuditSnapshot = {
+  code: string;
+  name: string;
+  densityKgPerM3: string | null;
+  active: boolean;
+  lockVersion: number;
+};
+
+type MaterialVariantAuditSnapshot = {
+  materialId: string;
+  code: string;
+  thicknessMm: string;
+  defaultInsideRadiusMm: string;
+  active: boolean;
+  lockVersion: number;
+};
+
+type SheetItemStateAuditSnapshot = {
+  active: boolean;
+  isDefault: boolean;
+  lockVersion: number;
+};
+
+type SheetItemAuditSnapshot = SheetItemStateAuditSnapshot & {
+  materialVariantId: string;
+  code: string;
+  name: string;
+  widthMm: string;
+  lengthMm: string;
+  finishName: string | null;
+};
 
 async function resolveActorSnapshot(
   database: AuditDatabaseClient,

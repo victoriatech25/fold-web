@@ -35,6 +35,44 @@ function migrateDocument(value: unknown): unknown {
       },
     };
   }
+  if (migrated.schemaVersion === 3) {
+    const blocks = Array.isArray(migrated.blocks)
+      ? migrated.blocks.map((block) => {
+          if (!isRecord(block) || !Array.isArray(block.segments)) return block;
+          return {
+            ...block,
+            segments: block.segments.map((segment) => isRecord(segment)
+              ? { ...segment, geometry: { kind: "line" } }
+              : segment),
+          };
+        })
+      : migrated.blocks;
+    migrated = {
+      ...migrated,
+      schemaVersion: FOLD_PROFILE_SCHEMA_VERSION,
+      blocks,
+      panelAttachments: [],
+    };
+  }
+  if (
+    migrated.schemaVersion === FOLD_PROFILE_SCHEMA_VERSION
+    && isRecord(migrated.calculation)
+    && migrated.calculation.elongationOption === undefined
+  ) {
+    migrated = {
+      ...migrated,
+      calculation: {
+        ...migrated.calculation,
+        elongationOption: "standard",
+      },
+    };
+  }
+  if (migrated.schemaVersion === FOLD_PROFILE_SCHEMA_VERSION && !Array.isArray(migrated.variables)) {
+    migrated = { ...migrated, variables: [] };
+  }
+  if (migrated.schemaVersion === FOLD_PROFILE_SCHEMA_VERSION && !Array.isArray(migrated.panelAttachments)) {
+    migrated = { ...migrated, panelAttachments: [] };
+  }
   return migrated;
 }
 
@@ -63,6 +101,9 @@ function assertDocumentShape(value: unknown): asserts value is FoldProfile {
     typeof value.product.length !== "number" ||
     typeof value.product.quantity !== "number" ||
     typeof value.calculation.mode !== "string" ||
+    !["standard", "two-line", "diagonal", "ext1"].includes(
+      String(value.calculation.elongationOption),
+    ) ||
     typeof value.calculation.vCutEnabled !== "boolean" ||
     typeof value.calculation.decimalPlaces !== "number" ||
     typeof value.calculation.decimalOperation !== "string"
@@ -71,6 +112,12 @@ function assertDocumentShape(value: unknown): asserts value is FoldProfile {
   }
   if (!Array.isArray(value.blocks)) {
     throw new FoldProfileParseError("절곡 면 목록이 올바르지 않습니다.");
+  }
+  if (!Array.isArray(value.variables)) {
+    throw new FoldProfileParseError("변수 목록이 올바르지 않습니다.");
+  }
+  if (!Array.isArray(value.panelAttachments)) {
+    throw new FoldProfileParseError("패널 연결 목록이 올바르지 않습니다.");
   }
   for (const block of value.blocks) {
     if (!isRecord(block) || typeof block.id !== "string" || !Array.isArray(block.segments)) {

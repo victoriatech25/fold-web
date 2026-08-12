@@ -211,6 +211,7 @@ export const FoldModelPreview = observer(function FoldModelPreview({ compact = f
     ? createBoxSolidModel(foldEditorStore.profile)
     : createFoldSolidModel(foldEditorStore.profile);
   const visibleCount = model.blocks.filter((block) => !hiddenBlockIds.has(block.blockId)).length;
+  const fixedHeight = height ?? (compact ? 360 : undefined);
   const requestView = (next: StandardView) => {
     setView(next);
     setFitRequest((value) => value + 1);
@@ -223,7 +224,7 @@ export const FoldModelPreview = observer(function FoldModelPreview({ compact = f
   }, [drawingCompletionRevision]);
 
   return (
-    <section style={{ height: height ?? (compact ? 360 : 620) }} className={`bg-[#edf1f3] ${compact ? "xl:border-l xl:border-slate-300" : ""}`} aria-label="3D 미리보기">
+    <section style={fixedHeight === undefined ? undefined : { height: fixedHeight }} className={`bg-[#edf1f3] ${fixedHeight === undefined ? "h-full min-h-[240px] xl:min-h-0" : ""} ${compact ? "xl:border-l xl:border-slate-300" : ""}`} aria-label="3D 미리보기">
       <div className="flex h-12 items-center gap-2 overflow-x-auto border-b border-slate-300 bg-white px-3">
         <Box size={16} className="shrink-0 text-teal-700" />
         <h2 className="shrink-0 text-sm font-bold text-slate-900">3D 미리보기</h2>
@@ -237,7 +238,7 @@ export const FoldModelPreview = observer(function FoldModelPreview({ compact = f
         <Tooltip label={projection === "perspective" ? "직교 투영으로 전환" : "원근 투영으로 전환"}><button type="button" aria-label="3D 투영 전환" onClick={() => { setProjection((value) => value === "perspective" ? "orthographic" : "perspective"); setFitRequest((value) => value + 1); }} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-100">{projection === "perspective" ? <Box size={15} /> : <Square size={15} />}</button></Tooltip>
         <Tooltip label="3D 모델 초기화"><button type="button" aria-label="3D 모델 초기화" disabled={!model.valid} onClick={() => setFitRequest((value) => value + 1)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"><Scan size={16} /></button></Tooltip>
       </div>
-      <div style={{ height: (height ?? (compact ? 360 : 620)) - 48 }} className="relative w-full">
+      <div style={fixedHeight === undefined ? undefined : { height: Math.max(0, fixedHeight - 48) }} className={`relative w-full ${fixedHeight === undefined ? "h-[calc(100%-3rem)]" : ""}`}>
         {model.valid && model.bounds ? (
           <>
             {model.blocks.length > 1 ? <div className="absolute left-3 top-3 z-10 flex gap-1 rounded bg-white/90 p-1 shadow-sm">{model.blocks.map((block) => {

@@ -58,7 +58,6 @@ describe("createBoxDevelopedPattern", () => {
       createFoldSegment({ x: 50, y: 80 }, { x: 90, y: 80 }, { id: "bottom" }),
     ];
     profile.blocks.push(vertical);
-
     const pattern = createBoxDevelopedPattern(profile)!;
 
     expect(pattern.finishedBase).toEqual({ width: 100, height: 80 });

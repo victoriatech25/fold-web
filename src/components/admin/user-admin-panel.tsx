@@ -5,6 +5,7 @@ import { FormEvent, useState, useTransition } from "react";
 
 import { adminRequest } from "@/components/admin/admin-api";
 import { OneTimeUrl } from "@/components/admin/one-time-url";
+import { useCommonPopup } from "@/components/ui/common-popup";
 import type {
   AdminDepartmentDto,
   AdminRoleDto,
@@ -30,6 +31,7 @@ function UserEditor({
   onUrl: (title: string, url: string) => void;
 }) {
   const router = useRouter();
+  const { confirm: confirmPopup } = useCommonPopup();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [displayName, setDisplayName] = useState(user.displayName);
@@ -41,7 +43,7 @@ function UserEditor({
     user.membership.roles.map(({ id }) => id),
   );
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const removesAdministrator =
       user.membership.roles.some(({ key }) => key === "ADMINISTRATOR") &&
@@ -51,9 +53,12 @@ function UserEditor({
       );
     if (
       (status !== "ACTIVE" || removesAdministrator) &&
-      !window.confirm(
-        `${user.displayName} 사용자의 접근 권한을 제한합니다. 계속하시겠습니까?`,
-      )
+      !(await confirmPopup({
+        title: "사용자 접근 제한",
+        message: `${user.displayName} 사용자의 상태 또는 관리자 역할을 변경해 접근 권한을 제한합니다. 계속하시겠습니까?`,
+        confirmText: "변경 저장",
+        variant: "danger",
+      }))
     ) {
       return;
     }

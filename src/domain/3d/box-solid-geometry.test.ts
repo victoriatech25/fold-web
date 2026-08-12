@@ -9,7 +9,7 @@ const createBoxProfile = () => {
   const profile = createFoldProfile({
     profileType: "box",
     material: { thickness: 2, insideBendRadius: 2 },
-    product: { length: 9999, quantity: 1 },
+    product: { length: 0, quantity: 1 },
   });
   const horizontal = profile.blocks[0];
   horizontal.id = "horizontal";
@@ -50,7 +50,7 @@ describe("box solid geometry", () => {
     expect(model.bounds!.max[2]).toBeGreaterThanOrEqual(20);
   });
 
-  it("does not use the normal product extrusion length", () => {
+  it("creates the box without a normal product extrusion length", () => {
     const profile = createBoxProfile();
     const first = createBoxSolidModel(profile).bounds;
     profile.product.length = 25000;
@@ -60,10 +60,28 @@ describe("box solid geometry", () => {
     expect(Math.max(...second!.size)).toBeLessThan(200);
   });
 
+  it("reports a clear issue when the two sections have no intersecting floor lines", () => {
+    const profile = createBoxProfile();
+    profile.blocks[1].segments.forEach((segment) => {
+      segment.start.x += 500;
+      segment.end.x += 500;
+    });
+    const model = createBoxSolidModel(profile);
+    expect(model.valid).toBe(false);
+    expect(model.issues[0]).toMatchObject({ code: "MISSING_BOX_INTERSECTION" });
+  });
+
+  it("does not treat overlapping parallel lines as a box floor crossing", () => {
+    const profile = createBoxProfile();
+    profile.blocks[1].segments = [
+      createFoldSegment({ x: 20, y: 0 }, { x: 80, y: 0 }, { id: "parallel-overlap" }),
+    ];
+    expect(findBoxBaseSegments(profile.blocks)).toBeNull();
+  });
+
   it("keeps source segment ids after radius sampling", () => {
     const model = createBoxSolidModel(createBoxProfile());
     const ids = model.blocks.flatMap((block) => block.segmentRanges.map((range) => range.segmentId));
     expect(ids).toEqual(expect.arrayContaining(["x-left", "x-base", "x-right", "y-front", "y-base", "y-back"]));
   });
 });
-

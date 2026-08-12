@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Circle, Group, Layer, Line, Rect, Stage, Text } from "react-konva";
 
 import { distanceMm, type PointMm } from "@/domain/fold-profile";
+import { arcBulgePoint, sampleSegmentPoints } from "@/domain/fold-geometry";
 import { foldEditorStore } from "@/stores/fold-editor-store";
 
 const DEFAULT_STAGE_HEIGHT = 620;
@@ -21,16 +22,19 @@ const snapOrthogonal = (start: PointMm, point: PointMm): PointMm => {
   return point;
 };
 
-export const KonvaStage = observer(function KonvaStage({ height = DEFAULT_STAGE_HEIGHT }: { height?: number }) {
+export const KonvaStage = observer(function KonvaStage({ height }: { height?: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const dragOriginRef = useRef<PointMm | null>(null);
+  const arcOriginRef = useRef<{ side: "left" | "right"; sagitta: number } | null>(null);
   const panOriginRef = useRef<{
     pointer: PointMm;
     camera: { x: number; y: number; scale: number };
   } | null>(null);
   const spacePressedRef = useRef(false);
-  const [width, setWidth] = useState(900);
+  const [size, setSize] = useState({ width: 900, height: height ?? DEFAULT_STAGE_HEIGHT });
+  const width = size.width;
+  const stageHeight = height ?? size.height;
   const [camera, setCamera] = useState({ x: 120, y: 310, scale: 2 });
   const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -39,7 +43,10 @@ export const KonvaStage = observer(function KonvaStage({ height = DEFAULT_STAGE_
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
-    const resizeObserver = new ResizeObserver(([entry]) => setWidth(Math.max(320, entry.contentRect.width)));
+    const resizeObserver = new ResizeObserver(([entry]) => setSize({
+      width: Math.max(320, entry.contentRect.width),
+      height: Math.max(120, entry.contentRect.height),
+    }));
     resizeObserver.observe(element);
     return () => resizeObserver.disconnect();
   }, []);
@@ -99,23 +106,23 @@ export const KonvaStage = observer(function KonvaStage({ height = DEFAULT_STAGE_
 
   const fitView = useCallback(() => {
     const points = foldEditorStore.profile.blocks.flatMap((block) =>
-      block.segments.flatMap((segment) => [segment.start, segment.end]),
+      block.segments.flatMap((segment) => sampleSegmentPoints(segment)),
     );
     if (points.length === 0) {
-      setCamera({ x: width / 2, y: height / 2, scale: 2 });
+      setCamera({ x: width / 2, y: stageHeight / 2, scale: 2 });
       return;
     }
     const minX = Math.min(...points.map((point) => point.x));
     const maxX = Math.max(...points.map((point) => point.x));
     const minY = Math.min(...points.map((point) => point.y));
     const maxY = Math.max(...points.map((point) => point.y));
-    const scale = Math.min(3, (width - 160) / Math.max(80, maxX - minX), (height - 120) / Math.max(80, maxY - minY));
+    const scale = Math.min(3, (width - 160) / Math.max(80, maxX - minX), Math.max(40, stageHeight - 120) / Math.max(80, maxY - minY));
     setCamera({
       x: width / 2 - ((minX + maxX) / 2) * scale,
-      y: height / 2 - ((minY + maxY) / 2) * scale,
+      y: stageHeight / 2 - ((minY + maxY) / 2) * scale,
       scale,
     });
-  }, [height, width]);
+  }, [stageHeight, width]);
 
   useEffect(() => {
     if (foldEditorStore.mode === "draw") return;
@@ -131,7 +138,7 @@ export const KonvaStage = observer(function KonvaStage({ height = DEFAULT_STAGE_
   const worldLeft = -camera.x / camera.scale;
   const worldTop = -camera.y / camera.scale;
   const worldRight = worldLeft + width / camera.scale;
-  const worldBottom = worldTop + height / camera.scale;
+  const worldBottom = worldTop + stageHeight / camera.scale;
   for (let x = Math.floor(worldLeft / GRID_SIZE) * GRID_SIZE; x <= worldRight; x += GRID_SIZE) {
     gridLines.push(<Line key={`x-${x}`} points={[x, worldTop, x, worldBottom]} stroke={x === 0 ? "#94a3b8" : "#e2e8f0"} strokeWidth={(x === 0 ? 1.2 : 0.6) / camera.scale} listening={false} />);
   }
@@ -154,13 +161,14 @@ export const KonvaStage = observer(function KonvaStage({ height = DEFAULT_STAGE_
   return (
     <div
       ref={containerRef}
-      style={{ height }}
-      className={`relative w-full overflow-hidden bg-[#f8fafc] ${isPanning ? "cursor-grabbing" : isSegmentHovered ? "cursor-default" : foldEditorStore.mode === "draw" ? "cursor-crosshair" : "cursor-grab"}`}
+      style={height === undefined ? undefined : { height }}
+      data-testid="fold-canvas"
+      className={`relative h-full min-h-[240px] w-full overflow-hidden bg-[#f8fafc] ${isPanning ? "cursor-grabbing" : isSegmentHovered ? "cursor-default" : foldEditorStore.mode === "draw" ? "cursor-crosshair" : "cursor-grab"}`}
     >
       <Stage
         ref={stageRef}
         width={width}
-        height={height}
+        height={stageHeight}
         onMouseDown={(event) => {
           const pointer = stageRef.current?.getPointerPosition();
           if (!pointer) return;
@@ -218,7 +226,7 @@ export const KonvaStage = observer(function KonvaStage({ height = DEFAULT_STAGE_
         }}
       >
         <Layer>
-          <Rect width={width} height={height} fill="#f8fafc" listening={false} />
+          <Rect width={width} height={stageHeight} fill="#f8fafc" listening={false} />
         </Layer>
         <Layer x={camera.x} y={camera.y} scaleX={camera.scale} scaleY={camera.scale}>
           {gridLines}
@@ -227,24 +235,61 @@ export const KonvaStage = observer(function KonvaStage({ height = DEFAULT_STAGE_
             const active = block.id === foldEditorStore.activeBlockId;
             const selected = active && segment.id === foldEditorStore.selectedSegmentId;
             const result = foldEditorStore.blockCalculations[blockIndex]?.segments[index];
-            const middle = { x: (segment.start.x + segment.end.x) / 2, y: (segment.start.y + segment.end.y) / 2 };
+            const arc = segment.geometry?.kind === "arc" ? segment.geometry : null;
+            const sampled = sampleSegmentPoints(segment);
+            const linePoints = sampled.flatMap((point) => [point.x, point.y]);
+            const middle = arc
+              ? arcBulgePoint(segment.start, segment.end, arc.sagitta, arc.side)
+              : { x: (segment.start.x + segment.end.x) / 2, y: (segment.start.y + segment.end.y) / 2 };
             const label = `${segment.inputLength.toFixed(1)} mm${result && result.calculatedLength !== segment.inputLength ? `  →  ${result.calculatedLength.toFixed(1)}` : ""}`;
             return (
               <Group key={segment.id}>
                 <Line
-                  points={[segment.start.x, segment.start.y, segment.end.x, segment.end.y]}
+                  points={linePoints}
                   stroke="transparent"
                   strokeWidth={14 / camera.scale}
                   onMouseEnter={() => setIsSegmentHovered(true)}
                   onMouseLeave={() => setIsSegmentHovered(false)}
                   onClick={(event) => { event.cancelBubble = true; foldEditorStore.selectSegment(segment.id, block.id); }}
                 />
-                <Line points={[segment.start.x, segment.start.y, segment.end.x, segment.end.y]} stroke={selected ? "#0f766e" : active ? "#1e293b" : "#64748b"} strokeWidth={(selected ? 4 : 3) / camera.scale} lineCap="round" dash={active ? undefined : [5 / camera.scale, 3 / camera.scale]} listening={false} />
+                <Line points={linePoints} stroke={selected ? "#0f766e" : active ? "#1e293b" : "#64748b"} strokeWidth={(selected ? 4 : 3) / camera.scale} lineCap="round" lineJoin="round" dash={active ? undefined : [5 / camera.scale, 3 / camera.scale]} listening={false} />
                 <Group x={middle.x} y={middle.y} listening={false}>
                   <Rect x={-42 / camera.scale} y={-26 / camera.scale} width={84 / camera.scale} height={18 / camera.scale} fill="#ffffff" opacity={0.94} cornerRadius={3 / camera.scale} />
                   <Text x={-60 / camera.scale} y={-24 / camera.scale} width={120 / camera.scale} text={label} align="center" fontSize={11 / camera.scale} fill="#334155" />
                 </Group>
                 {segment.bendAfter ? <Circle x={segment.end.x} y={segment.end.y} radius={7 / camera.scale} fill={segment.bendAfter.direction === "front" ? "#dc2626" : "#2563eb"} stroke="#fff" strokeWidth={2 / camera.scale} listening={false} /> : null}
+                {selected && arc ? <Circle
+                  x={middle.x}
+                  y={middle.y}
+                  radius={6 / camera.scale}
+                  fill="#f0fdfa"
+                  stroke="#0f766e"
+                  strokeWidth={2 / camera.scale}
+                  draggable={!foldEditorStore.readOnly}
+                  onDragStart={() => { arcOriginRef.current = { side: arc.side, sagitta: arc.sagitta }; }}
+                  onDragMove={(event) => {
+                    const midpoint = { x: (segment.start.x + segment.end.x) / 2, y: (segment.start.y + segment.end.y) / 2 };
+                    const dx = segment.end.x - segment.start.x;
+                    const dy = segment.end.y - segment.start.y;
+                    const chord = Math.hypot(dx, dy);
+                    if (chord <= 0) return;
+                    const signed = (-dy * (event.target.x() - midpoint.x) + dx * (event.target.y() - midpoint.y)) / chord;
+                    foldEditorStore.updateSelectedArc(signed >= 0 ? "left" : "right", Math.max(0.000001, Math.abs(signed)), false);
+                  }}
+                  onDragEnd={(event) => {
+                    const origin = arcOriginRef.current;
+                    const midpoint = { x: (segment.start.x + segment.end.x) / 2, y: (segment.start.y + segment.end.y) / 2 };
+                    const dx = segment.end.x - segment.start.x;
+                    const dy = segment.end.y - segment.start.y;
+                    const chord = Math.hypot(dx, dy);
+                    if (origin && chord > 0) {
+                      const signed = (-dy * (event.target.x() - midpoint.x) + dx * (event.target.y() - midpoint.y)) / chord;
+                      foldEditorStore.updateSelectedArc(origin.side, origin.sagitta, false);
+                      foldEditorStore.updateSelectedArc(signed >= 0 ? "left" : "right", Math.max(0.000001, Math.abs(signed)), true);
+                    }
+                    arcOriginRef.current = null;
+                  }}
+                /> : null}
               </Group>
             );
           }))}

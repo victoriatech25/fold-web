@@ -1,4 +1,5 @@
 import { distanceMm, type Bend, type FoldProfile, type PointMm } from "../fold-profile";
+import { sampleSegmentPoints } from "../fold-geometry";
 
 export type FoldModelSegmentInput = {
   id: string;
@@ -30,7 +31,8 @@ export type FoldModelIssueCode =
   | "INVALID_THICKNESS"
   | "INVALID_POINT"
   | "ZERO_LENGTH_SEGMENT"
-  | "DISCONNECTED_SEGMENT";
+  | "DISCONNECTED_SEGMENT"
+  | "MISSING_BOX_INTERSECTION";
 
 export type FoldModelIssue = {
   code: FoldModelIssueCode;
@@ -48,10 +50,14 @@ export type FoldModelInputResult = {
 
 const finitePoint = (point: PointMm) => Number.isFinite(point.x) && Number.isFinite(point.y);
 
-export function createFoldModelInput(profile: FoldProfile, tolerance = 0.001): FoldModelInputResult {
+export function createFoldModelInput(
+  profile: FoldProfile,
+  tolerance = 0.001,
+  options: { requireProductLength?: boolean } = {},
+): FoldModelInputResult {
   const issues: FoldModelIssue[] = [];
   const blocks = profile.blocks.map((block, blockIndex) => {
-    const segments = block.segments.map((segment, segmentIndex) => {
+    const segments = block.segments.flatMap((segment, segmentIndex) => {
       const path = `blocks[${blockIndex}].segments[${segmentIndex}]`;
       if (!finitePoint(segment.start) || !finitePoint(segment.end)) {
         issues.push({
@@ -81,12 +87,15 @@ export function createFoldModelInput(profile: FoldProfile, tolerance = 0.001): F
           segmentId: segment.id,
         });
       }
-      return {
+      const sampled = sampleSegmentPoints(segment);
+      return sampled.slice(0, -1).map((start, sampleIndex) => ({
         id: segment.id,
-        start: { ...segment.start },
-        end: { ...segment.end },
-        ...(segment.bendAfter && { bendAfter: { ...segment.bendAfter } }),
-      };
+        start: { ...start },
+        end: { ...sampled[sampleIndex + 1] },
+        ...(segment.bendAfter && sampleIndex === sampled.length - 2
+          ? { bendAfter: { ...segment.bendAfter } }
+          : {}),
+      }));
     });
     const first = segments[0]?.start;
     const last = segments.at(-1)?.end;
@@ -102,7 +111,7 @@ export function createFoldModelInput(profile: FoldProfile, tolerance = 0.001): F
   if (blocks.every((block) => block.segments.length === 0)) {
     issues.push({ code: "EMPTY_MODEL", message: "3D로 표시할 선이 없습니다.", path: "blocks" });
   }
-  if (!Number.isFinite(profile.product.length) || profile.product.length <= 0) {
+  if (options.requireProductLength !== false && (!Number.isFinite(profile.product.length) || profile.product.length <= 0)) {
     issues.push({
       code: "INVALID_PRODUCT_LENGTH",
       message: "3D 모델에는 0보다 큰 제품 길이가 필요합니다.",

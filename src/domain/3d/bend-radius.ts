@@ -1,6 +1,8 @@
 import type { FoldModelBlockInput, FoldModelInput, FoldModelSegmentInput } from "./fold-model-input";
 import type { ModelGeometryWarning } from "./surface-geometry";
 
+type BendRadiusWarning = Extract<ModelGeometryWarning, { code: "BEND_RADIUS_CLAMPED" }>;
+
 type Point2D = { x: number; y: number };
 type Fillet = {
   tangentIn: Point2D;
@@ -28,7 +30,7 @@ function createFillet(
   block: FoldModelBlockInput,
   bendSegment: FoldModelSegmentInput,
   input: FoldModelInput,
-  warnings: ModelGeometryWarning[],
+  warnings: BendRadiusWarning[],
 ): Fillet | null {
   if (!bendSegment.bendAfter || input.insideBendRadius <= 0) return null;
   const incoming = direction(previous, joint);
@@ -81,7 +83,7 @@ function appendArc(target: FoldModelSegmentInput[], fillet: Fillet) {
   }
 }
 
-function roundBlock(block: FoldModelBlockInput, input: FoldModelInput, warnings: ModelGeometryWarning[]): FoldModelBlockInput {
+function roundBlock(block: FoldModelBlockInput, input: FoldModelInput, warnings: BendRadiusWarning[]): FoldModelBlockInput {
   if (block.segments.length < 2) return block;
   const rawPoints = [block.segments[0].start, ...block.segments.map((segment) => segment.end)].map(point);
   const points = block.closed ? rawPoints.slice(0, -1) : rawPoints;
@@ -113,7 +115,7 @@ function roundBlock(block: FoldModelBlockInput, input: FoldModelInput, warnings:
 }
 
 export function createRoundedFoldModelInput(input: FoldModelInput) {
-  const warnings: ModelGeometryWarning[] = [];
+  const warnings: BendRadiusWarning[] = [];
   return {
     input: { ...input, blocks: input.blocks.map((block) => roundBlock(block, input, warnings)) },
     warnings,

@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
+import { CommonPopupProvider } from "@/components/ui/common-popup";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "절곡 단면 편집기",
-  description: "알루미늄 절곡 단면과 전개 폭을 계산하는 웹 편집기",
+  title: {
+    default: "FOLD WEB",
+    template: "%s | FOLD WEB",
+  },
+  description: "절곡 설계와 제작 업무를 연결하는 웹서비스",
 };
 
 export default function RootLayout({
@@ -13,7 +17,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <CommonPopupProvider>{children}</CommonPopupProvider>
+      </body>
     </html>
   );
 }

@@ -10,9 +10,14 @@ import {
 
 describe("permission catalog", () => {
   it("contains stable unique permission and system role keys", () => {
-    expect(new Set(permissionCatalog.map(({ key }) => key)).size).toBe(18);
+    expect(new Set(permissionCatalog.map(({ key }) => key)).size).toBe(23);
     expect(new Set(systemRoleDefinitions.map(({ key }) => key)).size).toBe(4);
     expect(isPermissionKey("admin.manage")).toBe(true);
+    expect(isPermissionKey("master_data.read")).toBe(true);
+    expect(isPermissionKey("master_data.manage")).toBe(true);
+    expect(isPermissionKey("pricing.read")).toBe(true);
+    expect(isPermissionKey("pricing.write")).toBe(true);
+    expect(isPermissionKey("pricing.approve")).toBe(true);
     expect(isPermissionKey("unknown")).toBe(false);
     expect(isSystemRoleKey("ADMINISTRATOR")).toBe(true);
     expect(isSystemRoleKey("CUSTOM")).toBe(false);
