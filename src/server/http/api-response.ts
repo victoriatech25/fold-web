@@ -42,6 +42,7 @@ export function apiErrorResponse(
   status: number,
   code: ApiErrorCode,
   message: string,
+  details?: unknown,
 ): Response {
   return jsonResponse(
     {
@@ -49,6 +50,7 @@ export function apiErrorResponse(
         code,
         message,
         requestId,
+        ...(details === undefined ? {} : { details }),
       },
     },
     requestId,

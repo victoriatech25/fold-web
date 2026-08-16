@@ -17,7 +17,13 @@ export async function authorizeOrderRequest(request: Request, requestId: string,
 export function orderRouteErrorResponse(error: unknown, requestId: string): Response {
   if (error instanceof OrderError) {
     const status = { INVALID_REQUEST: 400, FORBIDDEN: 403, NOT_FOUND: 404, CONFLICT: 409 }[error.code];
-    return apiErrorResponse(requestId, status, error.code as ApiErrorCode, error.message);
+    return apiErrorResponse(
+      requestId,
+      status,
+      error.code as ApiErrorCode,
+      error.message,
+      error.details,
+    );
   }
   console.error("Order request failed", { requestId, error });
   return apiErrorResponse(requestId, 500, "INTERNAL_ERROR", "서버에서 수주 요청을 처리하지 못했습니다.");

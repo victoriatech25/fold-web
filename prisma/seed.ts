@@ -1,5 +1,6 @@
 import "dotenv/config";
 
+import { createHash } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import {
@@ -12,6 +13,8 @@ import {
 } from "../src/domain/permission";
 import { calculateMaterialRuleChecksum } from "../src/server/material-rules/material-rule-policy";
 import { calculatePriceRevisionChecksum } from "../src/server/pricing/pricing-policy";
+import { projectCanonicalJsonV1 } from "../src/domain/fold-document/canonical";
+import { parseServerFoldDocument, type ServerFoldDocumentV1 } from "../src/domain/fold-document/schema";
 
 const connectionString =
   process.env.DATABASE_URL ??
@@ -20,6 +23,17 @@ const connectionString =
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
+
+function prepareSeedFoldDocument(input: ServerFoldDocumentV1) {
+  const document = parseServerFoldDocument(input);
+  const canonical = projectCanonicalJsonV1(document);
+  return {
+    materialRuleRevisionId: document.material.ruleRevisionId,
+    documentSchemaVersion: document.schemaVersion,
+    document: JSON.parse(canonical),
+    documentChecksumSha256: createHash("sha256").update(canonical, "utf8").digest("hex"),
+  };
+}
 
 async function seed() {
   const organizationCode = process.env.SEED_ORGANIZATION_CODE ?? "LOCAL_DEV";
@@ -176,7 +190,7 @@ async function seed() {
       { code: "AL-3T", name: "알루미늄 3T", thickness: "3", v: "1.8", a: "1.2", noCut: "3" },
     ] as const;
 
-    const pricingVariants: Array<{ id: string; code: string; material: string; bend: string; vCut: string; sheetItemId: string }> = [];
+    const pricingVariants: Array<{ id: string; code: string; material: string; bend: string; vCut: string; sheetItemId: string; ruleRevisionId: string }> = [];
     const localPriceRates = [
       { material: "20000", bend: "1000", vCut: "500" },
       { material: "30000", bend: "1200", vCut: "600" },
@@ -222,7 +236,7 @@ async function seed() {
         changeSummary: "로컬 기준 계산 규칙",
       };
       const contentChecksumSha256 = calculateMaterialRuleChecksum(ruleFields);
-      await tx.materialRuleRevision.upsert({
+      const ruleRevision = await tx.materialRuleRevision.upsert({
         where: {
           materialVariantId_revisionNumber: {
             materialVariantId: variant.id,
@@ -275,7 +289,7 @@ async function seed() {
         },
       });
       const localRates = localPriceRates[index]!;
-      pricingVariants.push({ id: variant.id, code: variant.code, ...localRates, sheetItemId: sheetItem.id });
+      pricingVariants.push({ id: variant.id, code: variant.code, ...localRates, sheetItemId: sheetItem.id, ruleRevisionId: ruleRevision.id });
     }
 
     const defaultTier = await tx.priceTier.upsert({
@@ -368,7 +382,7 @@ async function seed() {
 
     void defaultTier;
 
-    await tx.foldCategory.upsert({
+    const foldCategory = await tx.foldCategory.upsert({
       where: {
         organizationId_code: {
           organizationId: organization.id,
@@ -384,6 +398,45 @@ async function seed() {
         code: "DEFAULT",
         name: "기본",
       },
+    });
+
+    const screenTemplate = await tx.foldTemplate.upsert({
+      where: { organizationId_code: { organizationId: organization.id, code: "SCREEN-FOLD-L" } },
+      update: { name: "화면검수 ㄱ자 절곡", categoryId: foldCategory.id, active: true, deletedAt: null },
+      create: { organizationId: organization.id, categoryId: foldCategory.id, code: "SCREEN-FOLD-L", name: "화면검수 ㄱ자 절곡", documentType: "NORMAL" },
+    });
+    const primaryRule = pricingVariants[0]!;
+    const screenDocument: ServerFoldDocumentV1 = {
+      schemaVersion: 1,
+      documentType: "normal",
+      name: "화면검수 ㄱ자 절곡",
+      product: { lengthMm: "1200", quantity: 2 },
+      material: {
+        ruleRevisionId: primaryRule.ruleRevisionId,
+        name: "알루미늄 1T",
+        thicknessMm: "1",
+        insideBendRadiusMm: "1",
+        cutAngleDeg: "135",
+        elongationMm: { vCut: "0.6", aCut: "0.4", noCut: "1" },
+        cutDepthMm: { vCut: "0.5", aCut: "0.5", noCut: "0" },
+      },
+      calculation: { mode: "fixed", elongationOption: "standard", vCutEnabled: true, decimalPlaces: 1, decimalOperation: "round" },
+      variables: [{ name: "A", valueMm: "100" }],
+      blocks: [{
+        id: "screen-block-1",
+        name: "ㄱ자 단면",
+        order: 1,
+        segments: [
+          { id: "screen-segment-1", order: 1, geometry: { kind: "line", start: { xMm: "0", yMm: "0" }, end: { xMm: "100", yMm: "0" }, direction: "e" }, nominalLengthMm: "100", junctionAfter: { angleDeg: "90", calculateElongation: true, cutType: "no-cut", operations: [{ direction: "front", form: "standard" }] } },
+          { id: "screen-segment-2", order: 2, geometry: { kind: "line", start: { xMm: "100", yMm: "0" }, end: { xMm: "100", yMm: "80" }, direction: "n" }, nominalLengthMm: "80" },
+        ],
+      }],
+    };
+    const preparedScreenDocument = prepareSeedFoldDocument(screenDocument);
+    await tx.foldRevision.upsert({
+      where: { templateId_revisionNumber: { templateId: screenTemplate.id, revisionNumber: 1 } },
+      update: { status: "PUBLISHED", name: screenDocument.name, publishedAt: new Date("2026-08-17T00:00:00.000Z"), deletedAt: null, ...preparedScreenDocument },
+      create: { organizationId: organization.id, templateId: screenTemplate.id, revisionNumber: 1, status: "PUBLISHED", name: screenDocument.name, publishedAt: new Date("2026-08-17T00:00:00.000Z"), ...preparedScreenDocument },
     });
   });
 }

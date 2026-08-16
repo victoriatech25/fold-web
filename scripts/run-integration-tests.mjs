@@ -36,6 +36,8 @@ run(
     "src/server/admin/admin.integration.test.ts",
     "src/server/company-settings/company-settings.integration.test.ts",
     "src/server/customers/customer.integration.test.ts",
+    "src/server/orders/order.integration.test.ts",
+    "src/server/orders/order-fold.integration.test.ts",
     "src/server/materials/material.integration.test.ts",
     "src/server/material-rules/material-rule.integration.test.ts",
     "src/server/pricing/pricing.integration.test.ts",

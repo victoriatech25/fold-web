@@ -153,6 +153,29 @@ type AuditPayloadByAction = {
   "order.updated": { before: SalesOrderAuditSnapshot; after: SalesOrderAuditSnapshot };
   "order.copied": { after: SalesOrderAuditSnapshot; metadata: { sourceOrderId: string } };
   "order.cancelled": { before: SalesOrderAuditSnapshot; after: SalesOrderAuditSnapshot };
+  "order.party_snapshot_captured": {
+    after: { schemaVersion: number; checksumSha256: string };
+  };
+  "order.fold_item_added": {
+    after: SalesOrderFoldItemAuditSnapshot;
+    metadata: SalesOrderFoldItemSourceAuditMetadata;
+  };
+  "order.fold_item_updated": {
+    before: SalesOrderFoldItemAuditSnapshot;
+    after: SalesOrderFoldItemAuditSnapshot;
+    metadata: { changedFields: string[] };
+  };
+  "order.fold_item_copied": {
+    after: SalesOrderFoldItemAuditSnapshot;
+    metadata: SalesOrderFoldItemSourceAuditMetadata & { sourceItemId: string };
+  };
+  "order.fold_item_removed": {
+    before: SalesOrderFoldItemAuditSnapshot;
+    after: SalesOrderFoldItemAuditSnapshot;
+  };
+  "order.fold_items_reordered": {
+    metadata: { itemCount: number; orderedItemIds: string[] };
+  };
   "material.created": { after: MaterialAuditSnapshot };
   "material.updated": { before: MaterialAuditSnapshot; after: MaterialAuditSnapshot };
   "material.variant_created": { after: MaterialVariantAuditSnapshot };
@@ -357,7 +380,39 @@ type CustomerSiteAuditSnapshot = {
   active: boolean;
   lockVersion: number;
 };
-type SalesOrderAuditSnapshot = { orderNumber: string; status: string; customerId: string; customerSiteId: string | null; customerContactId: string | null; ownerMembershipId: string | null; dueDate: string | null; lockVersion: number };
+type SalesOrderAuditSnapshot = {
+  orderNumber: string;
+  status: string;
+  customerId: string;
+  customerSiteId: string | null;
+  customerContactId: string | null;
+  ownerMembershipId: string | null;
+  dueDate: string | null;
+  externalReference: string | null;
+  memo: string | null;
+  cancellationReason: string | null;
+  lockVersion: number;
+};
+
+type SalesOrderFoldItemAuditSnapshot = {
+  salesOrderId: string;
+  lineNumber: number;
+  sortOrder: number;
+  name: string;
+  quantity: number;
+  materialRuleRevisionId: string;
+  sheetItemId: string | null;
+  documentChecksumSha256: string;
+  lockVersion: number;
+  removed: boolean;
+};
+
+type SalesOrderFoldItemSourceAuditMetadata = {
+  sourceFoldTemplateId: string;
+  sourceFoldRevisionId: string;
+  sourceRevisionNumber: number;
+  sourceDocumentChecksumSha256: string;
+};
 
 type MaterialAuditSnapshot = {
   code: string;

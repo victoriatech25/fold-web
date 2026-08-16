@@ -220,6 +220,12 @@ export const auditActionCatalog = {
   "order.updated": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrder", label: "수주 변경" },
   "order.copied": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrder", label: "수주 복사" },
   "order.cancelled": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrder", label: "수주 취소" },
+  "order.party_snapshot_captured": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrder", label: "수주 고객정보 고정" },
+  "order.fold_item_added": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrderFoldItem", label: "수주 절곡 작업 추가" },
+  "order.fold_item_updated": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrderFoldItem", label: "수주 절곡 작업 변경" },
+  "order.fold_item_copied": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrderFoldItem", label: "수주 절곡 작업 복사" },
+  "order.fold_item_removed": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrderFoldItem", label: "수주 절곡 작업 제거" },
+  "order.fold_items_reordered": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrder", label: "수주 절곡 작업 순서 변경" },
   "material.created": {
     category: "DATA_CHANGE",
     defaultOutcome: "SUCCESS",
