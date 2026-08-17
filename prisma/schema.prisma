@@ -122,6 +122,12 @@ enum PriceScopeType {
 
 enum SalesOrderStatus {
   DRAFT
+  CALCULATED
+  APPROVED
+  PRODUCTION_REQUESTED
+  IN_PRODUCTION
+  PRODUCED
+  CLOSED
   CANCELLED
 }
 
@@ -152,42 +158,44 @@ enum AuditSource {
 }
 
 model Organization {
-  id                       String                    @id @default(uuid()) @db.Uuid
-  code                     String                    @unique @db.VarChar(50)
-  name                     String                    @db.VarChar(200)
-  status                   OrganizationStatus        @default(ACTIVE)
-  lockVersion              Int                       @default(1)
-  createdAt                DateTime                  @default(now()) @db.Timestamptz(6)
-  updatedAt                DateTime                  @updatedAt @db.Timestamptz(6)
-  companyProfile           CompanyProfile?
-  customerCodeCounter      CustomerCodeCounter?
-  businessSites            BusinessSite[]
-  memberships              OrganizationMembership[]
-  departments              Department[]
-  roles                    Role[]
-  customers                Customer[]
-  customerContacts         CustomerContact[]
-  customerSites            CustomerSite[]
-  salesOrders              SalesOrder[]
-  salesOrderFoldItems      SalesOrderFoldItem[]
-  salesOrderNumberCounters SalesOrderNumberCounter[]
-  priceTiers               PriceTier[]
-  priceBooks               PriceBook[]
-  priceBookRevisions       PriceBookRevision[]
-  foldPriceRates           FoldPriceRate[]
-  sheetPriceRates          SheetPriceRate[]
-  surchargePolicies        SurchargePolicy[]
-  materials                Material[]
-  materialVariants         MaterialVariant[]
-  materialRuleRevisions    MaterialRuleRevision[]
-  sheetItems               SheetItem[]
-  foldCategories           FoldCategory[]
-  foldTemplates            FoldTemplate[]
-  foldRevisions            FoldRevision[]
-  fileAssets               FileAsset[]
-  machineIntegrationConfig MachineIntegrationConfig?
-  auditEvents              AuditEvent[]
-  legacyMappings           LegacyMapping[]
+  id                         String                              @id @default(uuid()) @db.Uuid
+  code                       String                              @unique @db.VarChar(50)
+  name                       String                              @db.VarChar(200)
+  status                     OrganizationStatus                  @default(ACTIVE)
+  lockVersion                Int                                 @default(1)
+  createdAt                  DateTime                            @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime                            @updatedAt @db.Timestamptz(6)
+  companyProfile             CompanyProfile?
+  customerCodeCounter        CustomerCodeCounter?
+  businessSites              BusinessSite[]
+  memberships                OrganizationMembership[]
+  departments                Department[]
+  roles                      Role[]
+  customers                  Customer[]
+  customerContacts           CustomerContact[]
+  customerSites              CustomerSite[]
+  salesOrders                SalesOrder[]
+  salesOrderFoldItems        SalesOrderFoldItem[]
+  salesOrderCalculations     SalesOrderCalculationSnapshot[]
+  salesOrderFoldCalculations SalesOrderFoldCalculationSnapshot[]
+  salesOrderNumberCounters   SalesOrderNumberCounter[]
+  priceTiers                 PriceTier[]
+  priceBooks                 PriceBook[]
+  priceBookRevisions         PriceBookRevision[]
+  foldPriceRates             FoldPriceRate[]
+  sheetPriceRates            SheetPriceRate[]
+  surchargePolicies          SurchargePolicy[]
+  materials                  Material[]
+  materialVariants           MaterialVariant[]
+  materialRuleRevisions      MaterialRuleRevision[]
+  sheetItems                 SheetItem[]
+  foldCategories             FoldCategory[]
+  foldTemplates              FoldTemplate[]
+  foldRevisions              FoldRevision[]
+  fileAssets                 FileAsset[]
+  machineIntegrationConfig   MachineIntegrationConfig?
+  auditEvents                AuditEvent[]
+  legacyMappings             LegacyMapping[]
 
   @@index([status])
 }
@@ -333,23 +341,26 @@ model Department {
 }
 
 model OrganizationMembership {
-  id                         String               @id @default(uuid()) @db.Uuid
-  organizationId             String               @db.Uuid
-  userId                     String               @db.Uuid
-  departmentId               String?              @db.Uuid
-  status                     MembershipStatus     @default(ACTIVE)
-  joinedAt                   DateTime             @default(now()) @db.Timestamptz(6)
-  createdAt                  DateTime             @default(now()) @db.Timestamptz(6)
-  updatedAt                  DateTime             @updatedAt @db.Timestamptz(6)
-  organization               Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  user                       User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
-  department                 Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  roles                      MembershipRole[]
-  ownedSalesOrders           SalesOrder[]         @relation("SalesOrderOwner")
-  cancelledSalesOrders       SalesOrder[]         @relation("SalesOrderCanceller")
-  createdSalesOrderFoldItems SalesOrderFoldItem[] @relation("SalesOrderFoldItemCreator")
-  updatedSalesOrderFoldItems SalesOrderFoldItem[] @relation("SalesOrderFoldItemUpdater")
-  removedSalesOrderFoldItems SalesOrderFoldItem[] @relation("SalesOrderFoldItemRemover")
+  id                            String                          @id @default(uuid()) @db.Uuid
+  organizationId                String                          @db.Uuid
+  userId                        String                          @db.Uuid
+  departmentId                  String?                         @db.Uuid
+  status                        MembershipStatus                @default(ACTIVE)
+  joinedAt                      DateTime                        @default(now()) @db.Timestamptz(6)
+  createdAt                     DateTime                        @default(now()) @db.Timestamptz(6)
+  updatedAt                     DateTime                        @updatedAt @db.Timestamptz(6)
+  organization                  Organization                    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user                          User                            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  department                    Department?                     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  roles                         MembershipRole[]
+  ownedSalesOrders              SalesOrder[]                    @relation("SalesOrderOwner")
+  cancelledSalesOrders          SalesOrder[]                    @relation("SalesOrderCanceller")
+  approvedSalesOrders           SalesOrder[]                    @relation("SalesOrderApprover")
+  statusChangedSalesOrders      SalesOrder[]                    @relation("SalesOrderStatusChanger")
+  createdSalesOrderFoldItems    SalesOrderFoldItem[]            @relation("SalesOrderFoldItemCreator")
+  updatedSalesOrderFoldItems    SalesOrderFoldItem[]            @relation("SalesOrderFoldItemUpdater")
+  removedSalesOrderFoldItems    SalesOrderFoldItem[]            @relation("SalesOrderFoldItemRemover")
+  createdSalesOrderCalculations SalesOrderCalculationSnapshot[] @relation("SalesOrderCalculationCreator")
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -517,37 +528,47 @@ model SalesOrderNumberCounter {
 }
 
 model SalesOrder {
-  id                          String                  @id @default(uuid()) @db.Uuid
-  organizationId              String                  @db.Uuid
-  orderNumber                 String                  @db.VarChar(50)
-  sequenceYear                Int
-  status                      SalesOrderStatus        @default(DRAFT)
-  customerId                  String                  @db.Uuid
-  customerSiteId              String?                 @db.Uuid
-  customerContactId           String?                 @db.Uuid
-  ownerMembershipId           String?                 @db.Uuid
-  orderedAt                   DateTime                @default(now()) @db.Date
-  dueDate                     DateTime?               @db.Date
-  externalReference           String?                 @db.VarChar(200)
-  memo                        String?                 @db.Text
-  cancelledAt                 DateTime?               @db.Timestamptz(6)
-  cancelledByMembershipId     String?                 @db.Uuid
-  cancellationReason          String?                 @db.VarChar(500)
-  partySnapshotSchemaVersion  Int?
-  partySnapshot               Json?                   @db.JsonB
-  partySnapshotChecksumSha256 String?                 @db.Char(64)
-  partySnapshotCapturedAt     DateTime?               @db.Timestamptz(6)
-  nextFoldLineNumber          Int                     @default(1)
-  lockVersion                 Int                     @default(1)
-  createdAt                   DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt                   DateTime                @updatedAt @db.Timestamptz(6)
-  organization                Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  customer                    Customer                @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  customerSite                CustomerSite?           @relation(fields: [customerSiteId], references: [id], onDelete: Restrict)
-  customerContact             CustomerContact?        @relation(fields: [customerContactId], references: [id], onDelete: Restrict)
-  ownerMembership             OrganizationMembership? @relation("SalesOrderOwner", fields: [ownerMembershipId], references: [id], onDelete: Restrict)
-  cancelledByMembership       OrganizationMembership? @relation("SalesOrderCanceller", fields: [cancelledByMembershipId], references: [id], onDelete: Restrict)
-  foldItems                   SalesOrderFoldItem[]
+  id                            String                          @id @default(uuid()) @db.Uuid
+  organizationId                String                          @db.Uuid
+  orderNumber                   String                          @db.VarChar(50)
+  sequenceYear                  Int
+  status                        SalesOrderStatus                @default(DRAFT)
+  customerId                    String                          @db.Uuid
+  customerSiteId                String?                         @db.Uuid
+  customerContactId             String?                         @db.Uuid
+  ownerMembershipId             String?                         @db.Uuid
+  orderedAt                     DateTime                        @default(now()) @db.Date
+  dueDate                       DateTime?                       @db.Date
+  externalReference             String?                         @db.VarChar(200)
+  memo                          String?                         @db.Text
+  cancelledAt                   DateTime?                       @db.Timestamptz(6)
+  cancelledByMembershipId       String?                         @db.Uuid
+  cancellationReason            String?                         @db.VarChar(500)
+  approvedCalculationSnapshotId String?                         @unique @db.Uuid
+  approvedAt                    DateTime?                       @db.Timestamptz(6)
+  approvedByMembershipId        String?                         @db.Uuid
+  statusChangedAt               DateTime                        @default(now()) @db.Timestamptz(6)
+  statusChangedByMembershipId   String?                         @db.Uuid
+  partySnapshotSchemaVersion    Int?
+  partySnapshot                 Json?                           @db.JsonB
+  partySnapshotChecksumSha256   String?                         @db.Char(64)
+  partySnapshotCapturedAt       DateTime?                       @db.Timestamptz(6)
+  nextFoldLineNumber            Int                             @default(1)
+  nextCalculationNumber         Int                             @default(1)
+  lockVersion                   Int                             @default(1)
+  createdAt                     DateTime                        @default(now()) @db.Timestamptz(6)
+  updatedAt                     DateTime                        @updatedAt @db.Timestamptz(6)
+  organization                  Organization                    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer                      Customer                        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customerSite                  CustomerSite?                   @relation(fields: [customerSiteId], references: [id], onDelete: Restrict)
+  customerContact               CustomerContact?                @relation(fields: [customerContactId], references: [id], onDelete: Restrict)
+  ownerMembership               OrganizationMembership?         @relation("SalesOrderOwner", fields: [ownerMembershipId], references: [id], onDelete: Restrict)
+  cancelledByMembership         OrganizationMembership?         @relation("SalesOrderCanceller", fields: [cancelledByMembershipId], references: [id], onDelete: Restrict)
+  approvedByMembership          OrganizationMembership?         @relation("SalesOrderApprover", fields: [approvedByMembershipId], references: [id], onDelete: Restrict)
+  statusChangedByMembership     OrganizationMembership?         @relation("SalesOrderStatusChanger", fields: [statusChangedByMembershipId], references: [id], onDelete: Restrict)
+  approvedCalculationSnapshot   SalesOrderCalculationSnapshot?  @relation("SalesOrderApprovedCalculation", fields: [approvedCalculationSnapshotId], references: [id], onDelete: Restrict)
+  foldItems                     SalesOrderFoldItem[]
+  calculationSnapshots          SalesOrderCalculationSnapshot[]
 
   @@unique([organizationId, orderNumber])
   @@index([organizationId, status, updatedAt])
@@ -555,40 +576,41 @@ model SalesOrder {
 }
 
 model SalesOrderFoldItem {
-  id                           String                  @id @default(uuid()) @db.Uuid
-  organizationId               String                  @db.Uuid
-  salesOrderId                 String                  @db.Uuid
+  id                           String                              @id @default(uuid()) @db.Uuid
+  organizationId               String                              @db.Uuid
+  salesOrderId                 String                              @db.Uuid
   lineNumber                   Int
   sortOrder                    Int
-  sourceFoldTemplateId         String                  @db.Uuid
-  sourceFoldRevisionId         String                  @db.Uuid
-  sourceTemplateCode           String                  @db.VarChar(50)
-  sourceTemplateName           String                  @db.VarChar(200)
+  sourceFoldTemplateId         String                              @db.Uuid
+  sourceFoldRevisionId         String                              @db.Uuid
+  sourceTemplateCode           String                              @db.VarChar(50)
+  sourceTemplateName           String                              @db.VarChar(200)
   sourceRevisionNumber         Int
-  sourceDocumentChecksumSha256 String                  @db.Char(64)
-  name                         String                  @db.VarChar(200)
+  sourceDocumentChecksumSha256 String                              @db.Char(64)
+  name                         String                              @db.VarChar(200)
   quantity                     Int
-  materialRuleRevisionId       String                  @db.Uuid
-  sheetItemId                  String?                 @db.Uuid
+  materialRuleRevisionId       String                              @db.Uuid
+  sheetItemId                  String?                             @db.Uuid
   documentSchemaVersion        Int
-  document                     Json                    @db.JsonB
-  documentChecksumSha256       String                  @db.Char(64)
-  lockVersion                  Int                     @default(1)
-  createdByMembershipId        String                  @db.Uuid
-  updatedByMembershipId        String                  @db.Uuid
-  removedByMembershipId        String?                 @db.Uuid
-  removedAt                    DateTime?               @db.Timestamptz(6)
-  createdAt                    DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt                    DateTime                @updatedAt @db.Timestamptz(6)
-  organization                 Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  salesOrder                   SalesOrder              @relation(fields: [salesOrderId], references: [id], onDelete: Restrict)
-  sourceFoldTemplate           FoldTemplate            @relation("SalesOrderFoldItemSourceTemplate", fields: [sourceFoldTemplateId], references: [id], onDelete: Restrict)
-  sourceFoldRevision           FoldRevision            @relation("SalesOrderFoldItemSourceRevision", fields: [sourceFoldRevisionId], references: [id], onDelete: Restrict)
-  materialRuleRevision         MaterialRuleRevision    @relation(fields: [materialRuleRevisionId], references: [id], onDelete: Restrict)
-  sheetItem                    SheetItem?              @relation(fields: [sheetItemId], references: [id], onDelete: Restrict)
-  createdByMembership          OrganizationMembership  @relation("SalesOrderFoldItemCreator", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
-  updatedByMembership          OrganizationMembership  @relation("SalesOrderFoldItemUpdater", fields: [updatedByMembershipId], references: [id], onDelete: Restrict)
-  removedByMembership          OrganizationMembership? @relation("SalesOrderFoldItemRemover", fields: [removedByMembershipId], references: [id], onDelete: Restrict)
+  document                     Json                                @db.JsonB
+  documentChecksumSha256       String                              @db.Char(64)
+  lockVersion                  Int                                 @default(1)
+  createdByMembershipId        String                              @db.Uuid
+  updatedByMembershipId        String                              @db.Uuid
+  removedByMembershipId        String?                             @db.Uuid
+  removedAt                    DateTime?                           @db.Timestamptz(6)
+  createdAt                    DateTime                            @default(now()) @db.Timestamptz(6)
+  updatedAt                    DateTime                            @updatedAt @db.Timestamptz(6)
+  organization                 Organization                        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  salesOrder                   SalesOrder                          @relation(fields: [salesOrderId], references: [id], onDelete: Restrict)
+  sourceFoldTemplate           FoldTemplate                        @relation("SalesOrderFoldItemSourceTemplate", fields: [sourceFoldTemplateId], references: [id], onDelete: Restrict)
+  sourceFoldRevision           FoldRevision                        @relation("SalesOrderFoldItemSourceRevision", fields: [sourceFoldRevisionId], references: [id], onDelete: Restrict)
+  materialRuleRevision         MaterialRuleRevision                @relation(fields: [materialRuleRevisionId], references: [id], onDelete: Restrict)
+  sheetItem                    SheetItem?                          @relation(fields: [sheetItemId], references: [id], onDelete: Restrict)
+  createdByMembership          OrganizationMembership              @relation("SalesOrderFoldItemCreator", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+  updatedByMembership          OrganizationMembership              @relation("SalesOrderFoldItemUpdater", fields: [updatedByMembershipId], references: [id], onDelete: Restrict)
+  removedByMembership          OrganizationMembership?             @relation("SalesOrderFoldItemRemover", fields: [removedByMembershipId], references: [id], onDelete: Restrict)
+  calculationSnapshots         SalesOrderFoldCalculationSnapshot[]
 
   @@unique([salesOrderId, lineNumber])
   @@index([organizationId, salesOrderId, removedAt, sortOrder, id], map: "SalesOrderFoldItem_order_active_sort_idx")
@@ -596,6 +618,64 @@ model SalesOrderFoldItem {
   @@index([sourceFoldRevisionId])
   @@index([materialRuleRevisionId])
   @@index([sheetItemId])
+}
+
+model SalesOrderCalculationSnapshot {
+  id                    String                              @id @default(uuid()) @db.Uuid
+  organizationId        String                              @db.Uuid
+  salesOrderId          String                              @db.Uuid
+  snapshotNumber        Int
+  inputChecksumSha256   String                              @db.Char(64)
+  resultChecksumSha256  String                              @db.Char(64)
+  pricingEngineVersion  String                              @db.VarChar(50)
+  pricingMetricsVersion String                              @db.VarChar(50)
+  priceEffectiveAt      DateTime                            @db.Timestamptz(6)
+  currency              String                              @default("KRW") @db.Char(3)
+  vatRatePercent        Decimal                             @default(10) @db.Decimal(9, 4)
+  supplyAmountKrw       Decimal                             @db.Decimal(20, 0)
+  vatAmountKrw          Decimal                             @db.Decimal(20, 0)
+  totalAmountKrw        Decimal                             @db.Decimal(20, 0)
+  itemCount             Int
+  createdByMembershipId String                              @db.Uuid
+  createdAt             DateTime                            @default(now()) @db.Timestamptz(6)
+  organization          Organization                        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  salesOrder            SalesOrder                          @relation(fields: [salesOrderId], references: [id], onDelete: Restrict)
+  createdByMembership   OrganizationMembership              @relation("SalesOrderCalculationCreator", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+  itemSnapshots         SalesOrderFoldCalculationSnapshot[]
+  approvedOrder         SalesOrder?                         @relation("SalesOrderApprovedCalculation")
+
+  @@unique([salesOrderId, snapshotNumber])
+  @@index([organizationId, salesOrderId, snapshotNumber], map: "SalesOrderCalculationSnapshot_organizationId_salesOrderId_snaps")
+  @@index([createdByMembershipId])
+}
+
+model SalesOrderFoldCalculationSnapshot {
+  id                         String                        @id @default(uuid()) @db.Uuid
+  organizationId             String                        @db.Uuid
+  orderCalculationSnapshotId String                        @db.Uuid
+  salesOrderFoldItemId       String                        @db.Uuid
+  lineNumber                 Int
+  name                       String                        @db.VarChar(200)
+  quantity                   Int
+  materialRuleRevisionId     String                        @db.Uuid
+  itemDocumentChecksumSha256 String                        @db.Char(64)
+  inputChecksumSha256        String                        @db.Char(64)
+  resultChecksumSha256       String                        @db.Char(64)
+  metrics                    Json                          @db.JsonB
+  pricingResult              Json                          @db.JsonB
+  materialAmountKrw          Decimal                       @db.Decimal(20, 0)
+  bendAmountKrw              Decimal                       @db.Decimal(20, 0)
+  vCutAmountKrw              Decimal                       @db.Decimal(20, 0)
+  surchargeAmountKrw         Decimal                       @db.Decimal(20, 0)
+  supplyAmountKrw            Decimal                       @db.Decimal(20, 0)
+  createdAt                  DateTime                      @default(now()) @db.Timestamptz(6)
+  organization               Organization                  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  orderCalculationSnapshot   SalesOrderCalculationSnapshot @relation(fields: [orderCalculationSnapshotId], references: [id], onDelete: Cascade, map: "SalesOrderFoldCalculationSnapshot_orderCalculationSnapshotId_fk")
+  salesOrderFoldItem         SalesOrderFoldItem            @relation(fields: [salesOrderFoldItemId], references: [id], onDelete: Restrict)
+
+  @@unique([orderCalculationSnapshotId, salesOrderFoldItemId], map: "SalesOrderFoldCalculationSnapshot_order_item_key")
+  @@index([organizationId, orderCalculationSnapshotId, lineNumber], map: "SalesOrderFoldCalculationSnapshot_order_line_idx")
+  @@index([salesOrderFoldItemId])
 }
 
 model Material {

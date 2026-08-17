@@ -21,7 +21,7 @@ export function OrderFoldItemsPanel({
   options: OrderFoldOptionsDto;
   editable: boolean;
   getReadyOrder: () => Promise<SalesOrderDto | null>;
-  onMutation: (result: OrderFoldMutationResult) => void;
+  onMutation: (result: OrderFoldMutationResult, activeItemCount: number, affectsCalculation: boolean) => void;
 }) {
   const popup = useCommonPopup();
   const router = useRouter();
@@ -82,7 +82,7 @@ export function OrderFoldItemsPanel({
       const next = [...items, result.item];
       setItems(next);
       selectItem(result.item);
-      onMutation(result);
+      onMutation(result, next.length, true);
       setAdding(false);
     } catch (caught) {
       await handleFailure(caught, "절곡 작업 추가 실패");
@@ -109,7 +109,7 @@ export function OrderFoldItemsPanel({
       });
       setItems((current) => current.map((item) => item.id === result.item.id ? result.item : item));
       selectItem(result.item);
-      onMutation(result);
+      onMutation(result, items.length, selectedItem.documentChecksumSha256 !== result.item.documentChecksumSha256);
     } catch (caught) {
       await handleFailure(caught, "절곡 작업 저장 실패");
     } finally {
@@ -127,7 +127,7 @@ export function OrderFoldItemsPanel({
       });
       setItems((current) => [...current, result.item]);
       selectItem(result.item);
-      onMutation(result);
+      onMutation(result, items.length + 1, true);
     } catch (caught) {
       await handleFailure(caught, "절곡 작업 복사 실패");
     } finally {
@@ -151,7 +151,7 @@ export function OrderFoldItemsPanel({
         if (next[0]) selectItem(next[0]);
         else setSelectedItemId("");
       }
-      onMutation(result);
+      onMutation(result, next.length, true);
     } catch (caught) {
       await handleFailure(caught, "절곡 작업 제거 실패");
     } finally {
@@ -173,7 +173,7 @@ export function OrderFoldItemsPanel({
         body: JSON.stringify({ itemIds: next.map((candidate) => candidate.id), expectedOrderLockVersion: order.lockVersion }),
       });
       setItems(next.map((candidate, orderIndex) => ({ ...candidate, sortOrder: orderIndex + 1 })));
-      onMutation(result);
+      onMutation(result, items.length, false);
     } catch (caught) {
       await handleFailure(caught, "절곡 작업 순서 변경 실패");
     } finally {
@@ -186,7 +186,7 @@ export function OrderFoldItemsPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-black">절곡 작업</h2>
-          <p className="mt-1 text-sm text-slate-500">게시 개정을 주문용 불변 스냅샷으로 복사합니다. 계산과 금액은 다음 단계에서 처리합니다.</p>
+          <p className="mt-1 text-sm text-slate-500">게시 개정을 주문용 불변 스냅샷으로 복사하고 아래 계산·가격에서 금액을 확정합니다.</p>
         </div>
         {editable ? <button className="rounded bg-teal-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50" disabled={busy || options.templates.length === 0} onClick={() => setAdding((value) => !value)} type="button">{adding ? "선택 닫기" : "절곡 작업 추가"}</button> : null}
       </div>

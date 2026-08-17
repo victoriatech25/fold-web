@@ -12,8 +12,10 @@ import {
   getOrder,
   getOrderFormOptions,
   listOrders,
+  listOrdersPage,
   updateOrder,
 } from "@/server/orders/order-service";
+import { getOrderHistory } from "@/server/orders/order-history-service";
 
 const integration = process.env.RUN_DB_INTEGRATION === "1" ? describe : describe.skip;
 
@@ -126,6 +128,50 @@ integration.sequential("sales order header integration", () => {
     );
     expect(new Set(parallel.map((order) => order.orderNumber))).toHaveLength(4);
     expect((await listOrders(prisma, context, { q: "수주 검증" })).length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("filters order pages and exposes only order-scoped audit summaries", async () => {
+    const first = await createOrder(prisma, context, { customerId, requestId: "order-list-history-first" });
+    await createOrder(prisma, context, { customerId, requestId: "order-list-history-second" });
+    const page = await listOrdersPage(prisma, context, {
+      q: "ORDER-CUSTOMER",
+      customerId,
+      statuses: ["DRAFT"],
+      orderedFrom: new Date("2026-01-01T00:00:00.000Z"),
+      orderedTo: new Date("2026-12-31T00:00:00.000Z"),
+      limit: 25,
+    });
+    expect(page.items.map((item) => item.id)).toContain(first.id);
+    expect(page.items.every((item) => item.status === "DRAFT" && item.customerId === customerId)).toBe(true);
+    const history = await getOrderHistory(prisma, context, first.id);
+    expect(history.items).toEqual(expect.arrayContaining([expect.objectContaining({ action: "order.created", actionLabel: "수주 생성" })]));
+    expect(history.items.every((item) => !("metadata" in item) && !("after" in item))).toBe(true);
+  });
+
+  it("keeps the search filter on every cursor page", async () => {
+    const excluded = await prisma.customer.create({
+      data: { organizationId: context.organizationId, code: "PAGE-MISS-CUSTOMER", name: "페이지 제외 거래처", normalizedName: "페이지 제외 거래처" },
+    });
+    // 검색어에 걸리지 않는 수주를 먼저 만들어 cursor 뒤쪽에 놓는다.
+    for (let index = 0; index < 2; index += 1) {
+      await createOrder(prisma, context, { customerId: excluded.id, requestId: `order-page-excluded-${index}` });
+    }
+    for (let index = 0; index < 26; index += 1) {
+      await createOrder(prisma, context, { customerId, requestId: `order-page-match-${index}` });
+    }
+
+    const firstPage = await listOrdersPage(prisma, context, { q: "ORDER-CUSTOMER", limit: 25 });
+    expect(firstPage.items).toHaveLength(25);
+    expect(firstPage.nextCursor).not.toBeNull();
+    expect(firstPage.items.every((item) => item.customerId === customerId)).toBe(true);
+
+    const secondPage = await listOrdersPage(prisma, context, { q: "ORDER-CUSTOMER", cursor: firstPage.nextCursor ?? undefined, limit: 25 });
+    expect(secondPage.items.length).toBeGreaterThan(0);
+    expect(secondPage.items.every((item) => item.customerId === customerId)).toBe(true);
+    expect(secondPage.items.some((item) => item.customerId === excluded.id)).toBe(false);
+
+    const firstIds = new Set(firstPage.items.map((item) => item.id));
+    expect(secondPage.items.some((item) => firstIds.has(item.id))).toBe(false);
   });
 
   it("updates with atomic locking and records typed audit events", async () => {

@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
-import { calculateFoldPrice, PricingCalculationError, type PriceSourceTrace } from "@/domain/pricing";
+import { calculateFoldPrice, PricingCalculationError, type FoldPriceResult, type FoldPricingMetrics, type PriceSourceTrace } from "@/domain/pricing";
 import { requirePermission } from "@/server/authorization/authorization";
 import { writeAuditEvent } from "@/server/audit/audit-writer";
 import type { AuthenticatedContext } from "@/server/auth/auth-types";
@@ -409,9 +409,9 @@ async function effectiveRevision(database: Database, organizationId: string, boo
   });
 }
 
-async function priceResolutionChain(database: Database, organizationId: string, customerId: string, effectiveAt: Date) {
-  const customer = await database.customer.findFirst({ where: { id: customerId, organizationId, active: true, deletedAt: null }, select: { id: true, code: true, name: true, priceTierId: true } });
-  if (!customer) throw new PricingError("NOT_FOUND", "활성 거래처를 찾을 수 없습니다.");
+async function priceResolutionChain(database: Database, organizationId: string, customerId: string, effectiveAt: Date, requireActiveCustomer = true) {
+  const customer = await database.customer.findFirst({ where: { id: customerId, organizationId, ...(requireActiveCustomer ? { active: true } : {}), deletedAt: null }, select: { id: true, code: true, name: true, priceTierId: true } });
+  if (!customer) throw new PricingError("NOT_FOUND", requireActiveCustomer ? "활성 거래처를 찾을 수 없습니다." : "거래처를 찾을 수 없습니다.");
   const defaultTier = customer.priceTierId ? null : await database.priceTier.findFirst({ where: { organizationId, isDefault: true, active: true, deletedAt: null }, select: { id: true } });
   const tierId = customer.priceTierId ?? defaultTier?.id ?? null;
   const candidates = await database.priceBook.findMany({ where: { organizationId, active: true, deletedAt: null, OR: [
@@ -438,18 +438,32 @@ export async function calculateManualFoldPrice(prisma: PrismaClient, context: Au
   const variant = await prisma.materialVariant.findFirst({ where: { id: input.materialVariantId, organizationId: context.organizationId, active: true, deletedAt: null }, select: { id: true, code: true, name: true } });
   if (!variant) throw new PricingError("NOT_FOUND", "활성 재질·두께를 찾을 수 없습니다.");
   const { customer, chain } = await priceResolutionChain(prisma, context.organizationId, input.customerId, effectiveAt);
+  const result = priceFromChain(chain, input.materialVariantId, input.metrics, effectiveAt);
+  return { ...result, customer, materialVariant: variant, preview: true, notForOrder: true };
+}
+
+type ResolvedPriceChain = Awaited<ReturnType<typeof priceResolutionChain>>["chain"];
+
+// 해석된 가격표 chain 하나로 계산까지 마친다. 미리보기와 수주 계산이 같은 chain을 두 번 조회하지 않도록
+// 조회(priceResolutionChain)와 계산을 분리해 둔다.
+function priceFromChain(
+  chain: ResolvedPriceChain,
+  materialVariantId: string,
+  metrics: FoldPricingMetrics,
+  effectiveAt: Date,
+): FoldPriceResult {
   if (!chain.length) throw new PricingError("PRICE_REVISION_NOT_EFFECTIVE", "계산 시점에 유효한 게시 가격표가 없습니다.");
-  let foldRate: { row: RevisionRow["foldRates"][number]; source: typeof chain[number] } | null = null;
-  let surcharge: { row: NonNullable<RevisionRow["surchargePolicy"]>; source: typeof chain[number] } | null = null;
+  let foldRate: { row: RevisionRow["foldRates"][number]; source: ResolvedPriceChain[number] } | null = null;
+  let surcharge: { row: NonNullable<RevisionRow["surchargePolicy"]>; source: ResolvedPriceChain[number] } | null = null;
   for (const source of chain) {
-    const rate = source.revision.foldRates.find((row) => row.materialVariantId === input.materialVariantId);
+    const rate = source.revision.foldRates.find((row) => row.materialVariantId === materialVariantId);
     if (!foldRate && rate) foldRate = { row: rate, source };
     if (!surcharge && source.revision.surchargePolicy) surcharge = { row: source.revision.surchargePolicy, source };
   }
   if (!foldRate) throw new PricingError("PRICE_NOT_CONFIGURED", "선택한 거래처와 재질·두께에 적용할 가격 행이 없습니다.");
   try {
-    const result = calculateFoldPrice({
-      metrics: input.metrics,
+    return calculateFoldPrice({
+      metrics,
       rate: { materialRatePerM2Krw: foldRate.row.materialRatePerM2Krw.toString(), bendRatePerOperationKrw: foldRate.row.bendRatePerOperationKrw.toString(), vCutRatePerMeterKrw: foldRate.row.vCutRatePerMeterKrw.toString() },
       surchargePolicy: surcharge ? { minimumBendOperations: surcharge.row.minimumBendOperations, ratePercent: surcharge.row.ratePercent.toString(), baseType: "PROCESSING_ONLY" } : null,
       trace: {
@@ -457,9 +471,20 @@ export async function calculateManualFoldPrice(prisma: PrismaClient, context: Au
         surcharge: surcharge ? traceOf(surcharge.source.book.scopeType, surcharge.source.book.id, surcharge.source.revision, surcharge.row.id, effectiveAt) : null,
       },
     });
-    return { ...result, customer, materialVariant: variant, preview: true, notForOrder: true };
   } catch (error) {
     if (error instanceof PricingCalculationError) throw new PricingError(error.code === "PRICE_INPUT_INVALID" ? "PRICE_INPUT_INVALID" : "PRICE_INPUT_INVALID", error.message);
     throw error;
   }
+}
+
+export async function calculateResolvedFoldPrice(database: Database, input: {
+  organizationId: string;
+  customerId: string;
+  materialVariantId: string;
+  metrics: FoldPricingMetrics;
+  effectiveAt: Date;
+  requireActiveCustomer?: boolean;
+}): Promise<FoldPriceResult> {
+  const { chain } = await priceResolutionChain(database, input.organizationId, input.customerId, input.effectiveAt, input.requireActiveCustomer ?? false);
+  return priceFromChain(chain, input.materialVariantId, input.metrics, input.effectiveAt);
 }

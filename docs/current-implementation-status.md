@@ -1,8 +1,8 @@
 # fold_web 현재 구현 현황
 
-> 기준일: 2026-08-12
+> 기준일: 2026-08-17
 >
-> 기준: P1·P2-A01~P2-A05 사용자 검수 완료, P2-A06 1차 화면 구현·자동 검증 및 사용자 검수 완료
+> 기준: P1과 P2-A01~P2-A11 사용자 검수·승인 완료. P2-A 기준정보·수주 묶음을 닫았다.
 >
 > MFC 참조 프로젝트: `/Users/kyhoon/Library/Mobile Documents/com~apple~CloudDocs/회사/hicomtech/도면`
 >
@@ -39,11 +39,19 @@
 - 화면과 분리된 제작 geometry, 원호 3D와 자기 교차 경고
 - DXF R2000·mm·제작 layer·SHA-256·FileAsset·출력 감사·다운로드
 - 기존 승인 20건과 파생 100건, 합계 120건 계산 회귀 기준선
+- 가격등급·세 scope 가격표·게시 개정·Decimal 가격 엔진·할증·trace
+- 수주 헤더 자동 번호·거래처 snapshot·복사·취소와 동시 수정 제어
+- 게시 절곡 개정의 수주용 불변 복사, 수량·변수·재질·원판 지정
+- 입력 hash·엔진 버전을 고정한 계산·금액 불변 snapshot과 재계산 이력
+- 계산 완료·승인·생산 요청·생산 중·생산 완료·마감 상태 전이와 승인 후 변경 차단
+- 기간·거래처·담당자·복수 상태 검색과 cursor 목록, 수주 단위 안전 이력
 - Docker 이미지 빌드, 태그 기반 배포, 실패 시 롤백
 
 P1 구현 기준선은 완료됐다. 운영 인프라, binary object storage, Windows 현장 프로그램 DXF 검수와 생산 업무 연결은 P2 범위이며, 실제 기계 통신은 P3 범위다.
 
-`P2-A01 회사·사업장`, `P2-A02 거래처·담당자·고객 현장`, `P2-A03 재질·두께 기준정보`, [P2-A04 연신·컷 규칙](./work-items/P2-A04-material-calculation-rules.md), [P2-A05 원판 품목](./work-items/P2-A05-sheet-items.md)은 사용자 검수까지 완료했다. [P2-A06 가격 규칙](./work-items/P2-A06-price-rules.md)은 가격등급·세 범위 가격표·게시 개정·가격 엔진·관리/미리보기 화면의 1차 구현과 자동 검증을 완료하고 사용자 화면 검수도 완료해 2026-08-12 기준으로 `P2-A06 화면 검수 완료` 상태입니다.
+`P2-A01 회사·사업장`부터 [P2-A11 수주 목록·이력](./work-items/P2-A11-order-list-history.md)까지 P2-A 기준정보·수주 묶음 전체가 구현·자동 검증·사용자 승인을 마쳤다. 거래처와 기준정보에서 수주를 만들고, 게시 절곡 개정을 불변 snapshot으로 복사하고, 계산·금액을 고정해 승인한 뒤 생산 요청까지 한 흐름으로 이어진다.
+
+다음 단계는 `P2-B1 비동기 기반`이다. `P2-B01 작업 queue·worker`와 `P2-B02 파일 저장소`는 queue 제품과 object storage 제품·보존 정책 결정이 열려 있어 사용자 확정 뒤에 착수한다.
 
 ### 확정된 재구축 범위
 
@@ -79,9 +87,14 @@ MFC 코드, 화면과 계산 결과는 비교 근거로 사용하지만 1:1 복�
 | 회사·사업장 | P2-A01 완료 | 회사 프로필, 복수 사업장, 기본 사업장 단일성·비활성·검색·권한·감사 구현·검수 완료 |
 | 거래처·고객 현장 | P2-A02 완료 | 자동 코드, 통합 검색, 복수 담당자·현장, 기본 지정·비활성·권한·감사 구현·검수 완료 |
 | 원판 품목 | P2-A05 완료 | 규격·trim·면적·중량·기본/비활성, 설계 선택과 문서 v3 snapshot 구현·자동 검증·사용자 검수 완료 |
-| 가격 규칙 | P2-A06 화면 검수 완료 | 가격등급·세 scope 가격표·개정·Decimal 엔진·할증·trace·관리/미리보기 UI 구현, 사용자 검수와 20건 가격 기준선 확정 완료 |
-| 출력 | DXF 구현, STEP·PDF 미구현 | 제작 DXF 직접 다운로드 가능; PDF·파일 object storage는 P2 후속 |
-| 자동 검증 | 양호 | 단위 316건, PostgreSQL 통합 52건, Playwright 25개 시나리오와 lint/typecheck/build 통과 |
+| 가격 규칙 | P2-A06 완료 | 가격등급·세 scope 가격표·개정·Decimal 엔진·할증·trace·관리/미리보기 UI 구현, 사용자 검수와 20건 가격 기준선 확정 완료 |
+| 수주 헤더 | P2-A07 완료 | 연도별 자동 수주번호, 거래처 기본값·snapshot, 복사·취소, 낙관적 잠금·감사 구현·검수 완료 |
+| 절곡 작업 snapshot | P2-A08 완료 | 게시 개정 불변 복사, 수량·변수·재질·원판 지정, 복사·정렬·제거와 원본 변경 격리 검증 완료 |
+| 계산·금액 snapshot | P2-A09 완료 | 입력 hash·엔진/규칙 버전 고정, 항목별 면적·절곡·V-CUT·할증과 공급가·VAT·총액 불변 저장 |
+| 승인·생산 상태 | P2-A10 완료 | 8개 상태 단방향 전이, 승인 계산 고정, 승인 후 변경 차단, 사유 필수 승인 취소와 감사 구현 |
+| 수주 목록·이력 | P2-A11 완료 | 기간·거래처·담당자·복수 상태 검색, cursor 목록, 수주 단위 안전 이력, 생산 요청 진입 구현 |
+| 출력 | DXF 구현, STEP·PDF 미구현 | 제작 DXF 직접 다운로드 가능; PDF·파일 object storage는 P2-B 범위 |
+| 자동 검증 | 양호 | 단위 316건, PostgreSQL 통합 62건, Playwright 시나리오와 lint/typecheck/build 통과 |
 | 배포 | 구현됨 | Docker Hub 태그 이미지와 self-hosted runner 사용 |
 
 ## 2. 시스템 구성
@@ -403,6 +416,12 @@ Undo 이력은 JSON 스냅샷으로 최대 50개까지 유지되며 페이지를
 | `/api/v1/fold-drafts` | Node.js Route Handler | 조직 범위 최근 초안 목록·생성 |
 | `/api/v1/fold-drafts/:draftId` | Node.js Route Handler | 초안 상세·전체 문서 저장·soft delete |
 | `/api/v1/fold-material-options` | Node.js Route Handler | 게시된 조직 재질 규칙 선택 목록 |
+| `/orders`, `/orders/:orderId` | 보호된 동적 화면 | 수주 검색·목록과 상세 편집·계산·승인·이력 |
+| `/api/v1/orders` | Node.js Route Handler | 기간·거래처·담당자·상태 cursor 검색과 수주 생성 |
+| `/api/v1/orders/:orderId/fold-items/*` | Node.js Route Handler | 절곡 작업 불변 snapshot 추가·수정·복사·정렬·제거 |
+| `/api/v1/orders/:orderId/calculations` | Node.js Route Handler | 계산·금액 snapshot 생성과 현재 계산 상태 조회 |
+| `/api/v1/orders/:orderId/transitions` | Node.js Route Handler | `order.approve` 기반 승인·승인 취소·생산 상태 전이 |
+| `/api/v1/orders/:orderId/history` | Node.js Route Handler | `order.read` 기반 수주 단위 안전 감사 요약 |
 | `/api/health` | 동적 Route Handler | `{ "status": "ok" }`, 캐시 금지 |
 | `/api/internal/database-smoke` | 동적 Node.js Route Handler | 기본 비활성인 PostgreSQL transaction 통합 검증 |
 
@@ -488,12 +507,12 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 
 ## 8. 자동 검증 결과
 
-2026-08-01 P2-A06 화면 검수 준비 기준으로 아래 명령을 로컬에서 직접 실행했다.
+2026-08-17 P2-A11 승인 기준으로 아래 명령을 로컬에서 직접 실행했다.
 
 | 명령 | 결과 |
 |---|---|
 | `npm test` | 성공: 단위 테스트 316건 통과; DB 통합 테스트는 기본 실행에서 제외 |
-| `npm run test:integration` | 성공: test DB reset·12개 migration·seed 후 PostgreSQL 통합 테스트 52건 통과 |
+| `npm run test:integration` | 성공: test DB reset·17개 migration·seed 후 PostgreSQL 통합 테스트 62건 통과 |
 | `npm run test:e2e` | 성공: 가격 적용·개정·공통 팝업을 포함한 Playwright Chromium 25개 시나리오 통과 |
 | `npm run lint` | 성공: ESLint 오류 없음 |
 | `npm run typecheck` | 성공: TypeScript 오류 없음 |
@@ -552,10 +571,10 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 
 ## 10. 권장 다음 작업
 
-1. WEB-REFERENCE 기반 가격 20건 기대 금액을 확정하고 자동 회귀 fixture로 고정한다.
-2. 가격 규칙의 서버 전용 bulk/resolve/calculate-sheet·DRAFT preview와 게시 전 coverage·diff 계약을 보강한다.
-3. [P2-A07 수주 기본정보 상세계획](./work-items/P2-A07-order-header.md)의 수주번호·초기 상태·취소·담당자·복사 규칙을 승인한 뒤 구현한다.
-4. 이후 `P2-A08` 불변 절곡 작업 snapshot, `P2-A09` 계산·가격 snapshot, `P2-A10` 승인·생산 상태, `P2-A11` 검색·이력을 순서대로 연결한다. 운영 인프라는 필요한 작업 직전에 결정하고 실제 기계 통신은 P3에서 구현한다.
+1. `P2-B01` queue 제품과 worker 배포 방식(`D2-B01-*`), `P2-B02` object storage 제품과 보존·삭제 정책(`D2-B02-*`)을 확정한다. 두 결정 없이는 생산·출력 묶음에 착수하지 않는다.
+2. 감사 로그의 `after ->> 'salesOrderId'` 조회에 표현식 인덱스를 걸지, `salesOrderId`를 별도 열로 비정규화할지 결정한다. 지금 규모에서는 문제가 없지만 migration이 필요하므로 P2-B 착수와 함께 판단한다.
+3. 승인 수주의 전체 작업 복제(`D2-A11-H`에서 후속으로 미룬 범위)를 언제 열지 판단한다. 불변 snapshot 선택 규칙을 먼저 정해야 한다.
+4. 운영 인프라는 필요한 작업 직전에 결정하고 실제 기계 통신은 P3에서 구현한다.
 
 ## 11. 관련 문서
 
@@ -574,6 +593,12 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 - [P2-A05 화면 테스트 가이드](./P2-A05-screen-test-guide.md)
 - [P2-A06 가격 규칙 상세계획](./work-items/P2-A06-price-rules.md)
 - [P2-A06 가격 규칙 화면 테스트 가이드](./P2-A06-screen-test-guide.md)
+- [P2-A07 수주 기본정보 상세계획](./work-items/P2-A07-order-header.md)
+- [P2-A08 절곡 작업 스냅샷 상세계획](./work-items/P2-A08-order-fold-snapshots.md)
+- [P2-A09 계산·가격 스냅샷 상세계획](./work-items/P2-A09-order-calculation-pricing-snapshots.md)
+- [P2-A10 승인·생산 상태 상세계획](./work-items/P2-A10-order-approval-production-status.md)
+- [P2-A11 수주 목록·이력 상세계획](./work-items/P2-A11-order-list-history.md)
+- [P2-A11 수주 목록·이력 화면 테스트 가이드](./P2-A11-screen-test-guide.md)
 - [P1-07 절곡 초안 저장](./work-items/P1-07-fold-draft-persistence.md)
 - [P1-08 절곡 템플릿 라이브러리](./work-items/P1-08-fold-template-library.md)
 - [P1-09 Decimal 계산 정책](./work-items/P1-09-decimal-policy.md)

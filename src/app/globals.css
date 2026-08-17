@@ -22,6 +22,10 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+}
+
 input,
 select,
 button {
@@ -44,4 +48,18 @@ button {
 .field-control:focus {
   border-color: #0f766e;
   box-shadow: 0 0 0 2px #ccfbf1;
+}
+
+/* Disabled data remains readable while clearly indicating that it cannot be changed. */
+.field-control:disabled {
+  cursor: not-allowed;
+  border-color: #ded3bf !important;
+  background-color: #f7f3ea !important;
+  color: #6b5b45 !important;
+  box-shadow: inset 0 0 0 1px #eee6d9;
+  opacity: 1;
+}
+
+.field-control:disabled::placeholder {
+  color: #94a3b8;
 }

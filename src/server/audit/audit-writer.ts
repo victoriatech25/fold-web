@@ -176,6 +176,25 @@ type AuditPayloadByAction = {
   "order.fold_items_reordered": {
     metadata: { itemCount: number; orderedItemIds: string[] };
   };
+  "order.calculation_snapshot_created": {
+    after: {
+      salesOrderId: string;
+      snapshotNumber: number;
+      supplyAmountKrw: string;
+      vatAmountKrw: string;
+      totalAmountKrw: string;
+    };
+    metadata: {
+      inputChecksumSha256: string;
+      resultChecksumSha256: string;
+      itemCount: number;
+    };
+  };
+  "order.status_transitioned": {
+    before: { status: string; lockVersion: number };
+    after: { status: string; lockVersion: number };
+    metadata: { action: string; reason?: string; calculationSnapshotId?: string; calculationSnapshotNumber?: number };
+  };
   "material.created": { after: MaterialAuditSnapshot };
   "material.updated": { before: MaterialAuditSnapshot; after: MaterialAuditSnapshot };
   "material.variant_created": { after: MaterialVariantAuditSnapshot };

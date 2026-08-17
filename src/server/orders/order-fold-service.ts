@@ -153,7 +153,7 @@ async function getOrderForMutation(
     include: { customer: true, customerSite: true, customerContact: true },
   });
   if (!order) throw new OrderError("NOT_FOUND", "수주를 찾을 수 없습니다.");
-  if (order.status !== "DRAFT") throw new OrderError("CONFLICT", "작성 중 수주에서만 절곡 작업을 변경할 수 있습니다.");
+  if (order.status !== "DRAFT" && order.status !== "CALCULATED") throw new OrderError("CONFLICT", "승인·생산·마감 또는 취소 상태에서는 절곡 작업을 변경할 수 없습니다.");
   if (order.lockVersion !== expectedLockVersion) {
     throw new OrderError("CONFLICT", "수주가 다른 화면에서 변경되었습니다.", {
       latest: { id: order.id, lockVersion: order.lockVersion, status: order.status },
@@ -168,10 +168,11 @@ async function incrementOrderLock(
   orderId: string,
   expectedLockVersion: number,
   data: Prisma.SalesOrderUpdateManyMutationInput = {},
+  affectsCalculation = true,
 ): Promise<OrderFoldMutationResult> {
   const updated = await tx.salesOrder.updateMany({
-    where: { id: orderId, organizationId, status: "DRAFT", lockVersion: expectedLockVersion },
-    data: { ...data, lockVersion: { increment: 1 } },
+    where: { id: orderId, organizationId, status: { in: ["DRAFT", "CALCULATED"] }, lockVersion: expectedLockVersion },
+    data: { ...data, ...(affectsCalculation ? { status: "DRAFT" } : {}), lockVersion: { increment: 1 } },
   });
   if (updated.count !== 1) throw new OrderError("CONFLICT", "수주가 다른 화면에서 변경되었습니다.");
   const order = await tx.salesOrder.findUniqueOrThrow({
@@ -474,13 +475,15 @@ export async function updateOrderFoldItem(
         ? await resolveSheetItemSnapshot(tx, context.organizationId, input.sheetItemId, selectedRuleId)
         : undefined;
     }
+    const { sheetItemSnapshot: _previousSheetItemSnapshot, ...previousWithoutSheetItem } = previous;
+    void _previousSheetItemSnapshot;
     const document = parseServerFoldDocument({
-      ...previous,
+      ...previousWithoutSheetItem,
       product: { ...previous.product, quantity: input.quantity },
       variables,
       material,
       calculation,
-      ...(sheetItemSnapshot ? { sheetItemSnapshot } : { sheetItemSnapshot: undefined }),
+      ...(sheetItemSnapshot ? { sheetItemSnapshot } : {}),
     });
     const prepared = prepareFoldRevisionDocument(document);
     const updatedCount = await tx.salesOrderFoldItem.updateMany({
@@ -494,7 +497,10 @@ export async function updateOrderFoldItem(
       },
     });
     if (updatedCount.count !== 1) throw new OrderError("CONFLICT", "절곡 작업이 다른 화면에서 변경되었습니다.");
-    const orderResult = await incrementOrderLock(tx, context.organizationId, input.orderId, input.expectedOrderLockVersion);
+    // 문서가 실제로 바뀐 저장만 계산을 무효화한다. 화면도 같은 checksum 비교로 판단하므로
+    // 값이 그대로인 저장에서 서버만 DRAFT로 되돌아가 상태가 어긋나는 일이 없다.
+    const documentChanged = old.documentChecksumSha256 !== prepared.documentChecksumSha256;
+    const orderResult = await incrementOrderLock(tx, context.organizationId, input.orderId, input.expectedOrderLockVersion, {}, documentChanged);
     const updated = await getActiveItemRow(tx, context.organizationId, input.orderId, input.itemId);
     const changedFields = [
       ...(old.quantity !== updated.quantity ? ["quantity"] : []),
@@ -622,7 +628,7 @@ export async function reorderOrderFoldItems(
     for (const [index, id] of input.itemIds.entries()) {
       await tx.salesOrderFoldItem.update({ where: { id }, data: { sortOrder: index + 1 } });
     }
-    const orderResult = await incrementOrderLock(tx, context.organizationId, input.orderId, input.expectedOrderLockVersion);
+    const orderResult = await incrementOrderLock(tx, context.organizationId, input.orderId, input.expectedOrderLockVersion, {}, false);
     await writeAuditEvent(tx, {
       organizationId: context.organizationId,
       actorUserId: context.userId,

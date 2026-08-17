@@ -36,7 +36,8 @@ const LEGACY_BROWSER_EXPRESSION_GRAMMAR = "fold-profile-v3";
 
 function supportedExpressionGrammar(grammarVersion: string) {
   return grammarVersion === FOLD_EXPRESSION_GRAMMAR_VERSION
-    || grammarVersion === LEGACY_BROWSER_EXPRESSION_GRAMMAR;
+    || grammarVersion === LEGACY_BROWSER_EXPRESSION_GRAMMAR
+    || grammarVersion === "v1";
 }
 
 function conversionError(

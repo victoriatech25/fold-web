@@ -11,6 +11,14 @@ async function login(page: import("@playwright/test").Page) {
   await expect(page).toHaveURL("/");
 }
 
+async function confirmStatusAction(page: import("@playwright/test").Page, name: string) {
+  await page.getByRole("button", { name, exact: true }).click();
+  const confirm = page.getByRole("alertdialog", { name });
+  await confirm.getByRole("button", { name, exact: true }).click();
+  const completed = page.getByRole("alertdialog", { name: "상태 변경 완료" });
+  await completed.getByRole("button", { name: "확인" }).click();
+}
+
 test("수주 헤더를 생성·자동 저장·복사·취소하고 다시 조회한다", async ({ page }) => {
   await login(page);
   await page.getByRole("link", { name: "수주·작업" }).click();
@@ -55,6 +63,8 @@ test("수주 헤더를 생성·자동 저장·복사·취소하고 다시 조회
 
   await page.getByRole("link", { name: "수주 목록" }).click();
   await page.getByLabel("수주 검색").fill(copiedNumber ?? "");
+  await page.getByLabel("수주일 시작").fill("2026-01-01");
+  await page.getByLabel("수주일 종료").fill("2026-12-31");
   await page.getByLabel("수주 상태").selectOption("CANCELLED");
   await page.getByRole("button", { name: "조회" }).click();
   await expect(page.getByText(copiedNumber ?? "", { exact: true })).toBeVisible();
@@ -114,6 +124,46 @@ test("게시 절곡 개정을 수주 snapshot으로 추가하고 입력·복사�
   await page.reload();
   await expect(page.getByText(/수량 5 · 알루미늄 2T/)).toBeVisible();
   await expect(page.getByRole("textbox", { name: "A", exact: true })).toHaveValue("250");
+
+  await expect(page.getByRole("heading", { name: "계산·가격" })).toBeVisible();
+  await expect(page.getByText("계산 전", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "수주 계산" }).click();
+  const calculatedDialog = page.getByRole("alertdialog", { name: "수주 계산 완료" });
+  await calculatedDialog.getByRole("button", { name: "확인" }).click();
+  const calculationSection = page.locator("section").filter({ has: page.getByRole("heading", { name: "계산·가격" }) });
+  await expect(calculationSection.getByText("계산 완료", { exact: true })).toBeVisible();
+  await expect(page.getByText("계산 버전 1", { exact: false })).toBeVisible();
+  await expect(page.getByText("거래처 전용").or(page.getByText("가격등급")).or(page.getByText("조직 기본"))).toBeVisible();
+
+  await page.getByLabel("수량").fill("6");
+  await page.getByRole("button", { name: "작업 입력 저장" }).click();
+  await expect(page.getByText("재계산 필요", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "다시 계산" }).click();
+  const recalculatedDialog = page.getByRole("alertdialog", { name: "수주 재계산 완료" });
+  await recalculatedDialog.getByRole("button", { name: "확인" }).click();
+  await expect(page.getByText("계산 버전 2", { exact: false })).toBeVisible();
+
+  await confirmStatusAction(page, "수주 승인");
+  await expect(page.getByText("고정 계산 버전")).toContainText("2");
+  await expect(page.getByLabel("수량")).toBeDisabled();
+  await expect(page.getByLabel("수량")).toHaveCSS("background-color", "rgb(247, 243, 234)");
+  await expect(page.getByLabel("수량")).toHaveCSS("cursor", "not-allowed");
+
+  await page.getByRole("button", { name: "승인 취소" }).click();
+  const approvalCancel = page.getByRole("dialog", { name: "승인 취소" });
+  await approvalCancel.getByLabel("승인 취소 사유").fill("E2E 입력 재검토");
+  await approvalCancel.getByRole("button", { name: "승인 취소" }).click();
+  await page.getByRole("alertdialog", { name: "상태 변경 완료" }).getByRole("button", { name: "확인" }).click();
+  await expect(page.getByLabel("수량")).toBeEnabled();
+
+  await confirmStatusAction(page, "수주 승인");
+  await confirmStatusAction(page, "생산 요청");
+  await confirmStatusAction(page, "생산 시작");
+  await confirmStatusAction(page, "생산 완료");
+  await confirmStatusAction(page, "수주 마감");
+  await expect(page.getByText("현재 단계:")).toContainText("마감");
+  await expect(page.getByRole("heading", { name: "수주 이력" })).toBeVisible();
+  await expect(page.getByText("수주 승인·생산 상태 전이").first()).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();

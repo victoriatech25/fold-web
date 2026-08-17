@@ -15,6 +15,8 @@ import {
   updateOrderFoldItem,
 } from "@/server/orders/order-fold-service";
 import { createOrder, getOrder, updateOrder } from "@/server/orders/order-service";
+import { createOrderCalculationSnapshot, getCurrentOrderCalculation } from "@/server/orders/order-calculation-service";
+import { transitionOrder } from "@/server/orders/order-transition-service";
 
 const integration = process.env.RUN_DB_INTEGRATION === "1" ? describe : describe.skip;
 
@@ -27,6 +29,7 @@ integration.sequential("sales order fold snapshot integration", () => {
   let sourceRevisionId: string;
   let alternateRuleId: string;
   let alternateSheetId: string;
+  let primaryVariantId: string;
 
   beforeAll(async () => {
     prisma = getPrisma();
@@ -37,7 +40,7 @@ integration.sequential("sales order fold snapshot integration", () => {
       sessionId: crypto.randomUUID(), userId: user.id, displayName: user.displayName,
       membershipId: membership.id, departmentId: null, organizationId: organization.id,
       organizationCode: organization.code, organizationName: organization.name,
-      roleKeys: ["SALES"], permissions: ["order.read", "order.edit"], expiresAt: new Date("2027-01-01T00:00:00Z"),
+      roleKeys: ["SALES"], permissions: ["order.read", "order.edit", "order.calculate", "order.approve"], expiresAt: new Date("2027-01-01T00:00:00Z"),
     };
     const customer = await prisma.customer.create({ data: { organizationId: organization.id, code: "FOLD-CUSTOMER", name: "절곡 거래처", normalizedName: "절곡거래처", phone: "02-1000-2000", addressLine1: "서울시 테스트로 1" } });
     customerId = customer.id;
@@ -46,6 +49,7 @@ integration.sequential("sales order fold snapshot integration", () => {
 
     const material = await prisma.material.create({ data: { organizationId: organization.id, code: "FOLD-MAT", name: "절곡 재질", normalizedName: "절곡재질", densityKgPerM3: "2700" } });
     const firstVariant = await prisma.materialVariant.create({ data: { organizationId: organization.id, materialId: material.id, code: "FOLD-MAT-1", name: "절곡 1T", thicknessMm: "1", defaultInsideRadiusMm: "1" } });
+    primaryVariantId = firstVariant.id;
     const firstRule = await prisma.materialRuleRevision.create({ data: {
       organizationId: organization.id, materialVariantId: firstVariant.id, revisionNumber: 1, status: "PUBLISHED",
       calculationMode: "FIXED", elongationOption: "STANDARD", vCutEnabled: true, decimalPlaces: 1, decimalOperation: "ROUND",
@@ -83,6 +87,19 @@ integration.sequential("sales order fold snapshot integration", () => {
       organizationId: organization.id, templateId: template.id, revisionNumber: 1, status: "PUBLISHED", name: document.name,
       publishedAt: new Date(), ...prepared,
     } })).id;
+    const priceBook = await prisma.priceBook.create({ data: { organizationId: organization.id, scopeType: "STANDARD", code: "ORDER-FOLD-STANDARD", name: "수주 계산 표준 가격" } });
+    const priceRevision = await prisma.priceBookRevision.create({ data: {
+      organizationId: organization.id, priceBookId: priceBook.id, revisionNumber: 1, status: "PUBLISHED",
+      contentChecksumSha256: "a".repeat(64), effectiveFrom: new Date(Date.now() - 60_000), publishedAt: new Date(),
+    } });
+    await prisma.foldPriceRate.create({ data: {
+      organizationId: organization.id, priceBookRevisionId: priceRevision.id, materialVariantId: primaryVariantId,
+      materialRatePerM2Krw: "1000", bendRatePerOperationKrw: "100", vCutRatePerMeterKrw: "50",
+    } });
+    await prisma.surchargePolicy.create({ data: {
+      organizationId: organization.id, priceBookRevisionId: priceRevision.id,
+      minimumBendOperations: 3, ratePercent: "10", baseType: "PROCESSING_ONLY",
+    } });
   });
 
   afterAll(async () => disconnectPrisma());
@@ -134,5 +151,88 @@ integration.sequential("sales order fold snapshot integration", () => {
     await expect(copyOrderFoldItem(prisma, context, { orderId: order.id, itemId: updated.item.id, expectedOrderLockVersion: removed.orderLockVersion - 1, requestId: "order-fold-stale" })).rejects.toMatchObject({ code: "CONFLICT" });
     const actions = await prisma.auditEvent.findMany({ where: { organizationId: context.organizationId, requestId: { startsWith: "order-fold-" } }, select: { action: true } });
     expect(actions.map((event) => event.action)).toEqual(expect.arrayContaining(["order.party_snapshot_captured", "order.fold_item_added", "order.fold_item_updated", "order.fold_item_copied", "order.fold_items_reordered", "order.fold_item_removed"]));
+  });
+
+  it("creates immutable calculation snapshots and marks changed inputs stale", async () => {
+    await prisma.foldRevision.update({ where: { id: sourceRevisionId }, data: { status: "PUBLISHED" } });
+    const order = await createOrder(prisma, context, { customerId, customerSiteId: siteId, customerContactId: contactId, requestId: "order-calc-create" });
+    const added = await addOrderFoldItem(prisma, context, { orderId: order.id, sourceFoldRevisionId: sourceRevisionId, expectedOrderLockVersion: order.lockVersion, requestId: "order-calc-add" });
+    const calculated = await createOrderCalculationSnapshot(prisma, context, {
+      orderId: order.id,
+      expectedOrderLockVersion: added.orderLockVersion,
+      requestId: "order-calc-v1",
+    });
+    expect(calculated.state.snapshot).toMatchObject({ snapshotNumber: 1, supplyAmountKrw: "200", vatAmountKrw: "20", totalAmountKrw: "220", itemCount: 1 });
+    expect(calculated.state.snapshot?.items[0]).toMatchObject({ materialAmountKrw: "200", supplyAmountKrw: "200" });
+    expect(calculated.state.snapshot?.items[0]?.pricingResult.trace.foldRate.scopeType).toBe("STANDARD");
+
+    // 값이 그대로인 저장은 계산을 무효화하지 않는다.
+    const unchanged = await updateOrderFoldItem(prisma, context, {
+      orderId: order.id,
+      itemId: added.item.id,
+      quantity: added.item.quantity,
+      expectedOrderLockVersion: calculated.orderLockVersion,
+      expectedItemLockVersion: added.item.lockVersion,
+      requestId: "order-calc-noop-save",
+    });
+    expect((await getOrder(prisma, context, order.id)).status).toBe("CALCULATED");
+    expect((await getCurrentOrderCalculation(prisma, context, order.id)).stale).toBe(false);
+
+    const changed = await updateOrderFoldItem(prisma, context, {
+      orderId: order.id,
+      itemId: added.item.id,
+      quantity: 3,
+      expectedOrderLockVersion: unchanged.orderLockVersion,
+      expectedItemLockVersion: unchanged.item.lockVersion,
+      requestId: "order-calc-input-change",
+    });
+    expect((await getOrder(prisma, context, order.id)).status).toBe("DRAFT");
+    const stale = await getCurrentOrderCalculation(prisma, context, order.id);
+    expect(stale.stale).toBe(true);
+    expect(stale.snapshot?.snapshotNumber).toBe(1);
+    expect(stale.snapshot?.totalAmountKrw).toBe("220");
+
+    const recalculated = await createOrderCalculationSnapshot(prisma, context, {
+      orderId: order.id,
+      expectedOrderLockVersion: changed.orderLockVersion,
+      requestId: "order-calc-v2",
+    });
+    expect(recalculated.state).toMatchObject({ stale: false, snapshot: { snapshotNumber: 2, supplyAmountKrw: "300", vatAmountKrw: "30", totalAmountKrw: "330" } });
+    expect(await prisma.salesOrderCalculationSnapshot.count({ where: { salesOrderId: order.id } })).toBe(2);
+    expect(await prisma.auditEvent.count({ where: { organizationId: context.organizationId, action: "order.calculation_snapshot_created", entityId: { not: null } } })).toBeGreaterThanOrEqual(2);
+  });
+
+  it("freezes an approved calculation and enforces the production state flow", async () => {
+    await prisma.foldRevision.update({ where: { id: sourceRevisionId }, data: { status: "PUBLISHED" } });
+    const order = await createOrder(prisma, context, { customerId, customerSiteId: siteId, customerContactId: contactId, requestId: "order-state-create" });
+    const added = await addOrderFoldItem(prisma, context, { orderId: order.id, sourceFoldRevisionId: sourceRevisionId, expectedOrderLockVersion: order.lockVersion, requestId: "order-state-add" });
+    const calculated = await createOrderCalculationSnapshot(prisma, context, { orderId: order.id, expectedOrderLockVersion: added.orderLockVersion, requestId: "order-state-calculate" });
+    expect((await getOrder(prisma, context, order.id)).status).toBe("CALCULATED");
+
+    const approved = await transitionOrder(prisma, context, { orderId: order.id, action: "APPROVE", expectedLockVersion: calculated.orderLockVersion, requestId: "order-state-approve" });
+    expect(approved).toMatchObject({ status: "APPROVED", approvedCalculationSnapshotNumber: 1 });
+    await expect(updateOrderFoldItem(prisma, context, {
+      orderId: order.id, itemId: added.item.id, quantity: 4,
+      expectedOrderLockVersion: approved.lockVersion, expectedItemLockVersion: added.item.lockVersion,
+      requestId: "order-state-frozen-change",
+    })).rejects.toMatchObject({ code: "CONFLICT" });
+
+    const reopened = await transitionOrder(prisma, context, { orderId: order.id, action: "CANCEL_APPROVAL", reason: "고객 수량 변경", expectedLockVersion: approved.lockVersion, requestId: "order-state-unapprove" });
+    expect(reopened).toMatchObject({ status: "CALCULATED", approvedCalculationSnapshotId: null });
+    const changed = await updateOrderFoldItem(prisma, context, {
+      orderId: order.id, itemId: added.item.id, quantity: 4,
+      expectedOrderLockVersion: reopened.lockVersion, expectedItemLockVersion: added.item.lockVersion,
+      requestId: "order-state-change",
+    });
+    expect((await getOrder(prisma, context, order.id)).status).toBe("DRAFT");
+
+    const recalculated = await createOrderCalculationSnapshot(prisma, context, { orderId: order.id, expectedOrderLockVersion: changed.orderLockVersion, requestId: "order-state-recalculate" });
+    const reapproved = await transitionOrder(prisma, context, { orderId: order.id, action: "APPROVE", expectedLockVersion: recalculated.orderLockVersion, requestId: "order-state-reapprove" });
+    const requested = await transitionOrder(prisma, context, { orderId: order.id, action: "REQUEST_PRODUCTION", expectedLockVersion: reapproved.lockVersion, requestId: "order-state-request" });
+    const started = await transitionOrder(prisma, context, { orderId: order.id, action: "START_PRODUCTION", expectedLockVersion: requested.lockVersion, requestId: "order-state-start" });
+    const produced = await transitionOrder(prisma, context, { orderId: order.id, action: "COMPLETE_PRODUCTION", expectedLockVersion: started.lockVersion, requestId: "order-state-complete" });
+    const closed = await transitionOrder(prisma, context, { orderId: order.id, action: "CLOSE", expectedLockVersion: produced.lockVersion, requestId: "order-state-close" });
+    expect(closed.status).toBe("CLOSED");
+    expect(await prisma.auditEvent.count({ where: { organizationId: context.organizationId, action: "order.status_transitioned", requestId: { startsWith: "order-state-" } } })).toBe(7);
   });
 });

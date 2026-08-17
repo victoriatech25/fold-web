@@ -291,7 +291,7 @@ export const serverFoldDocumentV1Schema = serverFoldDocumentV1BaseSchema.superRe
       variableNames.add(variable.name);
     });
 
-    const size = new TextEncoder().encode(projectCanonicalJsonV1(document)).byteLength;
+    const size = new TextEncoder().encode(projectCanonicalJsonV1(JSON.parse(JSON.stringify(document)))).byteLength;
     if (size > MAX_FOLD_DOCUMENT_BYTES) {
       addContractIssue(
         context,
@@ -438,7 +438,7 @@ export const serverFoldDocumentV3Schema = serverFoldDocumentV3BaseSchema.superRe
       zodErrorToIssues(base.error).forEach((issue) => addContractIssue(context, issue.code, issue.path, issue.message));
       return;
     }
-    const size = new TextEncoder().encode(projectCanonicalJsonV1(document)).byteLength;
+    const size = new TextEncoder().encode(projectCanonicalJsonV1(JSON.parse(JSON.stringify(document)))).byteLength;
     if (size > MAX_FOLD_DOCUMENT_BYTES) addContractIssue(context, "DOCUMENT_TOO_LARGE", [], `절곡 문서는 최대 ${MAX_FOLD_DOCUMENT_BYTES} bytes입니다.`);
   },
 );

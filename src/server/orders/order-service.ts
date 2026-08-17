@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Prisma, PrismaClient } from "@/generated/prisma/client";
+import type { Prisma, PrismaClient, SalesOrderStatus } from "@/generated/prisma/client";
 import { requirePermission } from "@/server/authorization/authorization";
 import { writeAuditEvent } from "@/server/audit/audit-writer";
 import type { AuthenticatedContext } from "@/server/auth/auth-types";
@@ -9,7 +9,7 @@ import { OrderError } from "./order-error";
 type Database = PrismaClient | Prisma.TransactionClient;
 type Transaction = Prisma.TransactionClient;
 
-const orderSelect = {
+export const orderSelect = {
   id: true,
   orderNumber: true,
   status: true,
@@ -23,6 +23,12 @@ const orderSelect = {
   memo: true,
   cancelledAt: true,
   cancellationReason: true,
+  approvedCalculationSnapshotId: true,
+  approvedAt: true,
+  statusChangedAt: true,
+  approvedByMembership: { select: { user: { select: { displayName: true } } } },
+  statusChangedByMembership: { select: { user: { select: { displayName: true } } } },
+  approvedCalculationSnapshot: { select: { snapshotNumber: true, resultChecksumSha256: true, supplyAmountKrw: true, totalAmountKrw: true } },
   partySnapshotCapturedAt: true,
   lockVersion: true,
   updatedAt: true,
@@ -61,7 +67,7 @@ type OrderFields = {
   memo?: string | null;
 };
 
-function toDto(row: OrderRow) {
+export function toDto(row: OrderRow) {
   return {
     id: row.id,
     orderNumber: row.orderNumber,
@@ -76,6 +82,15 @@ function toDto(row: OrderRow) {
     memo: row.memo,
     cancelledAt: row.cancelledAt?.toISOString() ?? null,
     cancellationReason: row.cancellationReason,
+    approvedCalculationSnapshotId: row.approvedCalculationSnapshotId,
+    approvedCalculationSnapshotNumber: row.approvedCalculationSnapshot?.snapshotNumber ?? null,
+    approvedCalculationResultChecksumSha256: row.approvedCalculationSnapshot?.resultChecksumSha256 ?? null,
+    approvedSupplyAmountKrw: row.approvedCalculationSnapshot?.supplyAmountKrw.toString() ?? null,
+    approvedTotalAmountKrw: row.approvedCalculationSnapshot?.totalAmountKrw.toString() ?? null,
+    approvedAt: row.approvedAt?.toISOString() ?? null,
+    approvedByName: row.approvedByMembership?.user.displayName ?? null,
+    statusChangedAt: row.statusChangedAt.toISOString(),
+    statusChangedByName: row.statusChangedByMembership?.user.displayName ?? null,
     partySnapshotCapturedAt: row.partySnapshotCapturedAt?.toISOString() ?? null,
     customerFieldsLocked: row.partySnapshotCapturedAt !== null,
     lockVersion: row.lockVersion,
@@ -245,7 +260,7 @@ async function issueOrderNumber(tx: Transaction, organizationId: string, now: Da
 export async function listOrders(
   prisma: PrismaClient,
   context: AuthenticatedContext,
-  input: { q?: string; status?: "DRAFT" | "CANCELLED" },
+  input: { q?: string; status?: SalesOrderStatus },
 ) {
   requirePermission(context, "order.read");
   const q = input.q?.trim();
@@ -267,6 +282,69 @@ export async function listOrders(
     select: orderSelect,
   });
   return rows.map(toDto);
+}
+
+export type OrderListInput = {
+  q?: string;
+  customerId?: string;
+  ownerMembershipId?: string;
+  statuses?: SalesOrderStatus[];
+  orderedFrom?: Date;
+  orderedTo?: Date;
+  cursor?: string;
+  limit?: 25 | 100;
+};
+
+type OrderListCursor = { updatedAt: Date; id: string };
+
+function decodeOrderCursor(value: string | undefined): OrderListCursor | null {
+  if (!value) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as unknown;
+    if (typeof decoded !== "object" || decoded === null || !("updatedAt" in decoded) || !("id" in decoded) || typeof decoded.updatedAt !== "string" || typeof decoded.id !== "string") throw new Error("invalid cursor");
+    const updatedAt = new Date(decoded.updatedAt);
+    if (Number.isNaN(updatedAt.getTime()) || !/^[0-9a-f-]{36}$/i.test(decoded.id)) throw new Error("invalid cursor");
+    return { updatedAt, id: decoded.id };
+  } catch {
+    throw new OrderError("INVALID_REQUEST", "수주 목록 페이지 위치가 올바르지 않습니다.");
+  }
+}
+
+function encodeOrderCursor(cursor: OrderListCursor) {
+  return Buffer.from(JSON.stringify({ updatedAt: cursor.updatedAt.toISOString(), id: cursor.id }), "utf8").toString("base64url");
+}
+
+export async function listOrdersPage(
+  prisma: PrismaClient,
+  context: AuthenticatedContext,
+  input: OrderListInput,
+) {
+  requirePermission(context, "order.read");
+  const cursor = decodeOrderCursor(input.cursor);
+  const q = input.q?.trim();
+  const limit = input.limit ?? 25;
+  const rows = await prisma.salesOrder.findMany({
+    where: {
+      organizationId: context.organizationId,
+      ...(input.customerId ? { customerId: input.customerId } : {}),
+      ...(input.ownerMembershipId ? { ownerMembershipId: input.ownerMembershipId } : {}),
+      ...(input.statuses?.length ? { status: { in: input.statuses } } : {}),
+      ...(input.orderedFrom || input.orderedTo ? { orderedAt: { ...(input.orderedFrom ? { gte: input.orderedFrom } : {}), ...(input.orderedTo ? { lte: input.orderedTo } : {}) } } : {}),
+      ...(q ? { OR: [{ orderNumber: { contains: q, mode: "insensitive" } }, { customer: { code: { contains: q, mode: "insensitive" } } }, { customer: { name: { contains: q, mode: "insensitive" } } }] } : {}),
+      // cursor 조건은 AND로 감싼다. 같은 객체에 OR를 두 번 쓰면 뒤의 spread가 검색어 OR를 덮어써서
+      // 2페이지부터 검색 조건이 사라진다.
+      ...(cursor ? { AND: [{ OR: [{ updatedAt: { lt: cursor.updatedAt } }, { updatedAt: cursor.updatedAt, id: { lt: cursor.id } }] }] } : {}),
+    },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
+    select: orderSelect,
+  });
+  const hasMore = rows.length > limit;
+  const items = rows.slice(0, limit);
+  return {
+    items: items.map(toDto),
+    nextCursor: hasMore ? encodeOrderCursor({ updatedAt: items.at(-1)!.updatedAt, id: items.at(-1)!.id }) : null,
+  };
 }
 
 export async function getOrder(prisma: PrismaClient, context: AuthenticatedContext, id: string) {
@@ -359,8 +437,8 @@ export async function updateOrder(
   requirePermission(context, "order.edit");
   return prisma.$transaction(async (tx) => {
     const old = await getOrderRow(tx, context.organizationId, input.id);
-    if (old.status !== "DRAFT") {
-      throw new OrderError("CONFLICT", "취소된 수주는 수정할 수 없습니다.", {
+    if (old.status !== "DRAFT" && old.status !== "CALCULATED") {
+      throw new OrderError("CONFLICT", "승인·생산·마감 또는 취소 상태의 수주는 수정할 수 없습니다.", {
         latest: toDto(old),
       });
     }
@@ -379,7 +457,7 @@ export async function updateOrder(
       where: {
         id: input.id,
         organizationId: context.organizationId,
-        status: "DRAFT",
+        status: { in: ["DRAFT", "CALCULATED"] },
         lockVersion: input.expectedLockVersion,
       },
       data: {
@@ -472,14 +550,14 @@ export async function cancelOrder(
   }
   return prisma.$transaction(async (tx) => {
     const old = await getOrderRow(tx, context.organizationId, input.id);
-    if (old.status !== "DRAFT") {
-      throw new OrderError("CONFLICT", "이미 취소된 수주입니다.", { latest: toDto(old) });
+    if (old.status !== "DRAFT" && old.status !== "CALCULATED") {
+      throw new OrderError("CONFLICT", "작성 중 또는 계산 완료 수주만 취소할 수 있습니다.", { latest: toDto(old) });
     }
     const result = await tx.salesOrder.updateMany({
       where: {
         id: input.id,
         organizationId: context.organizationId,
-        status: "DRAFT",
+        status: { in: ["DRAFT", "CALCULATED"] },
         lockVersion: input.expectedLockVersion,
       },
       data: {

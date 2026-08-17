@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OrderRequestError, orderRequest } from "@/components/orders/order-api";
 import { OrderFoldItemsPanel } from "@/components/orders/order-fold-items-panel";
+import { OrderCalculationPanel } from "@/components/orders/order-calculation-panel";
+import { OrderStatusPanel, orderStatusLabels } from "@/components/orders/order-status-panel";
+import { OrderHistoryPanel } from "@/components/orders/order-history-panel";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type {
   OrderFormOptionsDto,
   SalesOrderDto,
 } from "@/server/orders/order-service";
 import type { OrderFoldItemDto, OrderFoldMutationResult, OrderFoldOptionsDto } from "@/server/orders/order-fold-service";
+import type { OrderCalculationStateDto } from "@/server/orders/order-calculation-service";
+import type { OrderHistoryDto } from "@/server/orders/order-history-service";
 
 type FormState = {
   customerId: string;
@@ -42,23 +47,31 @@ export function OrderDetailPanel({
   initial,
   options,
   canWrite,
+  canApprove,
   initialFoldItems,
   foldOptions,
+  initialCalculation,
+  initialHistory,
 }: {
   initial: SalesOrderDto;
   options: OrderFormOptionsDto;
   canWrite: boolean;
+  canApprove: boolean;
   initialFoldItems: OrderFoldItemDto[];
   foldOptions: OrderFoldOptionsDto;
+  initialCalculation: OrderCalculationStateDto;
+  initialHistory: OrderHistoryDto;
 }) {
   const popup = useCommonPopup();
   const router = useRouter();
   const [order, setOrder] = useState(initial);
+  const [calculation, setCalculation] = useState(initialCalculation);
+  const [historyVersion, setHistoryVersion] = useState(0);
   const [form, setForm] = useState(() => formFromOrder(initial));
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "error">("saved");
   const formRef = useRef(form);
   const savingRef = useRef(false);
-  const editable = canWrite && order.status === "DRAFT";
+  const editable = canWrite && (order.status === "DRAFT" || order.status === "CALCULATED");
   const customer = useMemo(
     () => options.customers.find((item) => item.id === form.customerId),
     [form.customerId, options.customers],
@@ -261,12 +274,12 @@ export function OrderDetailPanel({
               >
                 저장
               </button>
-              <button className="rounded border px-3 py-2 text-xs font-bold disabled:opacity-50" disabled={saveState === "saving"} onClick={() => void copy()} type="button">복사</button>
+              {order.status === "DRAFT" ? <button className="rounded border px-3 py-2 text-xs font-bold disabled:opacity-50" disabled={saveState === "saving"} onClick={() => void copy()} type="button">복사</button> : null}
               <button className="rounded border border-red-300 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50" disabled={saveState === "saving"} onClick={() => void cancel()} type="button">취소</button>
             </>
           ) : null}
           <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold">
-            {order.status === "DRAFT" ? "작성 중" : "취소"}
+            {orderStatusLabels[order.status]}
           </span>
         </div>
       </div>
@@ -334,21 +347,44 @@ export function OrderDetailPanel({
         </p>
       ) : null}
       <p className={`mt-3 text-xs ${saveState === "error" ? "text-red-700" : "text-slate-500"}`} role="status">
-        {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "변경 내용 저장 대기 중…" : saveState === "error" ? "저장 실패 · 저장 버튼으로 다시 시도하세요." : editable ? `저장됨 · ${new Date(order.updatedAt).toLocaleString("ko-KR")}` : "취소된 수주는 읽기 전용입니다."}
+        {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "변경 내용 저장 대기 중…" : saveState === "error" ? "저장 실패 · 저장 버튼으로 다시 시도하세요." : editable ? `저장됨 · ${new Date(order.updatedAt).toLocaleString("ko-KR")}` : `${orderStatusLabels[order.status]} 수주는 읽기 전용입니다.`}
       </p>
     </section>
     <OrderFoldItemsPanel
       editable={editable}
       getReadyOrder={() => persist(form, true)}
       initialItems={initialFoldItems}
-      onMutation={(result: OrderFoldMutationResult) => setOrder((current) => ({
-        ...current,
-        lockVersion: result.orderLockVersion,
-        partySnapshotCapturedAt: result.partySnapshotCapturedAt,
-        customerFieldsLocked: result.partySnapshotCapturedAt !== null,
-      }))}
+      onMutation={(result: OrderFoldMutationResult, activeItemCount, affectsCalculation) => {
+        setOrder((current) => ({
+          ...current,
+          status: affectsCalculation && current.status === "CALCULATED" ? "DRAFT" : current.status,
+          lockVersion: result.orderLockVersion,
+          partySnapshotCapturedAt: result.partySnapshotCapturedAt,
+          customerFieldsLocked: result.partySnapshotCapturedAt !== null,
+        }));
+        setCalculation((current) => ({ ...current, stale: affectsCalculation && current.snapshot !== null ? true : current.stale, canCalculate: activeItemCount > 0 }));
+      }}
       options={foldOptions}
     />
+    <OrderCalculationPanel
+      editable={editable}
+      getReadyOrder={() => persist(form, true)}
+      onCalculated={(result) => {
+        setOrder((current) => ({ ...current, status: "CALCULATED", lockVersion: result.orderLockVersion }));
+        setCalculation(result.state);
+      }}
+      state={calculation}
+    />
+    <OrderStatusPanel
+      canApprove={canApprove}
+      onChanged={(updated) => {
+        replaceWith(updated);
+        setCalculation((current) => ({ ...current, canCalculate: updated.status === "DRAFT" || updated.status === "CALCULATED" }));
+        setHistoryVersion((current) => current + 1);
+      }}
+      order={order}
+    />
+    <OrderHistoryPanel initial={initialHistory} orderId={order.id} refreshVersion={historyVersion} />
     </div>
   );
 }

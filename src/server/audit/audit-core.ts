@@ -226,6 +226,8 @@ export const auditActionCatalog = {
   "order.fold_item_copied": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrderFoldItem", label: "수주 절곡 작업 복사" },
   "order.fold_item_removed": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrderFoldItem", label: "수주 절곡 작업 제거" },
   "order.fold_items_reordered": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrder", label: "수주 절곡 작업 순서 변경" },
+  "order.calculation_snapshot_created": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrderCalculationSnapshot", label: "수주 계산·가격 스냅샷 생성" },
+  "order.status_transitioned": { category: "APPROVAL", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrder", label: "수주 승인·생산 상태 전이" },
   "material.created": {
     category: "DATA_CHANGE",
     defaultOutcome: "SUCCESS",
