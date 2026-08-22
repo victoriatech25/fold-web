@@ -22,6 +22,7 @@ test("회사정보와 복수 사업장의 기본·비활성 수명주기를 관�
   await expect(page.getByRole("alertdialog").getByText("회사 정보를 저장했습니다.")).toBeVisible();
   await page.getByRole("alertdialog").getByRole("button", { name: "확인" }).click();
 
+  await page.getByRole("tab", { name: /사업장/ }).click();
   await page.getByRole("button", { name: "사업장 추가" }).click();
   const createDialog = page.getByRole("dialog", { name: "사업장 추가" });
   await createDialog.getByLabel("사업장 코드").fill("E2E-FACTORY");

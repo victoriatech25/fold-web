@@ -37,6 +37,7 @@ test("거래처와 담당자·고객 현장의 기본 수명주기를 관리한�
   await expect(page).toHaveURL(/\/customers\/[0-9a-f-]+$/);
   await expect(page.getByRole("heading", { name: "E2E 빅토리아 거래처" })).toBeVisible();
 
+  await page.getByRole("tab", { name: /고객 현장/ }).click();
   await page.getByRole("button", { name: "현장 추가" }).click();
   let siteDialog = page.getByRole("dialog", { name: "고객 현장 추가" });
   await siteDialog.getByLabel("현장 코드").fill("MAIN");
@@ -57,6 +58,7 @@ test("거래처와 담당자·고객 현장의 기본 수명주기를 관리한�
   await closeSuccessPopup(page, "기본 고객 현장을 변경했습니다.");
   await expect(page.getByRole("article").filter({ hasText: "E2E 제2현장" })).toContainText("기본");
 
+  await page.getByRole("tab", { name: /담당자/ }).click();
   await page.getByRole("button", { name: "담당자 추가" }).click();
   let contactDialog = page.getByRole("dialog", { name: "담당자 추가" });
   await contactDialog.getByLabel("담당자명").fill("E2E 첫 담당자");

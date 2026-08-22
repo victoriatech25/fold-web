@@ -8,6 +8,8 @@ import { OrderFoldItemsPanel } from "@/components/orders/order-fold-items-panel"
 import { OrderCalculationPanel } from "@/components/orders/order-calculation-panel";
 import { OrderStatusPanel, orderStatusLabels } from "@/components/orders/order-status-panel";
 import { OrderHistoryPanel } from "@/components/orders/order-history-panel";
+import { StatusBadge } from "@/components/orders/order-list-panel";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type {
   OrderFormOptionsDto,
@@ -67,6 +69,8 @@ export function OrderDetailPanel({
   const [order, setOrder] = useState(initial);
   const [calculation, setCalculation] = useState(initialCalculation);
   const [historyVersion, setHistoryVersion] = useState(0);
+  const [tab, setTab] = useState("basic");
+  const [foldCount, setFoldCount] = useState(initialFoldItems.length);
   const [form, setForm] = useState(() => formFromOrder(initial));
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "error">("saved");
   const formRef = useRef(form);
@@ -254,43 +258,68 @@ export function OrderDetailPanel({
   const currentOwnerMissing = order.ownerMembershipId &&
     !options.owners.some((item) => item.id === order.ownerMembershipId);
 
+  const tabs = [
+    { id: "basic", label: "기본정보" },
+    { id: "folds", label: "절곡 작업", badge: foldCount },
+    { id: "calc", label: "계산·금액" },
+    { id: "status", label: "승인·생산" },
+    { id: "history", label: "이력" },
+  ];
+
   return (
-    <div className="space-y-5">
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link className="text-xs font-bold text-teal-700" href="/orders">← 수주 목록</Link>
-          <h1 className="mt-2 text-xl font-black">{order.orderNumber}</h1>
-          <p className="mt-1 text-sm text-slate-500">수주 기본정보 · 수주일 {order.orderedAt}</p>
+    <div className="space-y-3">
+      {/* 수주 문맥과 주 행동은 탭을 바꿔도 항상 같은 자리에 남는다. */}
+      <section className="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Link className="text-xs font-bold text-teal-700" href="/orders">← 수주 목록</Link>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-black">{order.orderNumber}</h1>
+              <StatusBadge status={order.status} />
+            </div>
+            <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+              <div className="flex gap-1.5"><dt className="font-bold">거래처</dt><dd>{order.customer.name}</dd></div>
+              <div className="flex gap-1.5"><dt className="font-bold">수주일</dt><dd>{order.orderedAt}</dd></div>
+              <div className="flex gap-1.5"><dt className="font-bold">납기</dt><dd>{order.dueDate ?? "미지정"}</dd></div>
+              <div className="flex gap-1.5"><dt className="font-bold">담당자</dt><dd>{order.ownerName ?? "미지정"}</dd></div>
+            </dl>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            {editable ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  className="rounded border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-50"
+                  disabled={saveState === "saving"}
+                  onClick={() => void persist(form, true)}
+                  type="button"
+                >
+                  저장
+                </button>
+                {order.status === "DRAFT" ? <button className="rounded border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-50" disabled={saveState === "saving"} onClick={() => void copy()} type="button">복사</button> : null}
+                <button className="rounded border border-red-300 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50" disabled={saveState === "saving"} onClick={() => void cancel()} type="button">취소</button>
+              </div>
+            ) : null}
+            <p className={`text-xs ${saveState === "error" ? "text-red-700" : "text-slate-500"}`} role="status">
+              {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "변경 내용 저장 대기 중…" : saveState === "error" ? "저장 실패 · 저장 버튼으로 다시 시도하세요." : editable ? `저장됨 · ${new Date(order.updatedAt).toLocaleString("ko-KR")}` : `${orderStatusLabels[order.status]} 수주는 읽기 전용입니다.`}
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {editable ? (
-            <>
-              <button
-                className="rounded border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-50"
-                disabled={saveState === "saving"}
-                onClick={() => void persist(form, true)}
-                type="button"
-              >
-                저장
-              </button>
-              {order.status === "DRAFT" ? <button className="rounded border px-3 py-2 text-xs font-bold disabled:opacity-50" disabled={saveState === "saving"} onClick={() => void copy()} type="button">복사</button> : null}
-              <button className="rounded border border-red-300 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50" disabled={saveState === "saving"} onClick={() => void cancel()} type="button">취소</button>
-            </>
-          ) : null}
-          <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold">
-            {orderStatusLabels[order.status]}
-          </span>
-        </div>
+      </section>
+
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <Tabs ariaLabel="수주 상세" onChange={setTab} tabs={tabs} value={tab} />
       </div>
 
+      <TabPanel id="basic" value={tab}>
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-sm font-black text-slate-800">수주 기본정보</h2>
       {(currentCustomerMissing || currentOwnerMissing || !order.customer.active || order.customerSite?.active === false || order.customerContact?.active === false) ? (
-        <p className="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           현재 참조 중 일부가 비활성 상태입니다. 기존 수주에는 표시되지만 새 선택에는 사용할 수 없습니다.
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <label className="text-sm font-bold">
           거래처
           <select
@@ -346,45 +375,56 @@ export function OrderDetailPanel({
           취소 사유: {order.cancellationReason}
         </p>
       ) : null}
-      <p className={`mt-3 text-xs ${saveState === "error" ? "text-red-700" : "text-slate-500"}`} role="status">
-        {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "변경 내용 저장 대기 중…" : saveState === "error" ? "저장 실패 · 저장 버튼으로 다시 시도하세요." : editable ? `저장됨 · ${new Date(order.updatedAt).toLocaleString("ko-KR")}` : `${orderStatusLabels[order.status]} 수주는 읽기 전용입니다.`}
-      </p>
-    </section>
-    <OrderFoldItemsPanel
-      editable={editable}
-      getReadyOrder={() => persist(form, true)}
-      initialItems={initialFoldItems}
-      onMutation={(result: OrderFoldMutationResult, activeItemCount, affectsCalculation) => {
-        setOrder((current) => ({
-          ...current,
-          status: affectsCalculation && current.status === "CALCULATED" ? "DRAFT" : current.status,
-          lockVersion: result.orderLockVersion,
-          partySnapshotCapturedAt: result.partySnapshotCapturedAt,
-          customerFieldsLocked: result.partySnapshotCapturedAt !== null,
-        }));
-        setCalculation((current) => ({ ...current, stale: affectsCalculation && current.snapshot !== null ? true : current.stale, canCalculate: activeItemCount > 0 }));
-      }}
-      options={foldOptions}
-    />
-    <OrderCalculationPanel
-      editable={editable}
-      getReadyOrder={() => persist(form, true)}
-      onCalculated={(result) => {
-        setOrder((current) => ({ ...current, status: "CALCULATED", lockVersion: result.orderLockVersion }));
-        setCalculation(result.state);
-      }}
-      state={calculation}
-    />
-    <OrderStatusPanel
-      canApprove={canApprove}
-      onChanged={(updated) => {
-        replaceWith(updated);
-        setCalculation((current) => ({ ...current, canCalculate: updated.status === "DRAFT" || updated.status === "CALCULATED" }));
-        setHistoryVersion((current) => current + 1);
-      }}
-      order={order}
-    />
-    <OrderHistoryPanel initial={initialHistory} orderId={order.id} refreshVersion={historyVersion} />
+        </section>
+      </TabPanel>
+
+      <TabPanel id="folds" value={tab}>
+        <OrderFoldItemsPanel
+          editable={editable}
+          getReadyOrder={() => persist(form, true)}
+          initialItems={initialFoldItems}
+          onMutation={(result: OrderFoldMutationResult, activeItemCount, affectsCalculation) => {
+            setFoldCount(activeItemCount);
+            setOrder((current) => ({
+              ...current,
+              status: affectsCalculation && current.status === "CALCULATED" ? "DRAFT" : current.status,
+              lockVersion: result.orderLockVersion,
+              partySnapshotCapturedAt: result.partySnapshotCapturedAt,
+              customerFieldsLocked: result.partySnapshotCapturedAt !== null,
+            }));
+            setCalculation((current) => ({ ...current, stale: affectsCalculation && current.snapshot !== null ? true : current.stale, canCalculate: activeItemCount > 0 }));
+          }}
+          options={foldOptions}
+        />
+      </TabPanel>
+
+      <TabPanel id="calc" value={tab}>
+        <OrderCalculationPanel
+          editable={editable}
+          getReadyOrder={() => persist(form, true)}
+          onCalculated={(result) => {
+            setOrder((current) => ({ ...current, status: "CALCULATED", lockVersion: result.orderLockVersion }));
+            setCalculation(result.state);
+          }}
+          state={calculation}
+        />
+      </TabPanel>
+
+      <TabPanel id="status" value={tab}>
+        <OrderStatusPanel
+          canApprove={canApprove}
+          onChanged={(updated) => {
+            replaceWith(updated);
+            setCalculation((current) => ({ ...current, canCalculate: updated.status === "DRAFT" || updated.status === "CALCULATED" }));
+            setHistoryVersion((current) => current + 1);
+          }}
+          order={order}
+        />
+      </TabPanel>
+
+      <TabPanel id="history" value={tab}>
+        <OrderHistoryPanel initial={initialHistory} orderId={order.id} refreshVersion={historyVersion} />
+      </TabPanel>
     </div>
   );
 }

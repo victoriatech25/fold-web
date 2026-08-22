@@ -9,6 +9,7 @@ import {
   CompanySettingsRequestError,
 } from "@/components/company-settings/company-settings-api";
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import type {
   BusinessSiteDto,
   CompanyProfileDto,
@@ -262,6 +263,7 @@ export function CompanySettingsPanel({
   const router = useRouter();
   const popup = useCommonPopup();
   const [dialogSite, setDialogSite] = useState<BusinessSiteDto | null | undefined>(undefined);
+  const [tab, setTab] = useState("profile");
   const [query, setQuery] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -300,8 +302,24 @@ export function CompanySettingsPanel({
   }
 
   return (
-    <div className="space-y-5">
-      <CompanyProfileForm canManage={canManage} company={company} />
+    <div className="space-y-3">
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <Tabs
+          ariaLabel="회사·사업장"
+          onChange={setTab}
+          tabs={[
+            { id: "profile", label: "회사 기본정보" },
+            { id: "sites", label: "사업장", badge: businessSites.length },
+          ]}
+          value={tab}
+        />
+      </div>
+
+      <TabPanel id="profile" value={tab}>
+        <CompanyProfileForm canManage={canManage} company={company} />
+      </TabPanel>
+
+      <TabPanel id="sites" value={tab}>
       <section className="rounded-lg border border-slate-300 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -356,6 +374,7 @@ export function CompanySettingsPanel({
           ))}
         </div>
       </section>
+      </TabPanel>
       <SiteDialog key={dialogSite === null ? "new" : dialogSite?.id ?? "closed"} onClose={() => setDialogSite(undefined)} site={dialogSite} />
     </div>
   );

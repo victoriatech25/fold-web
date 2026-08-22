@@ -19,6 +19,7 @@ import {
   CustomerRequestError,
 } from "@/components/customers/customer-api";
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import type { CustomerType } from "@/generated/prisma/client";
 import type {
   CustomerContactDto,
@@ -319,6 +320,7 @@ export function CustomerDetailPanel({
 }) {
   const popup = useCommonPopup();
   const [customer, setCustomer] = useState(initial);
+  const [tab, setTab] = useState("basic");
   const [contactDialog, setContactDialog] = useState<CustomerContactDto | null | undefined>();
   const [siteDialog, setSiteDialog] = useState<CustomerSiteDto | null | undefined>();
   const [pending, startTransition] = useTransition();
@@ -368,9 +370,24 @@ export function CustomerDetailPanel({
         <p className="mt-1 text-sm text-slate-500">기본정보와 담당자, 납품·공사 현장을 한곳에서 관리합니다.</p>
       </div>
 
-      <CustomerForm canWrite={canWrite} customer={customer} onChanged={setCustomer} />
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <Tabs
+          ariaLabel="거래처 상세"
+          onChange={setTab}
+          tabs={[
+            { id: "basic", label: "기본정보" },
+            { id: "contacts", label: "담당자", badge: customer.contacts.length },
+            { id: "sites", label: "고객 현장", badge: customer.sites.length },
+          ]}
+          value={tab}
+        />
+      </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <TabPanel id="basic" value={tab}>
+        <CustomerForm canWrite={canWrite} customer={customer} onChanged={setCustomer} />
+      </TabPanel>
+
+      <TabPanel id="contacts" value={tab}>
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><UserRound className="h-5 w-5" /></span><div><h2 className="font-black">담당자</h2><p className="text-xs text-slate-500">{customer.contacts.length}명 등록</p></div></div>
@@ -381,7 +398,9 @@ export function CustomerDetailPanel({
             return <article className="p-5" key={contact.id}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">{contact.name}</h3>{contact.isPrimary ? <span className="inline-flex items-center gap-1 rounded bg-teal-100 px-2 py-0.5 text-[11px] font-bold text-teal-800"><Star className="h-3 w-3" />기본</span> : null}{!contact.active ? <span className="rounded bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">비활성</span> : null}</div><p className="mt-1 text-xs text-slate-500">{[contact.department, contact.title, siteName ?? "거래처 공통"].filter(Boolean).join(" · ")}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">{contact.mobile || contact.phone ? <span className="inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{contact.mobile || contact.phone}</span> : null}{contact.email ? <span className="inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{contact.email}</span> : null}</div></div>{canWrite ? <div className="flex shrink-0 gap-1">{contact.active && !contact.isPrimary ? <button aria-label={`${contact.name} 기본 담당자 지정`} className="rounded border border-teal-200 p-2 text-teal-700" disabled={pending} onClick={() => setDefaultContact(contact)} title="기본 담당자 지정" type="button"><Star className="h-3.5 w-3.5" /></button> : null}<button aria-label={`${contact.name} 담당자 수정`} className="rounded border border-slate-200 p-2 text-slate-600" onClick={() => setContactDialog(contact)} type="button"><Pencil className="h-3.5 w-3.5" /></button></div> : null}</div></article>;
           })}</div>}
         </section>
+      </TabPanel>
 
+      <TabPanel id="sites" value={tab}>
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700"><MapPin className="h-5 w-5" /></span><div><h2 className="font-black">고객 현장</h2><p className="text-xs text-slate-500">{customer.sites.length}개 등록</p></div></div>
@@ -389,7 +408,7 @@ export function CustomerDetailPanel({
           </div>
           {customer.sites.length === 0 ? <p className="p-6 text-sm text-slate-500">등록된 고객 현장이 없습니다. 현장 없이도 거래처를 사용할 수 있습니다.</p> : <div className="divide-y divide-slate-100">{customer.sites.map((site) => <article className="p-5" key={site.id}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">{site.name}</h3><span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{site.code}</span>{site.isDefault ? <span className="inline-flex items-center gap-1 rounded bg-teal-100 px-2 py-0.5 text-[11px] font-bold text-teal-800"><Star className="h-3 w-3" />기본</span> : null}{!site.active ? <span className="rounded bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">비활성</span> : null}</div><p className="mt-2 text-xs text-slate-500">{[site.phone, site.addressLine1, site.addressLine2].filter(Boolean).join(" · ") || "연락처와 주소 미등록"}</p></div>{canWrite ? <div className="flex shrink-0 gap-1">{site.active && !site.isDefault ? <button aria-label={`${site.name} 기본 고객 현장 지정`} className="rounded border border-teal-200 p-2 text-teal-700" disabled={pending} onClick={() => setDefaultSite(site)} title="기본 고객 현장 지정" type="button"><Star className="h-3.5 w-3.5" /></button> : null}<button aria-label={`${site.name} 고객 현장 수정`} className="rounded border border-slate-200 p-2 text-slate-600" onClick={() => setSiteDialog(site)} type="button"><Pencil className="h-3.5 w-3.5" /></button></div> : null}</div></article>)}</div>}
         </section>
-      </div>
+      </TabPanel>
 
       <ContactDialog contact={contactDialog} customer={customer} onClose={() => setContactDialog(undefined)} onSaved={reload} />
       <SiteDialog customer={customer} onClose={() => setSiteDialog(undefined)} onSaved={reload} site={siteDialog} />

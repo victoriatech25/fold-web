@@ -10,7 +10,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 접속 주소 | `http://localhost:3001` |
+| 접속 주소 | `http://localhost:8000` |
 | 이메일 | `screen-test-admin@local.test` |
 | 비밀번호 | `Browser verification phrase 2026!` |
 | 표시 이름 | `로컬 화면 테스트 관리자` |
@@ -59,7 +59,7 @@ npm run auth:ensure-local-screen-test-account
 
 ## 화면 검수 원칙
 
-1. 반드시 `http://localhost:3001`으로 접속한다. 현재 `APP_ORIGIN`이 이 주소와 정확히 일치해야 mutation이 허용된다.
+1. 반드시 `http://localhost:8000`으로 접속한다. 현재 `APP_ORIGIN`이 이 주소와 정확히 일치해야 mutation이 허용된다.
 2. 화면 검수 시작 시 위 계정으로 로그인한다.
 3. 권한 없는 화면 검수가 필요하면 별도 조회 전용 fixture를 사용하고 이 관리자 계정의 역할을 변경하지 않는다.
 4. 로그인 실패가 반복되어 제한된 경우 15분을 기다리거나 로컬 개발 DB의 인증 throttle 상태를 점검한다.
@@ -71,8 +71,8 @@ npm run auth:ensure-local-screen-test-account
 이 오류는 계정·비밀번호 오류가 아니라 브라우저 주소와 `APP_ORIGIN`이 다를 때 발생하는 보안 차단이다.
 
 - 주소 표시줄이 `http://127.0.0.1:3000`이면 해당 탭을 닫는다.
-- 새 탭에서 `http://localhost:3001`을 직접 연다.
-- 주소가 `localhost:3001/login`인지 확인한 뒤 다시 로그인한다.
+- 새 탭에서 `http://localhost:8000`을 직접 연다.
+- 주소가 `localhost:8000/login`인지 확인한 뒤 다시 로그인한다.
 - `127.0.0.1` 화면에서 새로고침만 해서는 주소가 바뀌지 않는다.
 
-현재 로컬 기준선은 `APP_ORIGIN=http://localhost:3001`이다. 로그인과 초안 저장 같은 mutation 요청은 이 origin과 정확히 일치해야 한다.
+현재 로컬 기준선은 `APP_ORIGIN=http://localhost:8000`이다. 로그인과 초안 저장 같은 mutation 요청은 이 origin과 정확히 일치해야 한다.

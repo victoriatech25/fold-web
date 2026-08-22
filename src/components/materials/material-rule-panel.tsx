@@ -17,6 +17,7 @@ import Link from "next/link";
 import { type FormEvent, useMemo, useState, useTransition } from "react";
 
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import type {
   MaterialRuleFields,
   MaterialRulePreviewDto,
@@ -505,6 +506,7 @@ export function MaterialRulePanel({
 }) {
   const popup = useCommonPopup();
   const [workspace, setWorkspace] = useState(initial);
+  const [tab, setTab] = useState("revisions");
   const [editor, setEditor] = useState<{
     value: MaterialRuleFields & {
       id?: string;
@@ -732,6 +734,20 @@ export function MaterialRulePanel({
           detail={open?.changeSummary ?? "작성·검토 중인 개정 없음"}
         />
       </section>
+
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <Tabs
+          ariaLabel="계산 기준 상세"
+          onChange={setTab}
+          tabs={[
+            { id: "revisions", label: "개정 이력", badge: workspace.revisions.length },
+            { id: "audit", label: "처리 이력" },
+          ]}
+          value={tab}
+        />
+      </div>
+
+      <TabPanel id="revisions" value={tab}>
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b px-5 py-4">
           <h2 className="font-black">개정 이력</h2>
@@ -880,6 +896,9 @@ export function MaterialRulePanel({
           )}
         </div>
       </section>
+      </TabPanel>
+
+      <TabPanel id="audit" value={tab}>
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="font-black">처리 이력</h2>
         {workspace.history.length === 0 ? (
@@ -904,6 +923,8 @@ export function MaterialRulePanel({
           </ol>
         )}
       </section>
+      </TabPanel>
+
       {editor ? (
         <RuleEditorDialog
           open

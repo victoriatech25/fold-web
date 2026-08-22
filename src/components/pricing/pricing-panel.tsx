@@ -1,10 +1,11 @@
 "use client";
 
-import { BadgeDollarSign, Calculator, ChevronRight, CircleDollarSign, Plus, Tags, UsersRound } from "lucide-react";
+import { BadgeDollarSign, Calculator, CircleDollarSign, Plus, Tags, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useMemo, useState, useTransition } from "react";
 
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import type { FoldPricePreviewDto, PriceScopeTypeDto, PricingWorkspaceDto } from "@/server/pricing/pricing-types";
 
 import { pricingRequest } from "./pricing-api";
@@ -35,12 +36,143 @@ function ManualCalculator({ workspace }: { workspace: PricingWorkspaceDto }) {
 function Amount({label,value}:{label:string;value:string}){return <div className="rounded-lg border border-teal-100 bg-white p-3"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 text-lg font-black text-slate-950">{currency(value)}</p></div>}
 
 export function PricingPanel({ initial, canWrite }: { initial: PricingWorkspaceDto; canWrite: boolean }) {
-  const popup=useCommonPopup();const[workspace,setWorkspace]=useState(initial);const[tierOpen,setTierOpen]=useState(false);const[bookOpen,setBookOpen]=useState(false);const[pending,startTransition]=useTransition();
+  const popup=useCommonPopup();const[workspace,setWorkspace]=useState(initial);const[tierOpen,setTierOpen]=useState(false);const[bookOpen,setBookOpen]=useState(false);const[tab,setTab]=useState("books");const[pending,startTransition]=useTransition();
   async function reload(){setWorkspace(await pricingRequest<PricingWorkspaceDto>("/api/v1/pricing"));}
   function tierAction(tier:PricingWorkspaceDto["tiers"][number],action:"set_default"|"deactivate"|"reactivate"){startTransition(async()=>{const confirmed=await popup.confirm({title:action==="set_default"?"기본 가격등급 지정":action==="deactivate"?"가격등급 비활성화":"가격등급 재활성화",message:`${tier.name} 등급에 이 작업을 적용하시겠습니까?`,variant:action==="deactivate"?"warning":"info"});if(!confirmed)return;try{await pricingRequest(`/api/v1/pricing/tiers/${tier.id}/transitions`,{method:"POST",body:JSON.stringify({action,expectedLockVersion:tier.lockVersion})});await reload();}catch(error){await popup.alert({title:"처리 실패",message:error instanceof Error?error.message:"가격등급을 변경하지 못했습니다.",variant:"danger"});}})}
   function assign(customer:PricingWorkspaceDto["customers"][number],priceTierId:string|null){startTransition(async()=>{try{await pricingRequest(`/api/v1/customers/${customer.id}/pricing-tier`,{method:"POST",body:JSON.stringify({priceTierId,expectedLockVersion:customer.lockVersion})});await reload();}catch(error){await popup.alert({title:"배정 실패",message:error instanceof Error?error.message:"가격등급을 배정하지 못했습니다.",variant:"danger"});}})}
   const currentBooks=workspace.books.filter(book=>book.currentRevisionId).length;
-  return <div className="space-y-6"><header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-2xl font-black text-slate-950">가격 관리</h1><p className="mt-1 text-sm text-slate-600">기본·등급·거래처 전용 가격을 승인 개정으로 관리하고 적용 결과를 확인합니다.</p></div>{canWrite?<div className="flex gap-2"><button onClick={()=>setTierOpen(true)} className="inline-flex h-10 items-center gap-2 rounded border border-slate-300 bg-white px-4 text-sm font-bold"><Plus className="h-4 w-4"/>가격등급</button><button onClick={()=>setBookOpen(true)} className="inline-flex h-10 items-center gap-2 rounded bg-teal-700 px-4 text-sm font-bold text-white"><Plus className="h-4 w-4"/>가격표</button></div>:null}</header><div className="grid gap-3 sm:grid-cols-3"><Summary icon={Tags} label="활성 가격등급" value={`${workspace.tiers.filter(x=>x.active).length}개`}/><Summary icon={BadgeDollarSign} label="사용 중 가격표" value={`${currentBooks}개`}/><Summary icon={UsersRound} label="가격 대상 거래처" value={`${workspace.customers.length}개`}/></div><section className="rounded-xl border border-slate-200 bg-white shadow-sm"><div className="flex items-center justify-between border-b px-5 py-4"><div><h2 className="font-black">가격표</h2><p className="mt-1 text-xs text-slate-500">게시 개정과 작성 중 개정을 확인합니다.</p></div></div><div className="divide-y divide-slate-100">{workspace.books.length?workspace.books.map(book=><Link key={book.id} href={`/pricing/${book.id}`} className="grid gap-3 px-5 py-4 hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"><div><span className="font-bold">{book.name}</span><span className="ml-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{scopeLabel[book.scopeType]}</span><p className="mt-1 text-xs text-slate-500">{book.code}{book.priceTier?` · ${book.priceTier.name}`:""}{book.customer?` · ${book.customer.name}`:""}</p></div><div className="flex gap-2 text-[11px] font-bold"><span className={book.currentRevisionId?"rounded bg-teal-100 px-2 py-1 text-teal-800":"rounded bg-amber-100 px-2 py-1 text-amber-800"}>{book.currentRevisionId?"사용 중":"게시 필요"}</span>{book.openRevisionId?<span className="rounded bg-blue-100 px-2 py-1 text-blue-800">작성 중</span>:null}{book.scheduledRevisionId?<span className="rounded bg-violet-100 px-2 py-1 text-violet-800">예약</span>:null}</div><ChevronRight className="hidden h-4 w-4 text-slate-300 sm:block"/></Link>):<p className="px-5 py-12 text-center text-sm text-slate-500">등록된 가격표가 없습니다.</p>}</div></section><section className="grid gap-5 xl:grid-cols-2"><div className="rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b px-5 py-4"><h2 className="font-black">가격등급</h2><p className="mt-1 text-xs text-slate-500">거래처가 공유할 가격 범위입니다.</p></div><div className="divide-y">{workspace.tiers.map(tier=><div key={tier.id} className="flex items-center justify-between gap-3 px-5 py-4"><div><p className="font-bold">{tier.name} <span className="text-xs text-slate-400">{tier.code}</span></p><p className="mt-1 text-xs text-slate-500">거래처 {tier.customerCount}곳 {tier.isDefault?"· 조직 기본":""} {!tier.active?"· 비활성":""}</p></div>{canWrite?<div className="flex gap-1">{!tier.isDefault&&tier.active?<button disabled={pending} onClick={()=>tierAction(tier,"set_default")} className="rounded border px-2.5 py-1.5 text-xs font-bold">기본 지정</button>:null}<button disabled={pending} onClick={()=>tierAction(tier,tier.active?"deactivate":"reactivate")} className="rounded border px-2.5 py-1.5 text-xs font-bold">{tier.active?"비활성":"재활성"}</button></div>:null}</div>)}</div></div><div className="rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b px-5 py-4"><h2 className="font-black">거래처 가격등급</h2><p className="mt-1 text-xs text-slate-500">미지정은 조직 기본 등급을 사용합니다.</p></div><div className="max-h-80 divide-y overflow-auto">{workspace.customers.map(customer=><label key={customer.id} className="grid gap-2 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"><span className="text-sm font-bold">{customer.name}<span className="ml-2 text-xs font-normal text-slate-400">{customer.code}</span></span><select disabled={!canWrite||pending} value={customer.priceTierId??""} onChange={e=>assign(customer,e.target.value||null)} className="h-9 rounded border border-slate-300 bg-white px-2 text-sm"><option value="">조직 기본 사용</option>{workspace.tiers.filter(x=>x.active).map(tier=><option key={tier.id} value={tier.id}>{tier.name}</option>)}</select></label>)}</div></div></section><ManualCalculator workspace={workspace}/><div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"><b>로컬 검수 자료:</b> `LOCAL TEST ONLY` 가격은 화면 검수 전용이며 운영 가격으로 사용할 수 없습니다. 모든 가격은 VAT 별도입니다.</div><TierDialog open={tierOpen} onClose={()=>setTierOpen(false)} onSaved={reload}/><BookDialog open={bookOpen} onClose={()=>setBookOpen(false)} onSaved={reload} workspace={workspace}/></div>;
+  const tabs = [
+    { id: "books", label: "가격표", badge: workspace.books.length },
+    { id: "tiers", label: "가격등급", badge: workspace.tiers.length },
+    { id: "assign", label: "거래처 등급", badge: workspace.customers.length },
+    { id: "calculator", label: "가격 계산기" },
+  ];
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-black text-slate-950">가격 관리</h1>
+          <p className="mt-0.5 text-xs text-slate-500">기본·등급·거래처 전용 가격을 승인 개정으로 관리하고 적용 결과를 확인합니다.</p>
+        </div>
+        {canWrite ? (
+          <div className="flex gap-2">
+            <button className="inline-flex h-9 items-center gap-1.5 rounded border border-slate-300 bg-white px-4 text-xs font-bold" onClick={() => setTierOpen(true)} type="button"><Plus className="h-4 w-4" />가격등급</button>
+            <button className="inline-flex h-9 items-center gap-1.5 rounded bg-teal-700 px-4 text-xs font-bold text-white hover:bg-teal-800" onClick={() => setBookOpen(true)} type="button"><Plus className="h-4 w-4" />가격표</button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Summary icon={Tags} label="활성 가격등급" value={`${workspace.tiers.filter(x => x.active).length}개`} />
+        <Summary icon={BadgeDollarSign} label="사용 중 가격표" value={`${currentBooks}개`} />
+        <Summary icon={UsersRound} label="가격 대상 거래처" value={`${workspace.customers.length}개`} />
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <Tabs ariaLabel="가격 관리" onChange={setTab} tabs={tabs} value={tab} />
+      </div>
+
+      <TabPanel id="books" value={tab}>
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+            <h2 className="text-sm font-black text-slate-800">가격표</h2>
+            <span className="text-xs text-slate-500">게시 개정과 작성 중 개정을 확인합니다.</span>
+          </div>
+          {workspace.books.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead className="text-xs text-slate-500">
+                  <tr className="border-b border-slate-200">
+                    <th className="px-4 py-2.5 text-left font-bold">가격표</th>
+                    <th className="px-4 py-2.5 text-left font-bold">적용 범위</th>
+                    <th className="px-4 py-2.5 text-left font-bold">코드</th>
+                    <th className="px-4 py-2.5 text-left font-bold">상태</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {workspace.books.map(book => (
+                    <tr className="hover:bg-teal-50/60" key={book.id}>
+                      <td className="px-4 py-2.5">
+                        <Link className="font-bold text-teal-800 underline-offset-2 hover:underline" href={`/pricing/${book.id}`}>{book.name}</Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600">
+                        {scopeLabel[book.scopeType]}
+                        {book.priceTier ? ` · ${book.priceTier.name}` : ""}
+                        {book.customer ? ` · ${book.customer.name}` : ""}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600">{book.code}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="flex flex-wrap gap-1.5 text-[11px] font-bold">
+                          <span className={book.currentRevisionId ? "rounded bg-teal-100 px-2 py-1 text-teal-800" : "rounded bg-amber-100 px-2 py-1 text-amber-800"}>{book.currentRevisionId ? "사용 중" : "게시 필요"}</span>
+                          {book.openRevisionId ? <span className="rounded bg-blue-100 px-2 py-1 text-blue-800">작성 중</span> : null}
+                          {book.scheduledRevisionId ? <span className="rounded bg-violet-100 px-2 py-1 text-violet-800">예약</span> : null}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <p className="px-5 py-12 text-center text-sm text-slate-500">등록된 가격표가 없습니다.</p>}
+        </section>
+      </TabPanel>
+
+      <TabPanel id="tiers" value={tab}>
+        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b px-5 py-4">
+            <h2 className="font-black">가격등급</h2>
+            <p className="mt-1 text-xs text-slate-500">거래처가 공유할 가격 범위입니다.</p>
+          </div>
+          <div className="divide-y">
+            {workspace.tiers.map(tier => (
+              <div className="flex items-center justify-between gap-3 px-5 py-4" key={tier.id}>
+                <div>
+                  <p className="font-bold">{tier.name} <span className="text-xs text-slate-400">{tier.code}</span></p>
+                  <p className="mt-1 text-xs text-slate-500">거래처 {tier.customerCount}곳 {tier.isDefault ? "· 조직 기본" : ""} {!tier.active ? "· 비활성" : ""}</p>
+                </div>
+                {canWrite ? (
+                  <div className="flex gap-1">
+                    {!tier.isDefault && tier.active ? <button className="rounded border px-2.5 py-1.5 text-xs font-bold" disabled={pending} onClick={() => tierAction(tier, "set_default")} type="button">기본 지정</button> : null}
+                    <button className="rounded border px-2.5 py-1.5 text-xs font-bold" disabled={pending} onClick={() => tierAction(tier, tier.active ? "deactivate" : "reactivate")} type="button">{tier.active ? "비활성" : "재활성"}</button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      </TabPanel>
+
+      <TabPanel id="assign" value={tab}>
+        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b px-5 py-4">
+            <h2 className="font-black">거래처 가격등급</h2>
+            <p className="mt-1 text-xs text-slate-500">미지정은 조직 기본 등급을 사용합니다.</p>
+          </div>
+          <div className="divide-y">
+            {workspace.customers.map(customer => (
+              <label className="grid gap-2 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center" key={customer.id}>
+                <span className="text-sm font-bold">{customer.name}<span className="ml-2 text-xs font-normal text-slate-400">{customer.code}</span></span>
+                <select className="h-9 rounded border border-slate-300 bg-white px-2 text-sm" disabled={!canWrite || pending} onChange={e => assign(customer, e.target.value || null)} value={customer.priceTierId ?? ""}>
+                  <option value="">조직 기본 사용</option>
+                  {workspace.tiers.filter(x => x.active).map(tier => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+      </TabPanel>
+
+      <TabPanel id="calculator" value={tab}>
+        <ManualCalculator workspace={workspace} />
+      </TabPanel>
+
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        <b>로컬 검수 자료:</b> `LOCAL TEST ONLY` 가격은 화면 검수 전용이며 운영 가격으로 사용할 수 없습니다. 모든 가격은 VAT 별도입니다.
+      </div>
+      <TierDialog onClose={() => setTierOpen(false)} onSaved={reload} open={tierOpen} />
+      <BookDialog onClose={() => setBookOpen(false)} onSaved={reload} open={bookOpen} workspace={workspace} />
+    </div>
+  );
 }
 
 function Summary({icon:Icon,label,value}:{icon:typeof CircleDollarSign;label:string;value:string}){return <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center gap-2 text-xs font-bold text-slate-500"><Icon className="h-4 w-4 text-teal-700"/>{label}</div><p className="mt-2 text-2xl font-black">{value}</p></div>}

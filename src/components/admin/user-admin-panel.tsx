@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
 
 import { adminRequest } from "@/components/admin/admin-api";
+import { CommonDialog } from "@/components/ui/common-popup";
 import { OneTimeUrl } from "@/components/admin/one-time-url";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type {
@@ -218,6 +219,7 @@ export function UserAdminPanel({
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   function loadUsers({
     cursor,
@@ -273,6 +275,7 @@ export function UserAdminPanel({
         ]);
         setRoleIds([]);
         formElement.reset();
+        setInviteOpen(false);
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "초대 실패");
       }
@@ -280,7 +283,7 @@ export function UserAdminPanel({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {oneTimeUrl ? (
         <OneTimeUrl
           onClose={() => setOneTimeUrl(null)}
@@ -288,12 +291,24 @@ export function UserAdminPanel({
           url={oneTimeUrl.url}
         />
       ) : null}
-      <section className="rounded-md border border-slate-300 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-bold">새 사용자 초대</h2>
-        <p className="mt-1 text-xs text-slate-500">
-          30분 동안 유효한 비밀번호 설정 주소를 발급합니다.
-        </p>
-        <form className="mt-4 space-y-4" onSubmit={invite}>
+      <div className="flex justify-end">
+        <button
+          className="inline-flex h-9 items-center gap-1.5 rounded bg-teal-700 px-4 text-xs font-bold text-white hover:bg-teal-800"
+          onClick={() => setInviteOpen(true)}
+          type="button"
+        >
+          사용자 초대
+        </button>
+      </div>
+
+      <CommonDialog
+        description="30분 동안 유효한 비밀번호 설정 주소를 발급합니다."
+        onClose={() => setInviteOpen(false)}
+        open={inviteOpen}
+        size="lg"
+        title="새 사용자 초대"
+      >
+        <form className="space-y-4" onSubmit={invite}>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="text-xs font-semibold text-slate-600">
               이메일
@@ -345,7 +360,7 @@ export function UserAdminPanel({
             {pending ? "초대 중…" : "초대 주소 발급"}
           </button>
         </form>
-      </section>
+      </CommonDialog>
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">

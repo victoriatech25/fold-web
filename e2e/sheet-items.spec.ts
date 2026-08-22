@@ -20,7 +20,8 @@ async function closeAlert(page: import("@playwright/test").Page, message: string
 test("원판 품목을 계산·등록·기본 지정하고 도면 snapshot으로 선택한다", async ({ page }) => {
   await login(page);
   await page.getByRole("link", { name: "재질·두께" }).click();
-  await page.getByRole("button", { name: /알루미늄 AL/ }).click();
+  await page.getByRole("link", { name: "알루미늄", exact: true }).click();
+  await page.getByRole("tab", { name: /두께 항목/ }).click();
   await page.getByRole("link", { name: "원판 품목" }).first().click();
   await expect(page.getByRole("heading", { name: "원판 품목" })).toBeVisible();
   await expect(page.getByText("1220 × 2440mm").first()).toBeVisible();
@@ -46,7 +47,7 @@ test("원판 품목을 계산·등록·기본 지정하고 도면 snapshot으로
   card = page.getByRole("article").filter({ hasText: "E2E 보조 원판" });
   await expect(card).toContainText("기본");
 
-  await page.getByRole("link", { name: "도면 설계" }).click();
+  await page.getByRole("link", { name: "설계·도면" }).click();
   await page.getByRole("button", { name: "새 초안" }).click();
   dialog = page.getByRole("dialog", { name: "새 절곡 초안" });
   await dialog.getByLabel("새 초안 이름").fill("E2E 원판 snapshot");

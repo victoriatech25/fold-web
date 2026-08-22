@@ -3,6 +3,7 @@ import { ArrowLeft, CircleAlert, Layers3, Pencil, Plus, Settings2 } from "lucide
 import Link from "next/link";
 import { type FormEvent, useState, useTransition } from "react";
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
+import { TabPanel, Tabs } from "@/components/ui/tabs";
 import type {
   MaterialDetailDto,
   MaterialVariantDto,
@@ -191,6 +192,7 @@ export function MaterialDetailPanel({
 }) {
   const popup = useCommonPopup();
   const [material, setMaterial] = useState(initial);
+  const [tab, setTab] = useState("basic");
   const [dialog, setDialog] = useState<MaterialVariantDto | null | undefined>();
   const [pending, startTransition] = useTransition();
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -267,6 +269,20 @@ export function MaterialDetailPanel({
           ) : null}
         </div>
       </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <Tabs
+          ariaLabel="재질 상세"
+          onChange={setTab}
+          tabs={[
+            { id: "basic", label: "기본정보" },
+            { id: "variants", label: "두께 항목", badge: material.variants.length },
+          ]}
+          value={tab}
+        />
+      </div>
+
+      <TabPanel id="basic" value={tab}>
       <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b px-5 py-4">
           <h2 className="font-black">재질 기본정보</h2>
@@ -348,6 +364,9 @@ export function MaterialDetailPanel({
           </div>
         </form>
       </section>
+      </TabPanel>
+
+      <TabPanel id="variants" value={tab}>
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
           <div>
@@ -442,6 +461,7 @@ export function MaterialDetailPanel({
           </div>
         )}
       </section>
+      </TabPanel>
       <VariantDialog
         material={material}
         variant={dialog}

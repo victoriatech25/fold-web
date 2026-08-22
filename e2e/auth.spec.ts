@@ -57,30 +57,31 @@ test("관리자 UI에서 조직 설정과 사용자 수명주기를 완료한다
     page.getByRole("link", { name: "조직 관리" }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "조직 관리" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "조직 관리" }).click();
   await expect(page).toHaveURL(/\/admin\/users$/);
   await expect(
     page.getByRole("heading", { name: "사용자 관리" }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "부서" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "부서" }).click();
   await page.getByPlaceholder("DESIGN").fill("E2E_DESIGN");
   await page.getByPlaceholder("설계팀").fill("E2E 설계팀");
   await page.getByRole("button", { name: "추가" }).click();
   await expect(page.locator('input[value="E2E 설계팀"]')).toBeVisible();
 
-  await page.getByRole("link", { name: "역할과 권한" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "역할과 권한" }).click();
   await expect(page.getByText("ADMINISTRATOR", { exact: true })).toBeVisible();
   await page.getByPlaceholder("SHOP_TEAM").fill("E2E_SUPPORT");
   await page.getByLabel("이름").fill("E2E 지원");
   await page.getByLabel("설명").fill("브라우저 회귀 검증 역할");
   await page
-    .getByRole("checkbox", { name: "customer.read 거래처 조회" })
+    .getByRole("checkbox", { name: "거래처 조회" })
     .check();
   await page.getByRole("button", { name: "역할 추가" }).click();
   await expect(page.getByText("E2E_SUPPORT", { exact: true })).toBeVisible();
 
-  await page.getByRole("link", { name: "조직 관리" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "조직 관리" }).click();
+  await page.getByRole("button", { name: "사용자 초대" }).click();
   await page.getByLabel("이메일").fill("e2e-viewer@example.test");
   await page.locator('input[name="displayName"]').fill("E2E 조회자");
   await page
@@ -155,7 +156,7 @@ test("관리자 UI에서 조직 설정과 사용자 수명주기를 완료한다
   );
   expect(suspendResponse.ok()).toBe(true);
 
-  await page.getByRole("link", { name: "감사 로그" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "감사 로그" }).click();
   await expect(page).toHaveURL(/\/admin\/audit-logs$/);
   await expect(
     page.getByRole("heading", { name: "감사 로그" }),

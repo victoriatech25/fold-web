@@ -19,16 +19,22 @@ async function confirmStatusAction(page: import("@playwright/test").Page, name: 
   await completed.getByRole("button", { name: "확인" }).click();
 }
 
+async function openTab(page: import("@playwright/test").Page, name: string | RegExp) {
+  await page.getByRole("tab", { name }).click();
+}
+
 test("수주 헤더를 생성·자동 저장·복사·취소하고 다시 조회한다", async ({ page }) => {
   await login(page);
-  await page.getByRole("link", { name: "수주·작업" }).click();
+  await page.getByRole("link", { name: "수주 등록/조회" }).click();
   await expect(page).toHaveURL(/\/orders$/);
   await expect(page.getByRole("heading", { name: "수주 목록" })).toBeVisible();
 
-  await page.getByLabel("새 수주 거래처").selectOption({
+  await page.getByRole("button", { name: "새 수주" }).click();
+  const createDialog = page.getByRole("dialog", { name: "새 수주" });
+  await createDialog.getByLabel("새 수주 거래처").selectOption({
     label: "SCREEN-PRICE · 화면검수 가격 거래처",
   });
-  await page.getByRole("button", { name: "새 수주" }).click();
+  await createDialog.getByRole("button", { name: "수주 등록" }).click();
   await expect(page).toHaveURL(/\/orders\/[0-9a-f-]+$/);
   const originalUrl = page.url();
   const originalNumber = await page.getByRole("heading", { level: 1 }).textContent();
@@ -65,7 +71,7 @@ test("수주 헤더를 생성·자동 저장·복사·취소하고 다시 조회
   await page.getByLabel("수주 검색").fill(copiedNumber ?? "");
   await page.getByLabel("수주일 시작").fill("2026-01-01");
   await page.getByLabel("수주일 종료").fill("2026-12-31");
-  await page.getByLabel("수주 상태").selectOption("CANCELLED");
+  await page.getByRole("group", { name: "수주 상태" }).getByRole("button", { name: "취소" }).click();
   await page.getByRole("button", { name: "조회" }).click();
   await expect(page.getByText(copiedNumber ?? "", { exact: true })).toBeVisible();
 
@@ -81,10 +87,13 @@ test("수주 헤더를 생성·자동 저장·복사·취소하고 다시 조회
 
 test("게시 절곡 개정을 수주 snapshot으로 추가하고 입력·복사·정렬·제거한다", async ({ page }) => {
   await login(page);
-  await page.getByRole("link", { name: "수주·작업" }).click();
-  await page.getByLabel("새 수주 거래처").selectOption({ label: "SCREEN-PRICE · 화면검수 가격 거래처" });
+  await page.getByRole("link", { name: "수주 등록/조회" }).click();
   await page.getByRole("button", { name: "새 수주" }).click();
+  const createDialog = page.getByRole("dialog", { name: "새 수주" });
+  await createDialog.getByLabel("새 수주 거래처").selectOption({ label: "SCREEN-PRICE · 화면검수 가격 거래처" });
+  await createDialog.getByRole("button", { name: "수주 등록" }).click();
 
+  await openTab(page, /절곡 작업/);
   await expect(page.getByRole("heading", { name: "절곡 작업" })).toBeVisible();
   await page.getByRole("button", { name: "절곡 작업 추가" }).click();
   await page.getByLabel("게시 템플릿 검색").fill("SCREEN-FOLD-L");
@@ -93,11 +102,13 @@ test("게시 절곡 개정을 수주 snapshot으로 추가하고 입력·복사�
 
   await expect(page.getByText("작업 1 · SCREEN-FOLD-L · 개정 1")).toBeVisible();
   await expect(page.getByText(/수량 2 · 알루미늄 1T/)).toBeVisible();
+  await openTab(page, "기본정보");
   await expect(page.getByText(/고객정보가 고정되었습니다/)).toBeVisible();
   await expect(page.locator("select.field-control").nth(0)).toBeDisabled();
   await expect(page.locator("select.field-control").nth(1)).toBeDisabled();
   await expect(page.locator("select.field-control").nth(2)).toBeDisabled();
 
+  await openTab(page, /절곡 작업/);
   await page.getByLabel("수량").fill("5");
   await page.getByRole("textbox", { name: "A", exact: true }).fill("250");
   const materialSelect = page.getByLabel("재질·두께");
@@ -122,9 +133,11 @@ test("게시 절곡 개정을 수주 snapshot으로 추가하고 입력·복사�
   await expect(page.getByText("작업 1 · SCREEN-FOLD-L · 개정 1")).toBeVisible();
 
   await page.reload();
+  await openTab(page, /절곡 작업/);
   await expect(page.getByText(/수량 5 · 알루미늄 2T/)).toBeVisible();
   await expect(page.getByRole("textbox", { name: "A", exact: true })).toHaveValue("250");
 
+  await openTab(page, "계산·금액");
   await expect(page.getByRole("heading", { name: "계산·가격" })).toBeVisible();
   await expect(page.getByText("계산 전", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "수주 계산" }).click();
@@ -135,38 +148,47 @@ test("게시 절곡 개정을 수주 snapshot으로 추가하고 입력·복사�
   await expect(page.getByText("계산 버전 1", { exact: false })).toBeVisible();
   await expect(page.getByText("거래처 전용").or(page.getByText("가격등급")).or(page.getByText("조직 기본"))).toBeVisible();
 
+  await openTab(page, /절곡 작업/);
   await page.getByLabel("수량").fill("6");
   await page.getByRole("button", { name: "작업 입력 저장" }).click();
+  await openTab(page, "계산·금액");
   await expect(page.getByText("재계산 필요", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "다시 계산" }).click();
   const recalculatedDialog = page.getByRole("alertdialog", { name: "수주 재계산 완료" });
   await recalculatedDialog.getByRole("button", { name: "확인" }).click();
   await expect(page.getByText("계산 버전 2", { exact: false })).toBeVisible();
 
+  await openTab(page, "승인·생산");
   await confirmStatusAction(page, "수주 승인");
   await expect(page.getByText("고정 계산 버전")).toContainText("2");
+  await openTab(page, /절곡 작업/);
   await expect(page.getByLabel("수량")).toBeDisabled();
   await expect(page.getByLabel("수량")).toHaveCSS("background-color", "rgb(247, 243, 234)");
   await expect(page.getByLabel("수량")).toHaveCSS("cursor", "not-allowed");
 
+  await openTab(page, "승인·생산");
   await page.getByRole("button", { name: "승인 취소" }).click();
   const approvalCancel = page.getByRole("dialog", { name: "승인 취소" });
   await approvalCancel.getByLabel("승인 취소 사유").fill("E2E 입력 재검토");
   await approvalCancel.getByRole("button", { name: "승인 취소" }).click();
   await page.getByRole("alertdialog", { name: "상태 변경 완료" }).getByRole("button", { name: "확인" }).click();
+  await openTab(page, /절곡 작업/);
   await expect(page.getByLabel("수량")).toBeEnabled();
 
+  await openTab(page, "승인·생산");
   await confirmStatusAction(page, "수주 승인");
   await confirmStatusAction(page, "생산 요청");
   await confirmStatusAction(page, "생산 시작");
   await confirmStatusAction(page, "생산 완료");
   await confirmStatusAction(page, "수주 마감");
   await expect(page.getByText("현재 단계:")).toContainText("마감");
+  await openTab(page, "이력");
   await expect(page.getByRole("heading", { name: "수주 이력" })).toBeVisible();
   await expect(page.getByText("수주 승인·생산 상태 전이").first()).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
+  await openTab(page, /절곡 작업/);
   await expect(page.getByRole("heading", { name: "절곡 작업" })).toBeVisible();
   const viewport = await page.evaluate(() => ({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
   expect(viewport.scrollWidth).toBe(viewport.clientWidth);

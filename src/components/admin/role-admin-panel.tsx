@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
 
 import { adminRequest } from "@/components/admin/admin-api";
-import { useCommonPopup } from "@/components/ui/common-popup";
+import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
+import { permissionGroupOrder } from "@/domain/permission";
 import type {
   AdminPermissionDto,
   AdminRoleDto,
 } from "@/server/admin/admin-types";
 
+/** 권한을 한글 분류로 묶어 보여준다. 영문 키는 개발자 참고용이라 tooltip 으로만 남긴다. */
 function PermissionPicker({
   permissions,
   selected,
@@ -21,32 +23,110 @@ function PermissionPicker({
   onChange: (keys: string[]) => void;
   disabled?: boolean;
 }) {
+  const groups = permissionGroupOrder
+    .map((group) => ({
+      group,
+      items: permissions.filter((permission) => permission.group === group),
+    }))
+    .filter(({ items }) => items.length > 0);
+
   return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {permissions.map((permission) => (
-        <label
-          className="flex gap-2 rounded border border-slate-200 p-2 text-xs"
-          key={permission.key}
-        >
-          <input
-            checked={selected.includes(permission.key)}
-            disabled={disabled || permission.key === "admin.manage"}
-            onChange={(event) =>
-              onChange(
-                event.target.checked
-                  ? [...selected, permission.key]
-                  : selected.filter((key) => key !== permission.key),
-              )
-            }
-            type="checkbox"
-          />
-          <span>
-            <strong className="block text-slate-800">{permission.key}</strong>
-            <span className="text-slate-500">{permission.description}</span>
-          </span>
-        </label>
+    <div className="space-y-3">
+      {groups.map(({ group, items }) => (
+        <div key={group}>
+          <p className="mb-1.5 text-[11px] font-bold tracking-[0.08em] text-slate-400">{group}</p>
+          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
+            {items.map((permission) => (
+              <label
+                className="flex items-center gap-2 rounded border border-slate-200 px-2.5 py-2 text-sm hover:bg-slate-50"
+                key={permission.key}
+                title={permission.key}
+              >
+                <input
+                  checked={selected.includes(permission.key)}
+                  disabled={disabled || permission.key === "admin.manage"}
+                  onChange={(event) =>
+                    onChange(
+                      event.target.checked
+                        ? [...selected, permission.key]
+                        : selected.filter((key) => key !== permission.key),
+                    )
+                  }
+                  type="checkbox"
+                />
+                <span className="text-slate-800">{permission.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
+  );
+}
+
+/** 역할이 가진 권한을 한글 이름 chip 으로 보여주고, 많으면 팝업에서 전체를 본다. */
+function RolePermissionSummary({
+  permissions,
+  roleName,
+  roleKeys,
+}: {
+  permissions: AdminPermissionDto[];
+  roleName: string;
+  roleKeys: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const owned = permissions.filter((permission) => roleKeys.includes(permission.key));
+  const visible = owned.slice(0, 5);
+  const hidden = owned.length - visible.length;
+  const groups = permissionGroupOrder
+    .map((group) => ({ group, items: owned.filter((item) => item.group === group) }))
+    .filter(({ items }) => items.length > 0);
+
+  return (
+    <>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {visible.map((permission) => (
+          <span
+            className="rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-teal-800"
+            key={permission.key}
+          >
+            {permission.label}
+          </span>
+        ))}
+        {hidden > 0 ? (
+          <button
+            className="rounded-full border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+            onClick={() => setOpen(true)}
+            type="button"
+          >
+            외 {hidden}개 보기
+          </button>
+        ) : null}
+        {owned.length === 0 ? <span className="text-xs text-slate-400">부여된 권한 없음</span> : null}
+      </div>
+      <CommonDialog
+        description={`${roleName} 역할이 가진 권한 ${owned.length}개입니다.`}
+        onClose={() => setOpen(false)}
+        open={open}
+        size="lg"
+        title="역할 권한"
+      >
+        <div className="space-y-4">
+          {groups.map(({ group, items }) => (
+            <div key={group}>
+              <p className="mb-1.5 text-[11px] font-bold tracking-[0.08em] text-slate-400">{group}</p>
+              <ul className="grid gap-1 sm:grid-cols-2">
+                {items.map((permission) => (
+                  <li className="text-sm text-slate-700" key={permission.key} title={permission.key}>
+                    · {permission.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </CommonDialog>
+    </>
   );
 }
 
@@ -176,9 +256,18 @@ export function RoleAdminPanel({
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           {systemRoles.map((role) => (
             <article className="rounded-md border border-slate-300 bg-white p-4 shadow-sm" key={role.id}>
-              <h3 className="font-bold">{role.name}</h3>
-              <p className="font-mono text-xs text-slate-500">{role.key}</p>
-              <p className="mt-3 text-xs leading-5 text-slate-600">{role.permissions.join(" · ")}</p>
+              <div className="flex items-baseline gap-2">
+                <h3 className="font-bold">{role.name}</h3>
+                <span className="font-mono text-[11px] text-slate-400">{role.key}</span>
+              </div>
+              {role.description ? (
+                <p className="mt-1 text-xs text-slate-500">{role.description}</p>
+              ) : null}
+              <RolePermissionSummary
+                permissions={permissions}
+                roleKeys={role.permissions}
+                roleName={role.name}
+              />
             </article>
           ))}
         </div>

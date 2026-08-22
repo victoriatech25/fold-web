@@ -3,6 +3,7 @@
 import { FormEvent, useState, useTransition } from "react";
 
 import { adminRequest } from "@/components/admin/admin-api";
+import { QueryBar, QueryField } from "@/components/ui/query-bar";
 import type {
   AuditEventDetailDto,
   AuditEventListDto,
@@ -219,29 +220,21 @@ export function AuditLogPanel({
   }
 
   return (
-    <div className="space-y-5">
-      <form
-        className="rounded-md border border-slate-300 bg-white p-4 shadow-sm"
-        onSubmit={search}
-      >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="text-xs font-semibold text-slate-600">시작일<input className="field-control" defaultValue={dateInputValue(new Date(initialFrom))} name="from" required type="date" /></label>
-          <label className="text-xs font-semibold text-slate-600">종료일<input className="field-control" defaultValue={dateInputValue(new Date(initialTo))} name="to" required type="date" /></label>
-          <label className="text-xs font-semibold text-slate-600">분류<select className="field-control" defaultValue="" name="category"><option value="">전체</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="text-xs font-semibold text-slate-600">결과<select className="field-control" defaultValue="" name="outcome"><option value="">전체</option>{Object.entries(outcomeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="text-xs font-semibold text-slate-600">작업 코드<input className="field-control" maxLength={150} name="action" placeholder="admin.user_updated" /></label>
-          <label className="text-xs font-semibold text-slate-600">행위자<input className="field-control" maxLength={100} name="actorQuery" placeholder="이름 또는 이메일" /></label>
-          <label className="text-xs font-semibold text-slate-600">대상 유형<input className="field-control" maxLength={100} name="entityType" placeholder="User" /></label>
-          <label className="text-xs font-semibold text-slate-600">대상 ID<input className="field-control" maxLength={100} name="entityId" /></label>
-          <label className="text-xs font-semibold text-slate-600">요청 ID<input className="field-control" maxLength={100} name="requestId" /></label>
-          <label className="text-xs font-semibold text-slate-600">페이지 크기<select className="field-control" defaultValue="25" name="limit"><option value="25">25건</option><option value="100">100건</option></select></label>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button className="rounded bg-teal-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50" disabled={pending} type="submit">조회</button>
-          <p className="text-xs text-slate-500">한 번에 최대 90일까지 조회할 수 있습니다.</p>
-        </div>
-        {error ? <p className="mt-3 text-sm font-semibold text-red-700">{error}</p> : null}
-      </form>
+    <div className="space-y-3">
+      <QueryBar busy={pending} onSubmit={search}>
+        <QueryField label="시작일" width="w-36"><input className="field-control !mt-0 h-9" defaultValue={dateInputValue(new Date(initialFrom))} name="from" required type="date" /></QueryField>
+        <QueryField label="종료일" width="w-36"><input className="field-control !mt-0 h-9" defaultValue={dateInputValue(new Date(initialTo))} name="to" required type="date" /></QueryField>
+        <QueryField label="분류" width="w-36"><select className="field-control !mt-0 h-9 bg-white" defaultValue="" name="category"><option value="">전체</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></QueryField>
+        <QueryField label="결과" width="w-28"><select className="field-control !mt-0 h-9 bg-white" defaultValue="" name="outcome"><option value="">전체</option>{Object.entries(outcomeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></QueryField>
+        <QueryField label="작업 코드" width="w-44"><input className="field-control !mt-0 h-9" maxLength={150} name="action" placeholder="admin.user_updated" /></QueryField>
+        <QueryField label="행위자" width="w-40"><input className="field-control !mt-0 h-9" maxLength={100} name="actorQuery" placeholder="이름 또는 이메일" /></QueryField>
+        <QueryField label="대상 유형" width="w-32"><input className="field-control !mt-0 h-9" maxLength={100} name="entityType" placeholder="User" /></QueryField>
+        <QueryField label="대상 ID" width="w-40"><input className="field-control !mt-0 h-9" maxLength={100} name="entityId" /></QueryField>
+        <QueryField label="요청 ID" width="w-40"><input className="field-control !mt-0 h-9" maxLength={100} name="requestId" /></QueryField>
+        <QueryField label="페이지 크기" width="w-28"><select className="field-control !mt-0 h-9 bg-white" defaultValue="25" name="limit"><option value="25">25건</option><option value="100">100건</option><option value="200">200건</option></select></QueryField>
+      </QueryBar>
+      <p className="text-xs text-slate-500">한 번에 최대 90일까지 조회할 수 있습니다.</p>
+      {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
 
       {detail ? <AuditDetail detail={detail} onClose={() => setDetail(null)} /> : null}
 

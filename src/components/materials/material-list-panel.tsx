@@ -1,9 +1,11 @@
 "use client";
-import { ChevronRight, Layers3, Plus, Search } from "lucide-react";
+import { Layers3, Plus, Search } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState, useTransition } from "react";
 import { materialRequest } from "./material-api";
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
+import { QueryBar, QueryField } from "@/components/ui/query-bar";
 import type { MaterialDetailDto, MaterialListDto } from "@/server/materials/material-types";
 
 const field = (data: FormData, name: string) => String(data.get(name) ?? "").trim();
@@ -14,7 +16,100 @@ function CreateDialog({ open, onClose }: { open: boolean; onClose: () => void })
 }
 
 export function MaterialListPanel({ initial, canWrite }: { initial: MaterialListDto; canWrite: boolean }) {
-  const router = useRouter(); const [result,setResult]=useState(initial); const [query,setQuery]=useState(""); const [inactive,setInactive]=useState(false); const [open,setOpen]=useState(false); const [error,setError]=useState(""); const [pending,startTransition]=useTransition();
+  const [result,setResult]=useState(initial); const [query,setQuery]=useState(""); const [inactive,setInactive]=useState(false); const [open,setOpen]=useState(false); const [error,setError]=useState(""); const [pending,startTransition]=useTransition();
   function load(cursor?: string) { const params = new URLSearchParams({ limit:"25" }); if(query.trim()) params.set("q",query.trim()); if(inactive) params.set("includeInactive","true"); if(cursor) params.set("cursor",cursor); startTransition(async()=>{try{setError("");setResult(await materialRequest<MaterialListDto>(`/api/v1/materials?${params}`));}catch(e){setError(e instanceof Error?e.message:"목록을 불러오지 못했습니다.");}}); }
-  return <div className="space-y-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-xl font-black">재질·두께</h1><p className="mt-1 text-sm text-slate-600">제품 계산에 사용할 재질과 두께별 발행 상태를 관리합니다.</p></div>{canWrite?<button onClick={()=>setOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-bold text-white"><Plus className="h-4 w-4"/>새 재질</button>:null}</div><section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><form onSubmit={(e)=>{e.preventDefault();load();}} className="grid gap-3 border-b border-slate-200 bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end"><label className="text-xs font-semibold text-slate-600">통합 검색<span className="relative mt-1.5 block"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} className="h-9 w-full rounded border border-slate-300 bg-white pl-9 pr-3 text-sm" placeholder="재질·두께 코드 또는 이름"/></span></label><label className="flex h-9 items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={inactive} onChange={e=>setInactive(e.target.checked)}/>비활성 포함</label><button disabled={pending} className="h-9 rounded bg-slate-900 px-5 text-sm font-bold text-white">조회</button></form>{error?<p role="alert" className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>:null}{result.items.length===0?<div className="px-5 py-14 text-center"><Layers3 className="mx-auto h-8 w-8 text-slate-300"/><p className="mt-3 text-sm font-bold">조건에 맞는 재질이 없습니다.</p></div>:<div className="divide-y divide-slate-100">{result.items.map(item=><button key={item.id} onClick={()=>router.push(`/materials/${item.id}`)} className="grid w-full gap-3 px-4 py-4 text-left hover:bg-slate-50 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] sm:items-center sm:px-5"><span><span className="flex flex-wrap items-center gap-2"><b className="text-sm">{item.name}</b><span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{item.code}</span>{!item.active?<span className="rounded bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">비활성</span>:null}</span><span className="mt-1.5 block text-xs text-slate-500">밀도 {item.densityKgPerM3??"미입력"} kg/m³ · 정렬 {item.sortOrder}</span></span><span className="text-xs text-slate-600">사용 두께 {item.activeVariantCount}개<br/><span className={item.calculationRequiredCount?"font-bold text-amber-700":"text-teal-700"}>{item.calculationRequiredCount?`계산 기준 필요 ${item.calculationRequiredCount}개`:"계산 기준 준비 완료"}</span></span><ChevronRight className="hidden h-4 w-4 text-slate-300 sm:block"/></button>)}</div>}{result.nextCursor?<div className="border-t bg-slate-50 p-3 text-center"><button className="rounded border bg-white px-4 py-2 text-xs font-bold" onClick={()=>load(result.nextCursor!)}>다음 재질 보기</button></div>:null}</section><CreateDialog open={open} onClose={()=>setOpen(false)}/></div>;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-black">재질·두께</h1>
+          <p className="mt-0.5 text-xs text-slate-500">제품 계산에 사용할 재질과 두께별 발행 상태를 관리합니다.</p>
+        </div>
+        {canWrite ? (
+          <button className="inline-flex h-9 items-center gap-1.5 rounded bg-teal-700 px-4 text-xs font-bold text-white hover:bg-teal-800" onClick={() => setOpen(true)} type="button">
+            <Plus className="h-4 w-4" />새 재질
+          </button>
+        ) : null}
+      </div>
+
+      <QueryBar busy={pending} onSubmit={(event) => { event.preventDefault(); load(); }}>
+        <QueryField label="통합 검색" width="w-72">
+          <span className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              aria-label="통합 검색"
+              className="h-9 w-full rounded border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="재질·두께 코드 또는 이름"
+              value={query}
+            />
+          </span>
+        </QueryField>
+        <label className="flex h-9 items-center gap-2 text-xs font-bold text-slate-600">
+          <input checked={inactive} onChange={(event) => setInactive(event.target.checked)} type="checkbox" />
+          비활성 포함
+        </label>
+      </QueryBar>
+
+      {error ? <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p> : null}
+
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+          <h2 className="text-sm font-black text-slate-800">재질 목록</h2>
+          <span className="text-xs text-slate-500">{result.items.length}건 표시</span>
+        </div>
+        {result.items.length === 0 ? (
+          <div className="px-5 py-14 text-center">
+            <Layers3 className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-3 text-sm font-bold">조건에 맞는 재질이 없습니다.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="text-xs text-slate-500">
+                <tr className="border-b border-slate-200">
+                  <th className="px-4 py-2.5 text-left font-bold">재질명</th>
+                  <th className="px-4 py-2.5 text-left font-bold">코드</th>
+                  <th className="px-4 py-2.5 text-right font-bold">밀도(kg/m³)</th>
+                  <th className="px-4 py-2.5 text-right font-bold">사용 두께</th>
+                  <th className="px-4 py-2.5 text-left font-bold">계산 기준</th>
+                  <th className="px-4 py-2.5 text-left font-bold">상태</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {result.items.map((item) => (
+                  <tr className="hover:bg-teal-50/60" key={item.id}>
+                    <td className="px-4 py-2.5">
+                      <Link className="font-bold text-teal-800 underline-offset-2 hover:underline" href={`/materials/${item.id}`}>{item.name}</Link>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600">{item.code}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-600">{item.densityKgPerM3 ?? "미입력"}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-600">{item.activeVariantCount}개</td>
+                    <td className="px-4 py-2.5">
+                      <span className={item.calculationRequiredCount ? "font-bold text-amber-700" : "text-teal-700"}>
+                        {item.calculationRequiredCount ? `계산 기준 필요 ${item.calculationRequiredCount}개` : "계산 기준 준비 완료"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {item.active ? (
+                        <span className="rounded bg-teal-50 px-2 py-0.5 text-xs font-bold text-teal-800">사용</span>
+                      ) : (
+                        <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">비활성</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {result.nextCursor ? (
+          <div className="border-t border-slate-200 bg-slate-50 p-3 text-center">
+            <button className="rounded border border-slate-300 bg-white px-4 py-2 text-xs font-bold" onClick={() => load(result.nextCursor!)} type="button">다음 재질 보기</button>
+          </div>
+        ) : null}
+      </section>
+      <CreateDialog onClose={() => setOpen(false)} open={open} />
+    </div>
+  );
 }

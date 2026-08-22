@@ -25,6 +25,7 @@ test("가격 적용 순서를 계산하고 가격표 초안 수명주기를 공�
   await expect(page.getByText("활성 가격등급").locator("..")).toContainText("2개");
   await expect(page.getByText("사용 중 가격표").locator("..")).toContainText("3개");
 
+  await page.getByRole("tab", { name: "가격 계산기" }).click();
   await page.locator('select[name="customerId"]').selectOption({ label: "SCREEN-PRICE · 화면검수 가격 거래처" });
   await page.locator('select[name="materialVariantId"]').selectOption({ label: "알루미늄 · 알루미늄 1T" });
   await page.getByRole("button", { name: "가격 계산" }).click();
@@ -32,6 +33,7 @@ test("가격 적용 순서를 계산하고 가격표 초안 수명주기를 공�
   await expect(page.getByText(/적용 출처: 거래처 전용/)).toBeVisible();
   await expect(page.getByText(/최소 절곡 할증 적용/)).toBeVisible();
 
+  await page.getByRole("tab", { name: /가격표/ }).click();
   await page.getByRole("link", { name: /화면검수 거래처 전용 가격표/ }).click();
   await expect(page.getByRole("heading", { name: "화면검수 거래처 전용 가격표" })).toBeVisible();
   await expect(page.getByText("17000", { exact: true })).toBeVisible();

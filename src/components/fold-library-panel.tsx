@@ -1,5 +1,6 @@
 "use client";
 
+import { QueryBar, QueryField } from "@/components/ui/query-bar";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -399,34 +400,35 @@ export function FoldLibraryPanel({ canEdit, canPublish }: Props) {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-lg border border-slate-300 bg-white p-4 shadow-sm">
-        <form className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_220px_160px_160px_auto]" onSubmit={submitSearch}>
-          <label className="text-xs font-bold text-slate-700">이름 또는 코드
-            <input aria-label="템플릿 이름 또는 코드" className="field-control" onChange={(event) => setQuery(event.target.value)} placeholder="검색어" value={query} />
-          </label>
-          <label className="text-xs font-bold text-slate-700">분류
-            <select aria-label="템플릿 분류 필터" className="field-control" onChange={(event) => setCategoryId(event.target.value)} value={categoryId}>
-              <option value="">전체 분류</option><option value="uncategorized">미분류</option>
-              {activeCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-            </select>
-          </label>
-          <label className="text-xs font-bold text-slate-700">상태
-            <select aria-label="템플릿 상태 필터" className="field-control" onChange={(event) => setStatus(event.target.value)} value={status}>
-              <option value="">전체 상태</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-          <label className="text-xs font-bold text-slate-700">도면 타입
-            <select aria-label="템플릿 타입 필터" className="field-control" onChange={(event) => setDocumentType(event.target.value)} value={documentType}>
-              <option value="">전체 타입</option><option value="NORMAL">일반</option><option value="BOX">박스</option><option value="PANEL">패널</option>
-            </select>
-          </label>
-          <button className="mt-5 h-9 rounded bg-teal-700 px-5 text-sm font-bold text-white hover:bg-teal-800" type="submit">검색</button>
-        </form>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link className="rounded bg-slate-900 px-3 py-2 text-xs font-bold text-white" href="/fold-editor">새 템플릿 만들기</Link>
-          {canEdit ? <button className="rounded border border-slate-300 px-3 py-2 text-xs font-bold" onClick={() => void addCategory()} type="button">분류 추가</button> : null}
-        </div>
-      </section>
+      <QueryBar
+        actions={
+          <>
+            <Link className="inline-flex h-9 items-center rounded bg-slate-900 px-4 text-xs font-bold text-white" href="/fold-editor">새 템플릿 만들기</Link>
+            {canEdit ? <button className="h-9 rounded border border-slate-300 px-3 text-xs font-bold" onClick={() => void addCategory()} type="button">분류 추가</button> : null}
+          </>
+        }
+        onSubmit={submitSearch}
+      >
+        <QueryField label="이름 또는 코드" width="w-56">
+          <input aria-label="템플릿 이름 또는 코드" className="field-control !mt-0 h-9" onChange={(event) => setQuery(event.target.value)} placeholder="검색어" value={query} />
+        </QueryField>
+        <QueryField label="분류" width="w-44">
+          <select aria-label="템플릿 분류 필터" className="field-control !mt-0 h-9 bg-white" onChange={(event) => setCategoryId(event.target.value)} value={categoryId}>
+            <option value="">전체 분류</option><option value="uncategorized">미분류</option>
+            {activeCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </select>
+        </QueryField>
+        <QueryField label="상태" width="w-36">
+          <select aria-label="템플릿 상태 필터" className="field-control !mt-0 h-9 bg-white" onChange={(event) => setStatus(event.target.value)} value={status}>
+            <option value="">전체 상태</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </QueryField>
+        <QueryField label="도면 타입" width="w-32">
+          <select aria-label="템플릿 타입 필터" className="field-control !mt-0 h-9 bg-white" onChange={(event) => setDocumentType(event.target.value)} value={documentType}>
+            <option value="">전체 타입</option><option value="NORMAL">일반</option><option value="BOX">박스</option><option value="PANEL">패널</option>
+          </select>
+        </QueryField>
+      </QueryBar>
 
       {error ? <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</p> : null}
       {message ? <p className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{message}</p> : null}

@@ -207,8 +207,10 @@ export function listAdminPermissions(
   context: AuthenticatedContext,
 ): AdminPermissionDto[] {
   ensureAdmin(context);
-  return permissionCatalog.map(({ key, description }) => ({
+  return permissionCatalog.map(({ key, label, group, description }) => ({
     key,
+    label,
+    group,
     description,
   }));
 }

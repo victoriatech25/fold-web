@@ -33,7 +33,7 @@ test("템플릿을 분류하고 검토·게시·새 개정·비교한다", async
   await expect(page.getByRole("status")).toHaveText("분류를 생성했습니다.");
 
   await page.getByLabel("템플릿 이름 또는 코드").fill("E2E 라이브러리");
-  await page.getByRole("button", { name: "검색" }).click();
+  await page.getByRole("button", { name: "조회" }).click();
   await page.getByRole("button", { name: /E2E 라이브러리 수직 흐름/ }).click();
   await expect(page.getByRole("heading", { name: "E2E 라이브러리 수직 흐름" })).toBeVisible();
   await expect(page.getByLabel("선택 개정 형상 미리보기")).toBeVisible();

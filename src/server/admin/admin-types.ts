@@ -46,6 +46,10 @@ export type AdminRoleDto = {
 
 export type AdminPermissionDto = {
   key: PermissionKey;
+  /** 화면에 크게 보여줄 짧은 한글 이름. */
+  label: string;
+  /** 화면에서 권한을 묶는 한글 분류. */
+  group: string;
   description: string;
 };
 
