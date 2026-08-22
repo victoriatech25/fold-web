@@ -8,6 +8,7 @@ import {
   type CuttingResult,
 } from "@/domain/cutting/schema";
 import { compareWithSample, cuttingSampleSchema } from "@/domain/cutting/sample";
+import legacySamples from "@/domain/cutting/fixtures/legacy-input-samples.json";
 import { validateCuttingResult } from "@/domain/cutting/validate";
 
 function baseInput(overrides: Partial<CuttingInput> = {}): CuttingInput {
@@ -260,5 +261,35 @@ describe("cutting sample", () => {
     const comparison = compareWithSample(sample, result);
     expect(comparison.passed).toBe(false);
     expect(comparison.issues[0]).toContain("원판 수");
+  });
+});
+
+describe("legacy input samples", () => {
+  const samples = legacySamples.map((entry) => cuttingSampleSchema.parse(entry));
+
+  it("레거시 수주에서 뽑은 입력 표본을 계약으로 적재한다", () => {
+    expect(samples.length).toBeGreaterThanOrEqual(3);
+    for (const sample of samples) {
+      expect(sample.source).toBe("MFC");
+      expect(sample.input.parts.length).toBeGreaterThan(0);
+      expect(sample.input.sheets.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("기대값이 없는 표본은 비교를 건너뛴다", () => {
+    const comparison = compareWithSample(samples[0], baseResult());
+    expect(comparison.compared).toBe(false);
+    expect(comparison.issues).toEqual([]);
+  });
+
+  it("원판보다 긴 부품이 있어 회전이나 더 큰 원판이 필요하다", () => {
+    // 실제 수주에는 1220×2440 에 그대로 들어가지 않는 부품이 섞여 있다.
+    const sample = samples[0];
+    const smallest = sample.input.sheets[0];
+    const needsBiggerSheet = sample.input.parts.some(
+      (part) =>
+        Math.max(Number(part.widthMm), Number(part.lengthMm)) > Number(smallest.lengthMm),
+    );
+    expect(needsBiggerSheet).toBe(true);
   });
 });

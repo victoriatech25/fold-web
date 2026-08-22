@@ -1,0 +1,524 @@
+[
+  {
+    "name": "레거시 수주 표본 1 (E.G.I-1.6T)",
+    "source": "MFC",
+    "note": "krsteelfold2 실제 수주에서 부품 치수·수량만 옮긴 입력 표본. 원판 수·수율은 레거시 DB에 저장돼 있지 않아 기대값이 없다.",
+    "input": {
+      "contractVersion": "cutting-contract-v1",
+      "parts": [
+        {
+          "id": "part-1",
+          "label": "부품 1",
+          "widthMm": "2900",
+          "lengthMm": "496",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-2",
+          "label": "부품 2",
+          "widthMm": "3000",
+          "lengthMm": "176",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-3",
+          "label": "부품 3",
+          "widthMm": "1800",
+          "lengthMm": "465",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-4",
+          "label": "부품 4",
+          "widthMm": "1220",
+          "lengthMm": "465",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-5",
+          "label": "부품 5",
+          "widthMm": "3000",
+          "lengthMm": "98",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-6",
+          "label": "부품 6",
+          "widthMm": "1000",
+          "lengthMm": "51",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-7",
+          "label": "부품 7",
+          "widthMm": "1950",
+          "lengthMm": "1120",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-8",
+          "label": "부품 8",
+          "widthMm": "1120",
+          "lengthMm": "1952",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-9",
+          "label": "부품 9",
+          "widthMm": "870",
+          "lengthMm": "2310",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-10",
+          "label": "부품 10",
+          "widthMm": "1070",
+          "lengthMm": "2613",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-11",
+          "label": "부품 11",
+          "widthMm": "2230",
+          "lengthMm": "1070",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-12",
+          "label": "부품 12",
+          "widthMm": "1070",
+          "lengthMm": "440",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        }
+      ],
+      "sheets": [
+        {
+          "sheetItemId": "SHEET-1220x2440",
+          "label": "E.G.I-1.6T 1220×2440",
+          "widthMm": "1220",
+          "lengthMm": "2440",
+          "trimTopMm": "0",
+          "trimRightMm": "0",
+          "trimBottomMm": "0",
+          "trimLeftMm": "0",
+          "rotationPolicy": "FREE",
+          "grainAxis": "NONE",
+          "minRemnantWidthMm": "100",
+          "minRemnantLengthMm": "100",
+          "minRemnantAreaM2": "0.05",
+          "availableCount": null
+        },
+        {
+          "sheetItemId": "SHEET-1220x3000",
+          "label": "E.G.I-1.6T 1220×3000",
+          "widthMm": "1220",
+          "lengthMm": "3000",
+          "trimTopMm": "0",
+          "trimRightMm": "0",
+          "trimBottomMm": "0",
+          "trimLeftMm": "0",
+          "rotationPolicy": "FREE",
+          "grainAxis": "NONE",
+          "minRemnantWidthMm": "100",
+          "minRemnantLengthMm": "100",
+          "minRemnantAreaM2": "0.05",
+          "availableCount": null
+        },
+        {
+          "sheetItemId": "SHEET-1220x4000",
+          "label": "E.G.I-1.6T 1220×4000",
+          "widthMm": "1220",
+          "lengthMm": "4000",
+          "trimTopMm": "0",
+          "trimRightMm": "0",
+          "trimBottomMm": "0",
+          "trimLeftMm": "0",
+          "rotationPolicy": "FREE",
+          "grainAxis": "NONE",
+          "minRemnantWidthMm": "100",
+          "minRemnantLengthMm": "100",
+          "minRemnantAreaM2": "0.05",
+          "availableCount": null
+        }
+      ],
+      "options": {
+        "bladeKerfMm": "0",
+        "objective": "SHEET_COUNT_FIRST",
+        "seed": null
+      }
+    },
+    "expected": null
+  },
+  {
+    "name": "레거시 수주 표본 2 (H/L-1.2T)",
+    "source": "MFC",
+    "note": "krsteelfold2 실제 수주에서 부품 치수·수량만 옮긴 입력 표본. 원판 수·수율은 레거시 DB에 저장돼 있지 않아 기대값이 없다.",
+    "input": {
+      "contractVersion": "cutting-contract-v1",
+      "parts": [
+        {
+          "id": "part-1",
+          "label": "부품 1",
+          "widthMm": "900",
+          "lengthMm": "76",
+          "quantity": 6,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-2",
+          "label": "부품 2",
+          "widthMm": "600",
+          "lengthMm": "76",
+          "quantity": 6,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-3",
+          "label": "부품 3",
+          "widthMm": "900",
+          "lengthMm": "76",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-4",
+          "label": "부품 4",
+          "widthMm": "1410",
+          "lengthMm": "76",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-5",
+          "label": "부품 5",
+          "widthMm": "900",
+          "lengthMm": "76",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-6",
+          "label": "부품 6",
+          "widthMm": "2030",
+          "lengthMm": "76",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-7",
+          "label": "부품 7",
+          "widthMm": "900",
+          "lengthMm": "76",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-8",
+          "label": "부품 8",
+          "widthMm": "1455",
+          "lengthMm": "76",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-9",
+          "label": "부품 9",
+          "widthMm": "900",
+          "lengthMm": "76",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-10",
+          "label": "부품 10",
+          "widthMm": "1530",
+          "lengthMm": "76",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-11",
+          "label": "부품 11",
+          "widthMm": "900",
+          "lengthMm": "76",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-12",
+          "label": "부품 12",
+          "widthMm": "925",
+          "lengthMm": "76",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        }
+      ],
+      "sheets": [
+        {
+          "sheetItemId": "SHEET-1220x2440",
+          "label": "H/L-1.2T 1220×2440",
+          "widthMm": "1220",
+          "lengthMm": "2440",
+          "trimTopMm": "0",
+          "trimRightMm": "0",
+          "trimBottomMm": "0",
+          "trimLeftMm": "0",
+          "rotationPolicy": "FREE",
+          "grainAxis": "NONE",
+          "minRemnantWidthMm": "100",
+          "minRemnantLengthMm": "100",
+          "minRemnantAreaM2": "0.05",
+          "availableCount": null
+        },
+        {
+          "sheetItemId": "SHEET-1220x3000",
+          "label": "H/L-1.2T 1220×3000",
+          "widthMm": "1220",
+          "lengthMm": "3000",
+          "trimTopMm": "0",
+          "trimRightMm": "0",
+          "trimBottomMm": "0",
+          "trimLeftMm": "0",
+          "rotationPolicy": "FREE",
+          "grainAxis": "NONE",
+          "minRemnantWidthMm": "100",
+          "minRemnantLengthMm": "100",
+          "minRemnantAreaM2": "0.05",
+          "availableCount": null
+        },
+        {
+          "sheetItemId": "SHEET-1220x4000",
+          "label": "H/L-1.2T 1220×4000",
+          "widthMm": "1220",
+          "lengthMm": "4000",
+          "trimTopMm": "0",
+          "trimRightMm": "0",
+          "trimBottomMm": "0",
+          "trimLeftMm": "0",
+          "rotationPolicy": "FREE",
+          "grainAxis": "NONE",
+          "minRemnantWidthMm": "100",
+          "minRemnantLengthMm": "100",
+          "minRemnantAreaM2": "0.05",
+          "availableCount": null
+        }
+      ],
+      "options": {
+        "bladeKerfMm": "0",
+        "objective": "SHEET_COUNT_FIRST",
+        "seed": null
+      }
+    },
+    "expected": null
+  },
+  {
+    "name": "레거시 수주 표본 3 (철판-1.6T)",
+    "source": "MFC",
+    "note": "krsteelfold2 실제 수주에서 부품 치수·수량만 옮긴 입력 표본. 원판 수·수율은 레거시 DB에 저장돼 있지 않아 기대값이 없다.",
+    "input": {
+      "contractVersion": "cutting-contract-v1",
+      "parts": [
+        {
+          "id": "part-1",
+          "label": "부품 1",
+          "widthMm": "1405",
+          "lengthMm": "277",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-2",
+          "label": "부품 2",
+          "widthMm": "2440",
+          "lengthMm": "628",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-3",
+          "label": "부품 3",
+          "widthMm": "2440",
+          "lengthMm": "607",
+          "quantity": 3,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-4",
+          "label": "부품 4",
+          "widthMm": "2440",
+          "lengthMm": "197",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-5",
+          "label": "부품 5",
+          "widthMm": "3750",
+          "lengthMm": "554",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-6",
+          "label": "부품 6",
+          "widthMm": "2440",
+          "lengthMm": "583",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-7",
+          "label": "부품 7",
+          "widthMm": "460",
+          "lengthMm": "105",
+          "quantity": 6,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-8",
+          "label": "부품 8",
+          "widthMm": "2370",
+          "lengthMm": "105",
+          "quantity": 4,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-9",
+          "label": "부품 9",
+          "widthMm": "410",
+          "lengthMm": "105",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-10",
+          "label": "부품 10",
+          "widthMm": "3680",
+          "lengthMm": "105",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-11",
+          "label": "부품 11",
+          "widthMm": "486",
+          "lengthMm": "105",
+          "quantity": 2,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        },
+        {
+          "id": "part-12",
+          "label": "부품 12",
+          "widthMm": "2440",
+          "lengthMm": "504",
+          "quantity": 1,
+          "rotationAllowed": true,
+          "grainDirection": "NONE"
+        }
+      ],
+      "sheets": [
+        {
+          "sheetItemId": "SHEET-1220x2440",
+          "label": "철판-1.6T 1220×2440",
+          "widthMm": "1220",
+          "lengthMm": "2440",
+          "trimTopMm": "0",
+          "trimRightMm": "0",
+          "trimBottomMm": "0",
+          "trimLeftMm": "0",
+          "rotationPolicy": "FREE",
+          "grainAxis": "NONE",
+          "minRemnantWidthMm": "100",
+          "minRemnantLengthMm": "100",
+          "minRemnantAreaM2": "0.05",
+          "availableCount": null
+        },
+        {
+          "sheetItemId": "SHEET-1220x3000",
+          "label": "철판-1.6T 1220×3000",
+          "widthMm": "1220",
+          "lengthMm": "3000",
+          "trimTopMm": "0",
+          "trimRightMm": "0",
+          "trimBottomMm": "0",
+          "trimLeftMm": "0",
+          "rotationPolicy": "FREE",
+          "grainAxis": "NONE",
+          "minRemnantWidthMm": "100",
+          "minRemnantLengthMm": "100",
+          "minRemnantAreaM2": "0.05",
+          "availableCount": null
+        },
+        {
+          "sheetItemId": "SHEET-1220x4000",
+          "label": "철판-1.6T 1220×4000",
+          "widthMm": "1220",
+          "lengthMm": "4000",
+          "trimTopMm": "0",
+          "trimRightMm": "0",
+          "trimBottomMm": "0",
+          "trimLeftMm": "0",
+          "rotationPolicy": "FREE",
+          "grainAxis": "NONE",
+          "minRemnantWidthMm": "100",
+          "minRemnantLengthMm": "100",
+          "minRemnantAreaM2": "0.05",
+          "availableCount": null
+        }
+      ],
+      "options": {
+        "bladeKerfMm": "0",
+        "objective": "SHEET_COUNT_FIRST",
+        "seed": null
+      }
+    },
+    "expected": null
+  }
+]

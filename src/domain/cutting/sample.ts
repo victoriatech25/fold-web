@@ -17,10 +17,16 @@ export const cuttingSampleSchema = z.strictObject({
   source: z.enum(["MFC", "SYNTHETIC"]),
   note: z.string().trim().max(1_000).nullable(),
   input: cuttingInputSchema,
-  expected: z.strictObject({
-    sheetCount: z.number().int().min(0),
-    yieldPercent: percent,
-  }),
+  /**
+   * 기대 결과. 레거시가 재단 결과를 저장하지 않아 확보할 수 없는 표본은 `null`이다.
+   * 이런 표본은 제약 위반이 없는지까지만 검증한다(`D2-B03-P` 2026-08-22 보정).
+   */
+  expected: z
+    .strictObject({
+      sheetCount: z.number().int().min(0),
+      yieldPercent: percent,
+    })
+    .nullable(),
 });
 
 export type CuttingSample = z.infer<typeof cuttingSampleSchema>;
@@ -30,9 +36,11 @@ export const SHEET_COUNT_TOLERANCE = 0;
 export const YIELD_TOLERANCE_POINTS = 2;
 
 export type SampleComparison = {
+  /** 기대값이 없는 표본은 비교를 건너뛴다. 통과로 세지 않는다. */
+  compared: boolean;
   passed: boolean;
-  sheetCountDelta: number;
-  yieldDelta: number;
+  sheetCountDelta: number | null;
+  yieldDelta: number | null;
   issues: string[];
 };
 
@@ -42,6 +50,9 @@ export function compareWithSample(
   result: CuttingResult,
 ): SampleComparison {
   const issues: string[] = [];
+  if (!sample.expected) {
+    return { compared: false, passed: true, sheetCountDelta: null, yieldDelta: null, issues: [] };
+  }
   const sheetCountDelta = result.summary.sheetCount - sample.expected.sheetCount;
   const yieldDelta =
     Number(result.summary.yieldPercent) - Number(sample.expected.yieldPercent);
@@ -57,5 +68,5 @@ export function compareWithSample(
     );
   }
 
-  return { passed: issues.length === 0, sheetCountDelta, yieldDelta, issues };
+  return { compared: true, passed: issues.length === 0, sheetCountDelta, yieldDelta, issues };
 }
