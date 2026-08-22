@@ -40,3 +40,29 @@ services:
       - no-new-privileges:true
     # 돌고 있는 작업이 끝날 시간을 준다. 못 끝내도 lease 만료로 회수된다.
     stop_grace_period: 60s
+
+  # 로컬 개발·테스트용 S3 호환 저장소(`D2-B02-A`).
+  # 운영 서버 적용은 `P2-C08` 배포 작업에서 함께 한다.
+  storage:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    environment:
+      MINIO_ROOT_USER: "${STORAGE_ACCESS_KEY_ID:-fold-web-local}"
+      MINIO_ROOT_PASSWORD: "${STORAGE_SECRET_ACCESS_KEY:-fold-web-local-secret}"
+    volumes:
+      - storage-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+
+volumes:
+  storage-data:

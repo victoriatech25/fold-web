@@ -4,6 +4,16 @@ const applicationUrl =
   process.env.TEST_DATABASE_URL ??
   "postgresql://fold_web_app@127.0.0.1:5432/fold_web_test?schema=public";
 
+// 저장소 통합 테스트는 compose 의 `storage` 서비스를 기본값으로 본다.
+const storageEnvironment = {
+  STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT ?? "http://127.0.0.1:9000",
+  STORAGE_REGION: process.env.STORAGE_REGION ?? "us-east-1",
+  STORAGE_BUCKET: process.env.STORAGE_BUCKET ?? "fold-web-test",
+  STORAGE_ACCESS_KEY_ID: process.env.STORAGE_ACCESS_KEY_ID ?? "fold-web-local",
+  STORAGE_SECRET_ACCESS_KEY: process.env.STORAGE_SECRET_ACCESS_KEY ?? "fold-web-local-secret",
+  STORAGE_FORCE_PATH_STYLE: process.env.STORAGE_FORCE_PATH_STYLE ?? "true",
+};
+
 function run(command, arguments_, environment = process.env) {
   const result = spawnSync(command, arguments_, {
     env: environment,
@@ -47,10 +57,15 @@ run(
     "src/server/fold-draft/fold-draft.integration.test.ts",
     "src/server/fold-library/fold-library.integration.test.ts",
     "src/server/jobs/job.integration.test.ts",
+    "src/server/files/file.integration.test.ts",
+    "src/server/storage/storage.integration.test.ts",
   ],
   {
     ...process.env,
     RUN_DB_INTEGRATION: "1",
+    // 저장소 통합은 compose 의 `storage` 서비스가 떠 있을 때만 돈다.
+    RUN_STORAGE_INTEGRATION: process.env.RUN_STORAGE_INTEGRATION ?? "1",
+    ...storageEnvironment,
     DATABASE_URL: applicationUrl,
   },
 );

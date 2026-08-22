@@ -1,6 +1,6 @@
 # P2-B02 파일 저장소 상세계획
 
-> 상태: `READY` — 2026-08-22 `D2-B02-A` MinIO 자가 호스팅 확정, 구현 착수 대기
+> 상태: `IN_PROGRESS` — `B02-02`·`B02-03` 완료, `B02-04` 다운로드 URL 착수 대기
 >
 > 우선순위: `P2-B02`
 >
@@ -87,6 +87,21 @@
 - 운영 서버 구성 변경과 실제 배포 (`P2-C08`)
 - 바이러스 검사, 외부 공유 링크
 
+## 4.1 파일 종류별 정책
+
+`src/server/files/file-kind.ts` 한 곳에서 정한다. 화면과 라우트가 각자 판단하면 규칙이 갈라진다.
+
+| 종류 | 업로드 권한 | 다운로드 권한 | 허용 형식 | 상한 | 사용자 업로드 | 재생성 가능 |
+|---|---|---|---|---|---|---|
+| `DXF` | `output.print` | `output.print` | dxf | 20MB | 불가(서버 생성물) | 가능 |
+| `PDF` | `output.print` | `output.print` | pdf | 50MB | 불가 | 가능 |
+| `PREVIEW` | `template.fold.edit` | `template.fold.read` | png, jpg, webp | 10MB | 불가 | 가능 |
+| `FOLD_DOCUMENT` | `template.fold.edit` | `template.fold.read` | json | 10MB | 가능 | 불가 |
+| `IMPORT_SOURCE` | `admin.manage` | `admin.manage` | csv, json, xls, xlsx, zip | 100MB | 가능 | 불가 |
+| `OTHER` | `order.edit` | `order.read` | pdf, png, jpg, txt | 20MB | 가능 | 불가 |
+
+`재생성 가능`이 `가능`인 종류만 보존 기간이 지나면 정리한다(`D2-B02-J`).
+
 ## 5. API 계약(안)
 
 ```text
@@ -114,8 +129,8 @@ DELETE /api/v1/files/:fileId          soft delete
 | 단계 | 작업 |
 |---|---|
 | `B02-01` | 결정안 승인과 저장 제품 확정 (`DONE` — 2026-08-22) |
-| `B02-02` | `FileStorage` 인터페이스와 S3 호환 구현, 로컬·테스트 환경 |
-| `B02-03` | 업로드 시작·완료 API와 검증 |
+| `B02-02` | `FileStorage` 인터페이스와 S3 호환 구현, 로컬·테스트 환경 (`DONE` — 2026-08-22) |
+| `B02-03` | 업로드 시작·완료 API와 검증 (`DONE` — 2026-08-22) |
 | `B02-04` | 다운로드 URL 발급과 권한·조직 경계 |
 | `B02-05` | soft delete와 `storage.cleanup` 정기 작업 |
 | `B02-06` | `dxf.export`와 동기 DXF 경로를 저장소에 연결 |
@@ -137,3 +152,5 @@ DELETE /api/v1/files/:fileId          soft delete
 |---|---|---|
 | 2026-08-22 | 결정안 최초 작성. `D2-B02-A` 저장 제품을 사용자 결정 항목으로 올리고 나머지 `B~L`은 그 전제 위의 안으로 정리 | Claude |
 | 2026-08-22 | `D2-B02-A`를 MinIO 자가 호스팅으로 확정. 새 클라우드 자원과 청구를 만들지 않고 설계 문서의 S3 호환 출발점을 지킨다. 상태를 `READY`로 변경 | 사용자·Claude |
+| 2026-08-22 | `B02-02` 완료. `FileStorage` 인터페이스와 S3 호환 구현, 키 규칙, 로컬 `compose.yaml`의 MinIO 서비스와 통합 테스트를 만들었다 | Claude |
+| 2026-08-22 | `B02-03` 완료. 업로드 시작·완료 API, 파일 종류별 권한·형식·크기 정책, checksum·크기 검증과 감사 이벤트를 만들었다 | Claude |

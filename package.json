@@ -11,6 +11,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:storage": "RUN_STORAGE_INTEGRATION=1 vitest run src/server/storage",
     "test:integration": "node scripts/run-integration-tests.mjs",
     "test:e2e": "node scripts/prepare-e2e.mjs && playwright test",
     "auth:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
@@ -25,6 +26,8 @@
     "db:test:reset": "node scripts/reset-test-db.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1116.0",
+    "@aws-sdk/s3-request-presigner": "^3.1116.0",
     "@node-rs/argon2": "2.0.2",
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",

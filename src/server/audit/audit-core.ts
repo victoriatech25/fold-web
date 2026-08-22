@@ -233,6 +233,8 @@ export const auditActionCatalog = {
   "job.failed": { category: "SYSTEM", defaultOutcome: "FAILURE", defaultSource: "SYSTEM", entityType: "JobQueue", label: "작업 실패" },
   "job.cancelled": { category: "SYSTEM", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "JobQueue", label: "작업 취소" },
   "job.retried": { category: "SYSTEM", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "JobQueue", label: "작업 다시 실행" },
+  "file.uploaded": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "FileAsset", label: "파일 업로드 완료" },
+  "file.upload_rejected": { category: "DATA_CHANGE", defaultOutcome: "FAILURE", defaultSource: "WEB", entityType: "FileAsset", label: "파일 업로드 거부" },
   "material.created": {
     category: "DATA_CHANGE",
     defaultOutcome: "SUCCESS",

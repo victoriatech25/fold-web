@@ -211,6 +211,18 @@ type AuditPayloadByAction = {
   "job.retried": {
     metadata: { type: string; previousAttempt: number };
   };
+  // 파일 내용은 남기지 않는다(`D2-B02-L`). 종류·크기·checksum 까지만 남긴다.
+  "file.uploaded": {
+    metadata: { kind: string; sizeBytes: number; checksumSha256: string };
+  };
+  "file.upload_rejected": {
+    metadata: {
+      kind: string;
+      expectedSizeBytes: number;
+      actualSizeBytes: number;
+      checksumMatched: boolean;
+    };
+  };
   "material.created": { after: MaterialAuditSnapshot };
   "material.updated": { before: MaterialAuditSnapshot; after: MaterialAuditSnapshot };
   "material.variant_created": { after: MaterialVariantAuditSnapshot };
