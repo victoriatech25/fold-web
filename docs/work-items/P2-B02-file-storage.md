@@ -58,7 +58,7 @@
 | `D2-B02-B` | 저장 계층 경계 | `FileStorage` 인터페이스(`put`, `get`, `head`, `delete`, `signDownloadUrl`) 하나를 두고 S3 호환 구현 하나만 만든다. 업무 코드는 인터페이스만 본다 | 제품을 바꿔도 업무 코드가 흔들리지 않는다. 인터페이스가 없으면 SDK 호출이 서비스마다 퍼진다 |
 | `D2-B02-C` | 키 규칙 | 기존 `generated/{organizationId}/{kind}/{checksum}.{ext}`를 유지하고, 사용자 업로드는 `uploads/{organizationId}/{yyyy}/{mm}/{uuid}.{ext}`를 쓴다 | 생성물은 checksum이 같으면 같은 파일이므로 중복 저장을 막는다. 업로드본은 내용이 같아도 별개 문서일 수 있어 UUID로 구분한다 |
 | `D2-B02-D` | 조직 경계 | 키 첫 구간에 `organizationId`를 넣고, 모든 조회·서명 발급에서 `FileAsset.organizationId`를 대조한다 | 키를 알아도 다른 조직 파일을 받을 수 없게 한다 |
-| `D2-B02-E` | 다운로드 방식 | 서버가 권한을 검사한 뒤 **5분짜리 presigned URL**을 발급한다. 바이트가 앱 서버를 거치지 않는다 | 큰 파일이 Node 프로세스를 오래 붙잡지 않는다. 만료를 짧게 둬 URL 유출 피해를 줄인다 |
+| `D2-B02-E` | 다운로드 방식 | 서버가 권한을 검사하고 저장소에 객체가 실제로 있는지 확인한 뒤 **5분짜리 presigned URL**을 발급한다. 바이트가 앱 서버를 거치지 않는다 | 큰 파일이 Node 프로세스를 오래 붙잡지 않는다. 만료를 짧게 둬 URL 유출 피해를 줄인다 |
 | `D2-B02-F` | 업로드 방식 | 서버가 `PENDING` `FileAsset`을 만들고 presigned PUT URL을 준다. 업로드가 끝나면 클라이언트가 완료를 알리고, 서버가 크기·checksum을 확인한 뒤 `READY`로 바꾼다 | 미완성 업로드가 `READY`로 남지 않는다. 검증을 서버가 한다 |
 | `D2-B02-G` | 상한 | 단일 파일 100MB, 허용 media type을 `kind`별로 정한다 | 무제한 업로드는 디스크와 백업을 예고 없이 늘린다 |
 | `D2-B02-H` | 무결성 | 저장 시 checksum을 계산해 `FileAsset.checksumSha256`과 대조하고, 다르면 `READY`로 올리지 않는다 | DXF는 장비로 가는 파일이다. 깨진 바이트를 내려보내지 않는다 |
@@ -178,4 +178,5 @@ DELETE /api/v1/files/:fileId          soft delete
 | 2026-08-22 | `B02-05` 완료. soft delete 와 `storage.cleanup` 작업 종류를 만들었다. 고아 객체 정리는 저장소 목록 조회가 필요해 후속으로 남긴다 | Claude |
 | 2026-08-22 | `B02-06` 완료. 동기·queue 양쪽 DXF 경로가 바이트를 저장소에 보관하고 `contentRetained`가 `true`가 된다. 저장 실패는 출력 자체를 막지 않고 `PENDING`과 감사로 남긴다 | Claude |
 | 2026-08-22 | `B02-07` 완료. 배포 가이드에 저장소 서비스·환경변수·백업 대상과 복구 순서·정리 정책을 적었다 | Claude |
+| 2026-08-22 | 검수 중 발견: `READY`인데 바이트가 없는 행(저장소 도입 전 생성분)에 URL을 발급해 사용자가 저장소의 XML 오류를 보게 됐다. 발급 전에 객체 존재를 확인하고 없으면 `PENDING`으로 되돌리도록 고쳤다 | 사용자·Claude |
 | 2026-08-22 | 화면 테스트 가이드 작성. 파일 기능을 쓰는 화면이 아직 없어 `P2-B01`과 같이 콘솔 API 검수로 한다. 사용자용 진입점은 `P2-B09`에서 만든다 | 사용자·Claude |

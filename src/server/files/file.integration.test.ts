@@ -296,6 +296,21 @@ integration.sequential("file upload integration", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
+  it("READY 인데 바이트가 없으면 URL 대신 안내를 준다", async () => {
+    // 저장소가 붙기 전에 만들어진 행이 이 상태다.
+    const fileId = await uploadReady("보관안됨.txt", "저장소에서 사라질 파일");
+    const row = await prisma.fileAsset.findUniqueOrThrow({ where: { id: fileId } });
+    await storage.delete(row.storageKey);
+
+    await expect(
+      issueDownloadUrl(prisma, context, fileId, "file-missing-url", storage),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+
+    // 다음 요청부터는 상태로도 드러난다.
+    const after = await prisma.fileAsset.findUniqueOrThrow({ where: { id: fileId } });
+    expect(after.status).toBe("PENDING");
+  });
+
   it("다운로드 권한이 없으면 URL 을 주지 않는다", async () => {
     const body = new TextEncoder().encode("권한 확인용");
     const started = await startUpload(

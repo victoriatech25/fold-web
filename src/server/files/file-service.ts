@@ -276,6 +276,20 @@ export async function issueDownloadUrl(
     throw new FileError("NOT_FOUND", "파일을 찾을 수 없습니다.");
   }
 
+  // status 만 믿지 않는다. 저장소가 붙기 전에 만들어진 행처럼 READY 인데 바이트가
+  // 없는 경우가 있다. URL 을 내주면 사용자는 저장소의 XML 오류를 보게 된다.
+  const stored = await storage.head(row.storageKey);
+  if (!stored) {
+    await database.fileAsset.update({
+      where: { id: row.id },
+      data: { status: "PENDING" },
+    });
+    throw new FileError(
+      "CONFLICT",
+      "파일 내용이 저장소에 없습니다. 다시 출력하거나 다시 올려 주세요.",
+    );
+  }
+
   const signed = await storage.signDownloadUrl({
     key: row.storageKey,
     fileName: row.fileName,
