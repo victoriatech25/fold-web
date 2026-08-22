@@ -2,7 +2,7 @@
 
 > 기준일: 2026-08-22
 >
-> 기준: P1과 P2-A01~P2-A11, P2-B01 사용자 검수·승인 완료. P2-A 기준정보·수주 묶음과 P2-B01 작업 queue를 닫았다.
+> 기준: P1과 P2-A01~P2-A11, P2-B01, P2-B02 사용자 검수·승인 완료. P2-A 기준정보·수주 묶음과 P2-B 비동기 기반(작업 queue·파일 저장소)을 닫았다.
 >
 > MFC 참조 프로젝트: `/Users/kyhoon/Library/Mobile Documents/com~apple~CloudDocs/회사/hicomtech/도면`
 >
@@ -46,6 +46,7 @@
 - 계산 완료·승인·생산 요청·생산 중·생산 완료·마감 상태 전이와 승인 후 변경 차단
 - 기간·거래처·담당자·복수 상태 검색과 cursor 목록, 수주 단위 안전 이력
 - PostgreSQL 기반 작업 queue와 worker, 멱등 등록·lease 회수·backoff 재시도·취소·다시 실행
+- S3 호환 파일 저장소, presigned 업로드·다운로드, checksum 검증, soft delete와 보존 정리, 수주 첨부 화면
 - 상단 모듈 탭·서브탭·모듈 메뉴 3단 내비게이션과 공통 조회조건 바·탭 기반 목록/상세 화면
 - Docker 이미지 빌드, 태그 기반 배포, 실패 시 롤백
 
