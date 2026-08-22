@@ -1,8 +1,8 @@
 # fold_web 현재 구현 현황
 
-> 기준일: 2026-08-17
+> 기준일: 2026-08-22
 >
-> 기준: P1과 P2-A01~P2-A11 사용자 검수·승인 완료. P2-A 기준정보·수주 묶음을 닫았다.
+> 기준: P1과 P2-A01~P2-A11, P2-B01 사용자 검수·승인 완료. P2-A 기준정보·수주 묶음과 P2-B01 작업 queue를 닫았다.
 >
 > MFC 참조 프로젝트: `/Users/kyhoon/Library/Mobile Documents/com~apple~CloudDocs/회사/hicomtech/도면`
 >

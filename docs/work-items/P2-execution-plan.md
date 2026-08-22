@@ -1,6 +1,6 @@
 # P2 실행계획 — 기준정보·수주·생산 운영 완성
 
-> 상태: `IN_PROGRESS` — `P2-A01~P2-A11` 완료. `P2-B01 작업 queue·worker` 구현·자동 검증 완료 및 사용자 화면 검수 대기
+> 상태: `IN_PROGRESS` — `P2-A01~P2-A11` 완료. `P2-B01 작업 queue·worker` 사용자 검수까지 완료. `P2-B02 파일 저장소` 결정 대기
 >
 > 우선순위: `P2`
 >
@@ -158,8 +158,8 @@ P2는 P1에서 완성한 절곡 문서·계산·도면 기능을 회사 기준�
 | `D2-A09-*` | 계산 단위·입력 hash·가격 적용·VAT·불변 snapshot·동시성 | P2-A09 전 | 2026-08-17 확정안 `A~N` 전체 승인 및 검수 완료 |
 | `D2-A10-*` | 계산 완료·승인·승인 취소·생산·마감 상태와 변경 차단 | P2-A10 전 | 2026-08-17 확정안 `A~N` 전체 승인 및 구현 착수 |
 | `D2-A11-*` | 수주 기간·거래처·상태·담당자 검색, 안전 이력, 생산 요청 진입 | P2-A11 전 | 2026-08-17 확정안 `A~J` 전체 승인 및 구현 착수 |
-| `D2-B01-*` | queue 제품과 worker 배포 방식 | P2-B01 전 | 2026-08-17 확정안 `A~N` 전체 승인 및 구현 완료. PostgreSQL queue, 기존 이미지의 worker 컨테이너, 폴링(SSE 연기), `dxf.export` 실증 |
-| `D2-B02-*` | object storage와 보존·삭제 정책 | P2-B02 전 | 추후 결정 |
+| `D2-B01-*` | queue 제품과 worker 배포 방식 | P2-B01 전 | 2026-08-17 확정안 `A~N` 전체 승인, 2026-08-22 검수 완료. PostgreSQL queue, 기존 이미지의 worker 컨테이너, 폴링(SSE 연기), `dxf.export` 실증 |
+| `D2-B02-*` | object storage와 보존·삭제 정책 | P2-B02 전 | 2026-08-22 `D2-B02-A` MinIO 자가 호스팅 확정. 나머지 `B~L`은 [상세계획](./P2-B02-file-storage.md) 참조 |
 | `D2-C08-*` | 운영 서버·PostgreSQL/RDS·배포 방식 | P2-C08 전 | 추후 결정 |
 
 결정되지 않은 후속 항목 때문에 선행 로컬 개발을 멈추지 않는다. 다만 해당 결정이 DB 계약이나 사용자 결과를 바꾸는 작업에서는 구현 전에 멈추고 사용자 승인을 받는다.
@@ -177,6 +177,6 @@ P2는 P1에서 완성한 절곡 문서·계산·도면 기능을 회사 기준�
 
 `P2-A01 회사·사업장`, `P2-UX01` 공통 서비스 셸·업무 홈, `P2-A02 거래처·담당자·고객 현장`, [P2-A03 재질·두께](./P2-A03-materials-thickness.md), [P2-A04 연신·컷 규칙](./P2-A04-material-calculation-rules.md), [P2-A05 원판 품목](./P2-A05-sheet-items.md), [P2-A06 가격 규칙](./P2-A06-price-rules.md), [P2-A07 수주 기본정보](./P2-A07-order-header.md), [P2-A08 절곡 작업 스냅샷](./P2-A08-order-fold-snapshots.md), [P2-A09 계산·가격 snapshot](./P2-A09-order-calculation-pricing-snapshots.md), [P2-A10 승인·생산 상태](./P2-A10-order-approval-production-status.md)는 사용자 화면 검수까지 완료했다. [P2-A11 수주 목록·이력](./P2-A11-order-list-history.md)까지 사용자 승인을 마쳐 P2-A 기준정보·수주 묶음을 완료했다. 거래처·기준정보에서 수주 생성, 절곡 불변 snapshot, 계산·금액 snapshot, 승인·생산 상태, 목록·이력까지 한 흐름으로 이어진다.
 
-[P2-B01 작업 queue·worker](./P2-B01-job-queue-worker.md)는 구현과 자동 검증을 마쳤고 [화면 테스트 가이드](../P2-B01-screen-test-guide.md)에 따른 사용자 검수를 기다린다. 설계 문서의 "초기 PostgreSQL queue" 출발점을 유지해 새 제품·새 자원·추가 비용 없이 만들었다. worker는 기존 이미지에 진입점만 다른 컨테이너로 붙는다.
+[P2-B01 작업 queue·worker](./P2-B01-job-queue-worker.md)는 2026-08-22 [화면 테스트 가이드](../P2-B01-screen-test-guide.md)에 따른 사용자 검수까지 마쳤다. 설계 문서의 "초기 PostgreSQL queue" 출발점을 유지해 새 제품·새 자원·추가 비용 없이 만들었다. worker는 기존 이미지에 진입점만 다른 컨테이너로 붙는다.
 
-다음은 `P2-B02 파일 저장소`다. `D2-B02-*` object storage 제품과 보존 정책 결정이 남아 있다. B01의 `dxf.export`가 산출물 바이트 보관 직전까지 가 있어(`contentRetained: false`) B02가 그 자리를 채운다. 제품 선택은 비용이 붙는 결정이므로 상세계획에서 후보를 정리해 사용자 승인을 받은 뒤 착수한다.
+다음은 [P2-B02 파일 저장소](./P2-B02-file-storage.md)다. 2026-08-22 `D2-B02-A`를 MinIO 자가 호스팅으로 확정했다. 새 클라우드 자원과 청구를 만들지 않으면서 설계 문서의 S3 호환 출발점을 지키고, 나중에 AWS S3로 옮길 때 접속 정보만 바꾸면 되게 한다. B01의 `dxf.export`가 산출물 바이트 보관 직전까지 가 있어(`contentRetained: false`) B02가 그 자리를 채운다.
