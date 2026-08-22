@@ -7,7 +7,7 @@ import type { AuthenticatedContext } from "@/server/auth/auth-types";
 import { readStorageRuntimeConfig } from "@/server/config/storage-env";
 import { disconnectPrisma, getPrisma } from "@/server/db/prisma";
 import { FileError } from "@/server/files/file-error";
-import { completeUpload, getFile, startUpload } from "@/server/files/file-service";
+import { completeUpload, getFile, issueDownloadUrl, startUpload } from "@/server/files/file-service";
 import { createS3FileStorage, ensureBucket } from "@/server/storage/s3-file-storage";
 import type { FileStorage } from "@/server/storage/file-storage";
 
@@ -227,6 +227,90 @@ integration.sequential("file upload integration", () => {
         storage,
       ),
     ).rejects.toBeInstanceOf(FileError);
+  });
+
+  it("READY 파일은 다운로드 URL 로 그대로 받아진다", async () => {
+    const body = new TextEncoder().encode("내려받을 첨부");
+    const checksumSha256 = sha256(body);
+    const started = await startUpload(
+      prisma,
+      context,
+      {
+        kind: "OTHER",
+        fileName: "받을 파일.txt",
+        mediaType: "text/plain",
+        sizeBytes: body.byteLength,
+        checksumSha256,
+        requestId: "file-download-1",
+      },
+      storage,
+    );
+    await putSigned(started.upload.url, body, "text/plain");
+    await completeUpload(prisma, context, started.file.id, "file-download-1-complete", storage);
+
+    const ticket = await issueDownloadUrl(prisma, context, started.file.id, "file-download-1-url", storage);
+    expect(ticket.download.expiresAt).toBeTruthy();
+
+    const response = await fetch(ticket.download.url);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toContain("filename");
+    expect(sha256(new Uint8Array(await response.arrayBuffer()))).toBe(checksumSha256);
+
+    const audit = await prisma.auditEvent.findFirst({
+      where: {
+        organizationId: context.organizationId,
+        action: "file.download_url_issued",
+        entityId: started.file.id,
+      },
+    });
+    expect(audit).not.toBeNull();
+  });
+
+  it("완료되지 않은 파일과 다른 조직 요청에는 URL 을 주지 않는다", async () => {
+    const body = new TextEncoder().encode("아직 준비 안 됨");
+    const started = await startUpload(
+      prisma,
+      context,
+      {
+        kind: "OTHER",
+        fileName: "대기.txt",
+        mediaType: "text/plain",
+        sizeBytes: body.byteLength,
+        checksumSha256: sha256(body),
+        requestId: "file-download-2",
+      },
+      storage,
+    );
+    await expect(
+      issueDownloadUrl(prisma, context, started.file.id, "file-download-2-url", storage),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(
+      issueDownloadUrl(prisma, otherContext, started.file.id, "file-download-2-other", storage),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("다운로드 권한이 없으면 URL 을 주지 않는다", async () => {
+    const body = new TextEncoder().encode("권한 확인용");
+    const started = await startUpload(
+      prisma,
+      context,
+      {
+        kind: "OTHER",
+        fileName: "권한확인.txt",
+        mediaType: "text/plain",
+        sizeBytes: body.byteLength,
+        checksumSha256: sha256(body),
+        requestId: "file-download-3",
+      },
+      storage,
+    );
+    await putSigned(started.upload.url, body, "text/plain");
+    await completeUpload(prisma, context, started.file.id, "file-download-3-complete", storage);
+
+    const stranger = { ...context, permissions: [] as AuthenticatedContext["permissions"] };
+    await expect(
+      issueDownloadUrl(prisma, stranger, started.file.id, "file-download-3-url", storage),
+    ).rejects.toThrow();
   });
 
   it("권한이 없으면 업로드를 시작할 수 없다", async () => {

@@ -223,6 +223,9 @@ type AuditPayloadByAction = {
       checksumMatched: boolean;
     };
   };
+  "file.download_url_issued": {
+    metadata: { kind: string; expiresAt: string };
+  };
   "material.created": { after: MaterialAuditSnapshot };
   "material.updated": { before: MaterialAuditSnapshot; after: MaterialAuditSnapshot };
   "material.variant_created": { after: MaterialVariantAuditSnapshot };

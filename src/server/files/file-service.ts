@@ -10,7 +10,7 @@ import { requirePermission } from "@/server/authorization/authorization";
 import { readStorageRuntimeConfig } from "@/server/config/storage-env";
 import { extensionOf, fileKindPolicy } from "@/server/files/file-kind";
 import { FileError } from "@/server/files/file-error";
-import { uploadObjectKey } from "@/server/storage/file-storage";
+import { keyBelongsToOrganization, uploadObjectKey } from "@/server/storage/file-storage";
 import type { FileStorage } from "@/server/storage/file-storage";
 import { getFileStorage } from "@/server/storage/s3-file-storage";
 import { StorageError } from "@/server/storage/storage-error";
@@ -244,4 +244,53 @@ export async function getFile(
 
 export function isStorageUnavailable(error: unknown): boolean {
   return error instanceof StorageError && error.code === "UNAVAILABLE";
+}
+
+export type DownloadTicket = {
+  file: FileAssetDto;
+  download: { url: string; expiresAt: string };
+};
+
+/**
+ * 다운로드 URL 을 발급한다(`D2-B02-E`).
+ * 권한과 조직 경계를 발급 시점에 검사하고, 누가 언제 받아 갔는지 감사에 남긴다(`D2-B02-L`).
+ */
+export async function issueDownloadUrl(
+  database: PrismaClient,
+  context: AuthenticatedContext,
+  fileId: string,
+  requestId: string,
+  storage: FileStorage = getFileStorage(),
+): Promise<DownloadTicket> {
+  const row = await database.fileAsset.findFirst({
+    where: { id: fileId, organizationId: context.organizationId, deletedAt: null },
+    select: fileSelect,
+  });
+  if (!row) throw new FileError("NOT_FOUND", "파일을 찾을 수 없습니다.");
+  requirePermission(context, fileKindPolicy(row.kind).downloadPermission);
+  if (row.status !== "READY") {
+    throw new FileError("CONFLICT", "아직 받을 수 있는 상태가 아닙니다.");
+  }
+  // 키에 실린 조직이 다르면 DB 가 어떻든 발급하지 않는다.
+  if (!keyBelongsToOrganization(row.storageKey, context.organizationId)) {
+    throw new FileError("NOT_FOUND", "파일을 찾을 수 없습니다.");
+  }
+
+  const signed = await storage.signDownloadUrl({
+    key: row.storageKey,
+    fileName: row.fileName,
+    mediaType: row.mediaType,
+  });
+  await writeAuditEvent(database, {
+    organizationId: context.organizationId,
+    actorUserId: context.userId,
+    action: "file.download_url_issued",
+    entityId: row.id,
+    requestId,
+    metadata: { kind: row.kind, expiresAt: signed.expiresAt.toISOString() },
+  });
+  return {
+    file: toFileDto(row),
+    download: { url: signed.url, expiresAt: signed.expiresAt.toISOString() },
+  };
 }
