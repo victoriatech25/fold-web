@@ -39,4 +39,31 @@ run(
   { input: "Browser verification phrase 2026!" },
 );
 
+// 파일 저장소 bucket 을 미리 만든다. 없으면 업로드가 저장소 장애로 보인다(P2-B02).
+const storageEndpoint = process.env.STORAGE_ENDPOINT ?? "http://127.0.0.1:9000";
+const storageBucket = process.env.STORAGE_BUCKET ?? "fold-web-e2e";
+try {
+  const { S3Client, CreateBucketCommand, HeadBucketCommand } = await import("@aws-sdk/client-s3");
+  const client = new S3Client({
+    endpoint: storageEndpoint,
+    region: process.env.STORAGE_REGION ?? "us-east-1",
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: process.env.STORAGE_ACCESS_KEY_ID ?? "fold-web-local",
+      secretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY ?? "fold-web-local-secret",
+    },
+  });
+  try {
+    await client.send(new HeadBucketCommand({ Bucket: storageBucket }));
+  } catch {
+    await client.send(new CreateBucketCommand({ Bucket: storageBucket }));
+  }
+  process.stdout.write(`Storage bucket ${storageBucket} is ready.\n`);
+} catch (error) {
+  // 저장소가 없어도 나머지 e2e 는 돌아야 한다. 파일 시나리오만 실패한다.
+  process.stdout.write(
+    `Storage bucket preparation skipped (${error instanceof Error ? error.message : "unknown"}).\n`,
+  );
+}
+
 process.stdout.write("Playwright test database and account are ready.\n");

@@ -121,7 +121,7 @@ DELETE /api/v1/files/:fileId          soft delete
 - [x] `dxf.export` 작업 결과로 실제 파일을 내려받을 수 있고 동기 경로와 checksum이 같다.
 - [x] soft delete한 파일은 목록에서 사라지지만 유예 기간 안에는 객체가 남아 있다.
 - [x] 만료된 URL로는 받을 수 없다.
-- [ ] 단위·PostgreSQL 통합·API·Playwright·lint·typecheck·migration·build를 통과한다.
+- [x] 단위·PostgreSQL 통합·API·Playwright·lint·typecheck·migration·build를 통과한다.
 - [x] 백업 대상과 복구 절차가 배포 가이드에 적혀 있다.
 
 ## 7. 구현 순서(안)
@@ -144,6 +144,7 @@ DELETE /api/v1/files/:fileId          soft delete
 | 단위 | `npm test` | 성공 — 329건 (저장소 키·환경설정 9건, DXF 보관 성공·실패 2건 추가) |
 | PostgreSQL·저장소 통합 | `npm run test:integration` | 성공 — 93건 (파일 9건, 저장소 8건 추가) |
 | 저장소 단독 | `npm run test:storage` | 성공 — 실제 MinIO 상대 |
+| E2E | `npm run test:e2e` | 성공 — 33개 시나리오 (파일 API 5건 추가) |
 | lint·typecheck | `npm run lint`, `npm run typecheck` | 성공 |
 | migration | `npm run db:migrate:check` | 차이 없음. 기존 `FileAsset` 모델을 쓴다 |
 | build | `npm run build` | 성공 |
@@ -155,6 +156,14 @@ DELETE /api/v1/files/:fileId          soft delete
 - 다른 조직·권한 없는 사용자 차단, 서버 생성물 종류와 허용하지 않는 형식 거부
 - soft delete 후 유예 기간 객체 유지, 유예 만료 뒤 정리 작업의 실제 삭제, 업로드본 자동 정리 제외
 - queue 경로 DXF 보관과 다운로드 URL 왕복
+
+E2E가 확인하는 것은 다음과 같다. 실제 브라우저 session 과 presigned URL 왕복을 거친다.
+
+- 업로드 시작 → presigned PUT → 완료 → `READY` 전이와 다운로드 URL 왕복, 내용 일치
+- 완료 전 다운로드 요청 거절, 삭제 후 조회·발급 차단, 유예 기간 안 객체 유지
+- 내용 불일치 완료 거절과 `FAILED` 전이
+- 서버 생성물 종류·허용하지 않는 확장자·잘못된 checksum 형식 거절
+- 없는 파일(`404`)과 잘못된 식별자(`400`) 구분
 
 ## 8. 위험과 대응
 

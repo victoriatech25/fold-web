@@ -39,6 +39,13 @@ export default defineConfig({
       AUTH_RATE_LIMIT_SECRET:
         "playwright-rate-limit-secret-000000000000",
       AUTH_TRUST_PROXY: "false",
+      // 파일 저장소(P2-B02). compose 의 `storage` 서비스를 그대로 쓴다.
+      STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT ?? "http://127.0.0.1:9000",
+      STORAGE_REGION: process.env.STORAGE_REGION ?? "us-east-1",
+      STORAGE_BUCKET: process.env.STORAGE_BUCKET ?? "fold-web-e2e",
+      STORAGE_ACCESS_KEY_ID: process.env.STORAGE_ACCESS_KEY_ID ?? "fold-web-local",
+      STORAGE_SECRET_ACCESS_KEY: process.env.STORAGE_SECRET_ACCESS_KEY ?? "fold-web-local-secret",
+      STORAGE_FORCE_PATH_STYLE: "true",
     },
   },
 });
