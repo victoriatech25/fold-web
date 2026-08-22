@@ -51,10 +51,15 @@ describe("DXF export service", () => {
       auditEvent: { create: auditCreate },
     };
 
-    const result = await exportFoldRevisionDxf(database as never, context, {
-      revisionId: profile.id,
-      requestId: "request-1",
-    });
+    const put = vi.fn().mockResolvedValue(undefined);
+    const storage = { put } as never;
+
+    const result = await exportFoldRevisionDxf(
+      database as never,
+      context,
+      { revisionId: profile.id, requestId: "request-1" },
+      storage,
+    );
 
     expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ organizationId: context.organizationId }),
@@ -67,6 +72,53 @@ describe("DXF export service", () => {
     }));
     expect(auditCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ action: "fold.dxf_exported" }),
+    }));
+    // 바이트를 저장소에 보관한다(`P2-B02`).
+    expect(put).toHaveBeenCalledWith(
+      expect.objectContaining({ mediaType: "application/dxf", checksumSha256: result.checksumSha256 }),
+    );
+    expect(result.contentRetained).toBe(true);
+  });
+
+  it("저장소가 실패해도 DXF 출력 자체는 막지 않는다", async () => {
+    const profile = createFoldProfile({
+      id: "44444444-4444-4444-8444-444444444444",
+      name: "테스트/도면",
+      product: { length: 2400, quantity: 1 },
+      material: { id: "55555555-5555-4555-8555-555555555555" },
+    });
+    profile.blocks[0].segments = [createFoldSegment({ x: 0, y: 0 }, { x: 100, y: 0 })];
+    const prepared = prepareFoldRevisionDocument(
+      browserFoldProfileV4ToServerDocumentV2(profile, profile.material.id),
+    );
+    const findFirst = vi.fn().mockResolvedValue({
+      id: profile.id,
+      name: profile.name,
+      createdAt: new Date("2026-07-26T00:00:00.000Z"),
+      updatedAt: new Date("2026-07-26T01:00:00.000Z"),
+      ...prepared,
+    });
+    const upsert = vi.fn().mockResolvedValue({ id: "66666666-6666-4666-8666-666666666666" });
+    const database = {
+      foldRevision: { findFirst },
+      fileAsset: { upsert },
+      user: { findUnique: vi.fn().mockResolvedValue({ displayName: context.displayName, email: "test@example.test" }) },
+      auditEvent: { create: vi.fn().mockResolvedValue({ id: "audit-2" }) },
+    };
+    const storage = { put: vi.fn().mockRejectedValue(new Error("저장소 연결 실패")) } as never;
+
+    const result = await exportFoldRevisionDxf(
+      database as never,
+      context,
+      { revisionId: profile.id, requestId: "request-2" },
+      storage,
+    );
+
+    // 사용자는 여전히 DXF를 받는다. 다만 아직 내려받을 수 있는 상태는 아니다.
+    expect(result.content).toContain("AC1015");
+    expect(result.contentRetained).toBe(false);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ status: "PENDING" }),
     }));
   });
 });
