@@ -1,6 +1,6 @@
 # P2-B02 파일 저장소 상세계획
 
-> 상태: `IN_PROGRESS` — `B02-02`~`B02-05` 완료, `B02-06` DXF 경로 연결 착수 대기
+> 상태: `IN_PROGRESS` — `B02-02`~`B02-06` 완료, `B02-07` 감사·배포 문서 착수 대기
 >
 > 우선순위: `P2-B02`
 >
@@ -133,7 +133,7 @@ DELETE /api/v1/files/:fileId          soft delete
 | `B02-03` | 업로드 시작·완료 API와 검증 (`DONE` — 2026-08-22) |
 | `B02-04` | 다운로드 URL 발급과 권한·조직 경계 (`DONE` — 2026-08-22) |
 | `B02-05` | soft delete와 `storage.cleanup` 정기 작업 (`DONE` — 2026-08-22) |
-| `B02-06` | `dxf.export`와 동기 DXF 경로를 저장소에 연결 |
+| `B02-06` | `dxf.export`와 동기 DXF 경로를 저장소에 연결 (`DONE` — 2026-08-22) |
 | `B02-07` | 감사 이벤트와 배포·백업 문서 |
 | `B02-08` | 화면 테스트 가이드와 사용자 검수 |
 
@@ -157,3 +157,4 @@ DELETE /api/v1/files/:fileId          soft delete
 | 2026-08-22 | `B02-03` 완료. 업로드 시작·완료 API, 파일 종류별 권한·형식·크기 정책, checksum·크기 검증과 감사 이벤트를 만들었다 | Claude |
 | 2026-08-22 | `B02-04` 완료. 다운로드 URL 발급에 권한·조직 경계·상태 검사와 발급 감사를 붙였다. 감사 분류는 schema 에 `DATA_ACCESS`가 없어 기존 DXF 출력과 같은 `OUTPUT`을 쓴다 | Claude |
 | 2026-08-22 | `B02-05` 완료. soft delete 와 `storage.cleanup` 작업 종류를 만들었다. 고아 객체 정리는 저장소 목록 조회가 필요해 후속으로 남긴다 | Claude |
+| 2026-08-22 | `B02-06` 완료. 동기·queue 양쪽 DXF 경로가 바이트를 저장소에 보관하고 `contentRetained`가 `true`가 된다. 저장 실패는 출력 자체를 막지 않고 `PENDING`과 감사로 남긴다 | Claude |

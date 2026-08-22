@@ -37,8 +37,7 @@ export const dxfExportJob = defineJob({
         checksumSha256: result.checksumSha256,
         sizeBytes: result.sizeBytes,
         entityCount: result.entityCount,
-        // 바이트는 P2-B02 파일 저장소가 붙기 전까지 보관하지 않는다.
-        contentRetained: false,
+        contentRetained: result.contentRetained,
       };
     } catch (error) {
       // 문서가 없거나 DXF로 만들 수 없는 형상이면 다시 시도해도 같은 결과다.

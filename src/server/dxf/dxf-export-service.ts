@@ -10,6 +10,8 @@ import { requirePermission } from "@/server/authorization/authorization";
 import { createDxfDocument } from "@/server/dxf/dxf-writer";
 import { FoldDraftServiceError } from "@/server/fold-draft/fold-draft-error";
 import { readFoldRevisionDocument } from "@/server/fold-document/revision-contract";
+import type { FileStorage } from "@/server/storage/file-storage";
+import { getFileStorage } from "@/server/storage/s3-file-storage";
 
 export type DxfExportResult = {
   assetId: string;
@@ -18,6 +20,8 @@ export type DxfExportResult = {
   checksumSha256: string;
   sizeBytes: number;
   entityCount: number;
+  /** 바이트를 저장소에 보관했는지. 저장에 실패해도 출력 자체는 막지 않는다. */
+  contentRetained: boolean;
 };
 
 function safeFileStem(name: string) {
@@ -29,6 +33,7 @@ export async function exportFoldRevisionDxf(
   database: PrismaClient,
   context: AuthenticatedContext,
   input: { revisionId: string; requestId?: string },
+  storage?: FileStorage,
 ): Promise<DxfExportResult> {
   requirePermission(context, "output.print");
   const revision = await database.foldRevision.findFirst({
@@ -77,8 +82,30 @@ export async function exportFoldRevisionDxf(
     "dxf",
     `${dxf.checksumSha256}.dxf`,
   ].join("/");
+  // 저장소가 죽어도 DXF 출력 자체는 멈추지 않는다. 응답으로 바이트를 내보내고
+  // 보관 실패만 남긴다. 다음 출력에서 같은 키로 다시 시도한다.
+  let contentRetained = true;
+  let storageFailure: string | null = null;
+  try {
+    // 저장소 설정이 없거나 연결이 안 되는 환경에서도 출력 자체는 계속되어야 하므로
+    // client 생성까지 이 try 안에서 한다.
+    await (storage ?? getFileStorage()).put({
+      key: storageKey,
+      body: new TextEncoder().encode(dxf.content),
+      mediaType: "application/dxf",
+      checksumSha256: dxf.checksumSha256,
+      fileName,
+    });
+  } catch (error) {
+    contentRetained = false;
+    storageFailure = error instanceof Error ? error.message : "저장소 오류";
+    console.error("DXF storage write failed", { revisionId: revision.id, error });
+  }
+
   const assetMetadata = {
-    delivery: "DIRECT_RESPONSE",
+    delivery: contentRetained ? "STORED" : "DIRECT_RESPONSE",
+    contentRetained,
+    storageFailure,
     sourceRevisionId: revision.id,
     documentChecksumSha256: revision.documentChecksumSha256,
     geometryVersion: manufacturing.geometry.version,
@@ -93,7 +120,8 @@ export async function exportFoldRevisionDxf(
     create: {
       organizationId: context.organizationId,
       kind: "DXF",
-      status: "READY",
+      // 바이트가 저장되지 않았으면 아직 내려받을 수 없다.
+      status: contentRetained ? "READY" : "PENDING",
       storageKey,
       fileName,
       mediaType: "application/dxf",
@@ -103,7 +131,7 @@ export async function exportFoldRevisionDxf(
       metadata: assetMetadata,
     },
     update: {
-      status: "READY",
+      status: contentRetained ? "READY" : "PENDING",
       fileName,
       sizeBytes: BigInt(dxf.sizeBytes),
       uploadedById: context.userId,
@@ -126,6 +154,7 @@ export async function exportFoldRevisionDxf(
       writerVersion: dxf.version,
       sizeBytes: dxf.sizeBytes,
       entityCount: dxf.entityCount,
+      contentRetained,
     },
   });
   return {
@@ -135,5 +164,6 @@ export async function exportFoldRevisionDxf(
     checksumSha256: dxf.checksumSha256,
     sizeBytes: dxf.sizeBytes,
     entityCount: dxf.entityCount,
+    contentRetained,
   };
 }

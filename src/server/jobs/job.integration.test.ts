@@ -11,6 +11,8 @@ import { claimNextJob, reclaimExpiredLeases, renewLease } from "@/server/jobs/jo
 import { processNextJob } from "@/server/jobs/job-worker";
 
 const integration = process.env.RUN_DB_INTEGRATION === "1" ? describe : describe.skip;
+// 저장소가 함께 떠 있을 때만 DXF 바이트 보관까지 확인한다.
+const storageAvailable = process.env.RUN_STORAGE_INTEGRATION === "1";
 
 integration.sequential("job queue integration", () => {
   let prisma: PrismaClient;
@@ -188,8 +190,26 @@ integration.sequential("job queue integration", () => {
       checksumSha256: direct.checksumSha256,
       sizeBytes: direct.sizeBytes,
       entityCount: direct.entityCount,
-      contentRetained: false,
+      // 저장소가 함께 떠 있으면 바이트까지 보관한다(`P2-B02`).
+      contentRetained: storageAvailable,
     });
+  });
+
+  it("보관한 DXF를 다운로드 URL로 그대로 받는다", async () => {
+    if (!storageAvailable) return;
+    const { exportFoldRevisionDxf } = await import("@/server/dxf/dxf-export-service");
+    const { issueDownloadUrl } = await import("@/server/files/file-service");
+    const exported = await exportFoldRevisionDxf(prisma, context, {
+      revisionId,
+      requestId: "job-download-dxf",
+    });
+    expect(exported.contentRetained).toBe(true);
+
+    const ticket = await issueDownloadUrl(prisma, context, exported.assetId, "job-download-url");
+    const response = await fetch(ticket.download.url);
+    expect(response.status).toBe(200);
+    const received = await response.text();
+    expect(received).toBe(exported.content);
   });
 
   it("cancels a queued job and refuses to cancel a finished one", async () => {

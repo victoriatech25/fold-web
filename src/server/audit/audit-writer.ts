@@ -293,6 +293,8 @@ type AuditPayloadByAction = {
       writerVersion: string;
       sizeBytes: number;
       entityCount: number;
+      // 저장소 보관 여부까지 남긴다. 보관 실패는 조용히 넘어가지 않는다.
+      contentRetained: boolean;
     };
   };
   "fold.category_created": {
