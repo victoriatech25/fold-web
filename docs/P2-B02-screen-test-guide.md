@@ -24,6 +24,12 @@ npm run dev
 npm run worker
 ```
 
+**worker 는 코드를 바꿔도 스스로 다시 읽지 않는다.** 개발 서버(`next dev`)와 달리 watch 가 없으므로, 검수 중 서버 코드가 바뀌면 worker 를 껐다 다시 띄운다. 옛 코드로 도는 worker 는 작업을 성공시키면서도 새 동작을 하지 않아 원인을 찾기 어렵다. 기동 로그의 `types` 에 처리 가능한 작업 종류가 찍히므로 그것으로 확인한다.
+
+```json
+{"event":"worker_started","types":["dxf.export","storage.cleanup"],...}
+```
+
 - 웹: `http://localhost:8000`
 - MinIO 콘솔: `http://127.0.0.1:9001` (`fold-web-local` / `fold-web-local-secret`)
 - 계정 정보는 [로컬 화면 테스트 계정](./local-screen-test-account.md)에 있다
