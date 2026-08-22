@@ -45,13 +45,16 @@
 - 입력 hash·엔진 버전을 고정한 계산·금액 불변 snapshot과 재계산 이력
 - 계산 완료·승인·생산 요청·생산 중·생산 완료·마감 상태 전이와 승인 후 변경 차단
 - 기간·거래처·담당자·복수 상태 검색과 cursor 목록, 수주 단위 안전 이력
+- PostgreSQL 기반 작업 queue와 worker, 멱등 등록·lease 회수·backoff 재시도·취소·다시 실행
 - Docker 이미지 빌드, 태그 기반 배포, 실패 시 롤백
 
 P1 구현 기준선은 완료됐다. 운영 인프라, binary object storage, Windows 현장 프로그램 DXF 검수와 생산 업무 연결은 P2 범위이며, 실제 기계 통신은 P3 범위다.
 
 `P2-A01 회사·사업장`부터 [P2-A11 수주 목록·이력](./work-items/P2-A11-order-list-history.md)까지 P2-A 기준정보·수주 묶음 전체가 구현·자동 검증·사용자 승인을 마쳤다. 거래처와 기준정보에서 수주를 만들고, 게시 절곡 개정을 불변 snapshot으로 복사하고, 계산·금액을 고정해 승인한 뒤 생산 요청까지 한 흐름으로 이어진다.
 
-다음 단계는 `P2-B1 비동기 기반`이다. `P2-B01 작업 queue·worker`와 `P2-B02 파일 저장소`는 queue 제품과 object storage 제품·보존 정책 결정이 열려 있어 사용자 확정 뒤에 착수한다.
+[P2-B01 작업 queue·worker](./work-items/P2-B01-job-queue-worker.md)는 구현과 자동 검증을 마치고 [화면 테스트 가이드](./P2-B01-screen-test-guide.md)에 따른 사용자 검수를 기다린다. 설계 문서의 "초기 PostgreSQL queue" 출발점을 유지해 새 제품이나 새 자원 없이 만들었고, worker는 기존 Docker 이미지에 진입점만 다른 컨테이너로 붙는다.
+
+`P2-B02 파일 저장소`는 object storage 제품과 보존 정책(`D2-B02-*`) 결정이 남아 있다. 비용이 붙는 결정이므로 상세계획에서 후보를 정리해 사용자 승인을 받은 뒤 착수한다.
 
 ### 확정된 재구축 범위
 
@@ -93,8 +96,9 @@ MFC 코드, 화면과 계산 결과는 비교 근거로 사용하지만 1:1 복�
 | 계산·금액 snapshot | P2-A09 완료 | 입력 hash·엔진/규칙 버전 고정, 항목별 면적·절곡·V-CUT·할증과 공급가·VAT·총액 불변 저장 |
 | 승인·생산 상태 | P2-A10 완료 | 8개 상태 단방향 전이, 승인 계산 고정, 승인 후 변경 차단, 사유 필수 승인 취소와 감사 구현 |
 | 수주 목록·이력 | P2-A11 완료 | 기간·거래처·담당자·복수 상태 검색, cursor 목록, 수주 단위 안전 이력, 생산 요청 진입 구현 |
+| 작업 queue·worker | P2-B01 검수 대기 | `SKIP LOCKED` 작업 선택, lease 좀비 회수, 멱등 등록, 지수 backoff, 취소·다시 실행, 작업 큐 화면 구현·자동 검증 완료 |
 | 출력 | DXF 구현, STEP·PDF 미구현 | 제작 DXF 직접 다운로드 가능; PDF·파일 object storage는 P2-B 범위 |
-| 자동 검증 | 양호 | 단위 316건, PostgreSQL 통합 62건, Playwright 시나리오와 lint/typecheck/build 통과 |
+| 자동 검증 | 양호 | 단위 319건, PostgreSQL 통합 72건, Playwright 28개 시나리오와 lint/typecheck/build 통과 |
 | 배포 | 구현됨 | Docker Hub 태그 이미지와 self-hosted runner 사용 |
 
 ## 2. 시스템 구성
@@ -422,6 +426,9 @@ Undo 이력은 JSON 스냅샷으로 최대 50개까지 유지되며 페이지를
 | `/api/v1/orders/:orderId/calculations` | Node.js Route Handler | 계산·금액 snapshot 생성과 현재 계산 상태 조회 |
 | `/api/v1/orders/:orderId/transitions` | Node.js Route Handler | `order.approve` 기반 승인·승인 취소·생산 상태 전이 |
 | `/api/v1/orders/:orderId/history` | Node.js Route Handler | `order.read` 기반 수주 단위 안전 감사 요약 |
+| `/jobs` | 보호된 동적 화면 | 작업 큐 목록·진행·취소·다시 실행 |
+| `/api/v1/jobs` | Node.js Route Handler | 멱등 작업 등록과 상태·cursor 목록 |
+| `/api/v1/jobs/:jobId/cancel`, `/retries` | Node.js Route Handler | 작업 취소 요청과 실패 작업 다시 실행 |
 | `/api/health` | 동적 Route Handler | `{ "status": "ok" }`, 캐시 금지 |
 | `/api/internal/database-smoke` | 동적 Node.js Route Handler | 기본 비활성인 PostgreSQL transaction 통합 검증 |
 
@@ -511,8 +518,8 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 
 | 명령 | 결과 |
 |---|---|
-| `npm test` | 성공: 단위 테스트 316건 통과; DB 통합 테스트는 기본 실행에서 제외 |
-| `npm run test:integration` | 성공: test DB reset·17개 migration·seed 후 PostgreSQL 통합 테스트 62건 통과 |
+| `npm test` | 성공: 단위 테스트 319건 통과; DB 통합 테스트는 기본 실행에서 제외 |
+| `npm run test:integration` | 성공: test DB reset·18개 migration·seed 후 PostgreSQL 통합 테스트 72건 통과 |
 | `npm run test:e2e` | 성공: 가격 적용·개정·공통 팝업을 포함한 Playwright Chromium 25개 시나리오 통과 |
 | `npm run lint` | 성공: ESLint 오류 없음 |
 | `npm run typecheck` | 성공: TypeScript 오류 없음 |
@@ -571,7 +578,7 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 
 ## 10. 권장 다음 작업
 
-1. `P2-B01` queue 제품과 worker 배포 방식(`D2-B01-*`), `P2-B02` object storage 제품과 보존·삭제 정책(`D2-B02-*`)을 확정한다. 두 결정 없이는 생산·출력 묶음에 착수하지 않는다.
+1. `P2-B01` 작업 queue의 사용자 화면 검수를 마친다. 이후 `P2-B02` object storage 제품과 보존·삭제 정책(`D2-B02-*`)을 확정한다. 이 결정은 비용이 붙으므로 상세계획에서 후보를 정리해 승인받는다.
 2. 감사 로그의 `after ->> 'salesOrderId'` 조회에 표현식 인덱스를 걸지, `salesOrderId`를 별도 열로 비정규화할지 결정한다. 지금 규모에서는 문제가 없지만 migration이 필요하므로 P2-B 착수와 함께 판단한다.
 3. 승인 수주의 전체 작업 복제(`D2-A11-H`에서 후속으로 미룬 범위)를 언제 열지 판단한다. 불변 snapshot 선택 규칙을 먼저 정해야 한다.
 4. 운영 인프라는 필요한 작업 직전에 결정하고 실제 기계 통신은 P3에서 구현한다.
@@ -599,6 +606,8 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 - [P2-A10 승인·생산 상태 상세계획](./work-items/P2-A10-order-approval-production-status.md)
 - [P2-A11 수주 목록·이력 상세계획](./work-items/P2-A11-order-list-history.md)
 - [P2-A11 수주 목록·이력 화면 테스트 가이드](./P2-A11-screen-test-guide.md)
+- [P2-B01 작업 queue·worker 상세계획](./work-items/P2-B01-job-queue-worker.md)
+- [P2-B01 작업 queue·worker 화면 테스트 가이드](./P2-B01-screen-test-guide.md)
 - [P1-07 절곡 초안 저장](./work-items/P1-07-fold-draft-persistence.md)
 - [P1-08 절곡 템플릿 라이브러리](./work-items/P1-08-fold-template-library.md)
 - [P1-09 Decimal 계산 정책](./work-items/P1-09-decimal-policy.md)

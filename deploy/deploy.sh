@@ -31,13 +31,13 @@ rollback() {
   rollback_image="$(head -n 1 "${previous_file}")"
   echo "Deployment failed. Rolling back to ${rollback_image}." >&2
   printf 'APP_IMAGE=%s\n' "${rollback_image}" > "${env_file}"
-  docker compose pull app
+  docker compose pull
   docker compose up -d --no-build --remove-orphans
 }
 
 trap rollback ERR
 
-docker compose pull app
+docker compose pull
 docker compose up -d --no-build --remove-orphans
 
 container_id="$(docker compose ps -q app)"

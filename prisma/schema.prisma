@@ -135,6 +135,14 @@ enum SurchargeBaseType {
   PROCESSING_ONLY
 }
 
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
 enum AuditCategory {
   AUTHENTICATION
   ADMINISTRATION
@@ -196,6 +204,7 @@ model Organization {
   machineIntegrationConfig   MachineIntegrationConfig?
   auditEvents                AuditEvent[]
   legacyMappings             LegacyMapping[]
+  jobs                       JobQueue[]
 
   @@index([status])
 }
@@ -361,6 +370,7 @@ model OrganizationMembership {
   updatedSalesOrderFoldItems    SalesOrderFoldItem[]            @relation("SalesOrderFoldItemUpdater")
   removedSalesOrderFoldItems    SalesOrderFoldItem[]            @relation("SalesOrderFoldItemRemover")
   createdSalesOrderCalculations SalesOrderCalculationSnapshot[] @relation("SalesOrderCalculationCreator")
+  requestedJobs                 JobQueue[]                      @relation("JobQueueRequester")
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -1080,6 +1090,38 @@ model FileAsset {
   @@index([organizationId, kind, status])
   @@index([organizationId, checksumSha256])
   @@index([uploadedById])
+}
+
+model JobQueue {
+  id                      String                 @id @default(uuid()) @db.Uuid
+  organizationId          String                 @db.Uuid
+  type                    String                 @db.VarChar(100)
+  status                  JobStatus              @default(QUEUED)
+  idempotencyKey          String                 @db.VarChar(200)
+  payload                 Json                   @db.JsonB
+  result                  Json?                  @db.JsonB
+  priority                Int                    @default(100)
+  attempt                 Int                    @default(0)
+  maxAttempts             Int                    @default(5)
+  progressPercent         Int                    @default(0)
+  availableAt             DateTime               @default(now()) @db.Timestamptz(6)
+  startedAt               DateTime?              @db.Timestamptz(6)
+  finishedAt              DateTime?              @db.Timestamptz(6)
+  leaseExpiresAt          DateTime?              @db.Timestamptz(6)
+  lockedBy                String?                @db.VarChar(120)
+  cancelRequestedAt       DateTime?              @db.Timestamptz(6)
+  lastError               String?                @db.VarChar(1000)
+  requestedByMembershipId String                 @db.Uuid
+  createdAt               DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime               @updatedAt @db.Timestamptz(6)
+  organization            Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  requestedByMembership   OrganizationMembership @relation("JobQueueRequester", fields: [requestedByMembershipId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, type, idempotencyKey])
+  @@index([status, priority, availableAt, id], map: "JobQueue_claim_idx")
+  @@index([status, leaseExpiresAt], map: "JobQueue_lease_reclaim_idx")
+  @@index([organizationId, status, createdAt, id], map: "JobQueue_organization_list_idx")
+  @@index([requestedByMembershipId])
 }
 
 model MachineIntegrationConfig {

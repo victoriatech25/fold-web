@@ -228,6 +228,11 @@ export const auditActionCatalog = {
   "order.fold_items_reordered": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrder", label: "수주 절곡 작업 순서 변경" },
   "order.calculation_snapshot_created": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrderCalculationSnapshot", label: "수주 계산·가격 스냅샷 생성" },
   "order.status_transitioned": { category: "APPROVAL", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SalesOrder", label: "수주 승인·생산 상태 전이" },
+  "job.enqueued": { category: "SYSTEM", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "JobQueue", label: "작업 등록" },
+  "job.succeeded": { category: "SYSTEM", defaultOutcome: "SUCCESS", defaultSource: "SYSTEM", entityType: "JobQueue", label: "작업 완료" },
+  "job.failed": { category: "SYSTEM", defaultOutcome: "FAILURE", defaultSource: "SYSTEM", entityType: "JobQueue", label: "작업 실패" },
+  "job.cancelled": { category: "SYSTEM", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "JobQueue", label: "작업 취소" },
+  "job.retried": { category: "SYSTEM", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "JobQueue", label: "작업 다시 실행" },
   "material.created": {
     category: "DATA_CHANGE",
     defaultOutcome: "SUCCESS",

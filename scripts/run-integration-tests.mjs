@@ -46,6 +46,7 @@ run(
     "src/server/fold-document/fold-document.integration.test.ts",
     "src/server/fold-draft/fold-draft.integration.test.ts",
     "src/server/fold-library/fold-library.integration.test.ts",
+    "src/server/jobs/job.integration.test.ts",
   ],
   {
     ...process.env,

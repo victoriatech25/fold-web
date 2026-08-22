@@ -18,3 +18,25 @@ services:
     security_opt:
       - no-new-privileges:true
     stop_grace_period: 20s
+
+  # web과 같은 이미지를 쓰고 진입점만 다르다(`D2-B01-B`).
+  worker:
+    image: ${APP_IMAGE:-victoriatech/fold_web:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    restart: unless-stopped
+    init: true
+    command: ["node", "worker.mjs"]
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      # 긴 작업이 web용 5초 statement timeout에 끊기지 않도록 worker는 따로 잡는다.
+      DATABASE_STATEMENT_TIMEOUT_MS: "${WORKER_DATABASE_STATEMENT_TIMEOUT_MS:-60000}"
+      DATABASE_CONNECTION_LIMIT: "${WORKER_DATABASE_CONNECTION_LIMIT:-4}"
+    security_opt:
+      - no-new-privileges:true
+    # 돌고 있는 작업이 끝날 시간을 준다. 못 끝내도 lease 만료로 회수된다.
+    stop_grace_period: 60s

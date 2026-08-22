@@ -14,10 +14,13 @@ export type ApiAuthorizationResult =
   | { ok: true; context: AuthenticatedContext }
   | { ok: false; response: Response };
 
-export async function authorizeApiRequest(
+/**
+ * session만 확인한다. 필요한 권한이 요청 본문에 따라 달라지는 경로(작업 queue처럼
+ * 작업 종류가 권한을 정하는 경우)에서 쓰고, 권한 검사는 application service가 한다.
+ */
+export async function authenticateApiRequest(
   request: Request,
   requestId: string,
-  permission: PermissionKey,
 ): Promise<ApiAuthorizationResult> {
   const config = readAuthRuntimeConfig();
   const token = readSessionCookie(request.headers.get("cookie"), config);
@@ -36,6 +39,17 @@ export async function authorizeApiRequest(
       ),
     };
   }
+  return { ok: true, context };
+}
+
+export async function authorizeApiRequest(
+  request: Request,
+  requestId: string,
+  permission: PermissionKey,
+): Promise<ApiAuthorizationResult> {
+  const authenticated = await authenticateApiRequest(request, requestId);
+  if (!authenticated.ok) return authenticated;
+  const { context } = authenticated;
   if (!hasPermission(context, permission)) {
     await writeDeniedAuditBestEffort(getPrisma(), {
       organizationId: context.organizationId,

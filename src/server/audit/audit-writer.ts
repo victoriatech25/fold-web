@@ -195,6 +195,22 @@ type AuditPayloadByAction = {
     after: { status: string; lockVersion: number };
     metadata: { action: string; reason?: string; calculationSnapshotId?: string; calculationSnapshotNumber?: number };
   };
+  // payload 원문은 남기지 않는다(`D2-B01-L`). 종류·멱등키·시도 횟수와 오류 요약만 남긴다.
+  "job.enqueued": {
+    metadata: { type: string; idempotencyKey: string; priority: number; maxAttempts: number; reused: boolean };
+  };
+  "job.succeeded": {
+    metadata: { type: string; attempt: number; durationMs: number };
+  };
+  "job.failed": {
+    metadata: { type: string; attempt: number; maxAttempts: number; retryable: boolean; error: string };
+  };
+  "job.cancelled": {
+    metadata: { type: string; previousStatus: string };
+  };
+  "job.retried": {
+    metadata: { type: string; previousAttempt: number };
+  };
   "material.created": { after: MaterialAuditSnapshot };
   "material.updated": { before: MaterialAuditSnapshot; after: MaterialAuditSnapshot };
   "material.variant_created": { after: MaterialVariantAuditSnapshot };
