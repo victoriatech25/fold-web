@@ -16,6 +16,7 @@ const startSchema = z.strictObject({
   mediaType: z.string().trim().min(1).max(150),
   sizeBytes: z.number().int().positive(),
   checksumSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  salesOrderId: z.uuid().nullish(),
 });
 
 export async function POST(request: Request) {

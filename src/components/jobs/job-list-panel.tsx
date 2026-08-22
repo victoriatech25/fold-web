@@ -37,6 +37,54 @@ async function jobRequest<T>(url: string, init?: RequestInit): Promise<T> {
   return body.data as T;
 }
 
+/** 작업 결과에 실린 산출물을 화면에서 바로 내려받게 한다(`P2-B02`). */
+function JobResultFile({ job }: { job: JobDto }) {
+  const popup = useCommonPopup();
+  const [busy, setBusy] = useState(false);
+  const result = job.result as { assetId?: string; fileName?: string; contentRetained?: boolean } | null;
+  if (!result?.assetId) return null;
+
+  async function download() {
+    if (!result?.assetId) return;
+    setBusy(true);
+    try {
+      const ticket = await jobRequest<{ download: { url: string } }>(
+        `/api/v1/files/${result.assetId}/downloads`,
+        { method: "POST" },
+      );
+      // 새 탭에서 열면 브라우저가 파일 이름 그대로 내려받는다.
+      window.open(ticket.download.url, "_blank", "noopener");
+    } catch (caught) {
+      await popup.alert({
+        title: "내려받기 실패",
+        message: caught instanceof Error ? caught.message : "파일을 내려받지 못했습니다.",
+        variant: "danger",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2">
+      <span className="text-xs font-bold text-slate-700">{result.fileName ?? "산출물"}</span>
+      {result.contentRetained === false ? (
+        <span className="rounded bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+          저장소에 보관되지 않음
+        </span>
+      ) : null}
+      <button
+        className="ml-auto rounded bg-teal-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+        disabled={busy || result.contentRetained === false}
+        onClick={() => void download()}
+        type="button"
+      >
+        {busy ? "여는 중…" : "내려받기"}
+      </button>
+    </div>
+  );
+}
+
 export function JobListPanel({ initial }: { initial: JobPage }) {
   const popup = useCommonPopup();
   const [items, setItems] = useState(initial.items);
@@ -219,6 +267,7 @@ export function JobListPanel({ initial }: { initial: JobPage }) {
               {job.lastError ? (
                 <p className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{job.lastError}</p>
               ) : null}
+              {job.status === "SUCCEEDED" ? <JobResultFile job={job} /> : null}
               {job.status === "SUCCEEDED" && job.result ? (
                 <pre className="mt-3 overflow-x-auto rounded bg-slate-50 px-3 py-2 text-xs text-slate-700">
                   {JSON.stringify(job.result, null, 2)}

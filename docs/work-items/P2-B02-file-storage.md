@@ -69,6 +69,16 @@
 
 ## 4. 범위
 
+### 포함 (2026-08-22 확대)
+
+사용자 화면 없이 콘솔로만 검수하는 것은 의미가 없다는 판단에 따라, 파일 기능을 실제로 쓰는 최소 화면을 이번 범위에 넣었다.
+
+- 수주 상세 `첨부` 탭: 첨부·목록·내려받기·삭제
+- 작업 큐: 산출물 내려받기 버튼
+- `FileAsset.salesOrderId` 와 migration
+
+`P2-B09` 대량 DXF는 여러 수주의 파일을 묶는 별도 화면이므로 그대로 후속이다.
+
 ### 포함
 
 - `FileStorage` 인터페이스와 S3 호환 구현, 로컬·테스트 환경 구성
@@ -81,7 +91,7 @@
 
 ### 제외
 
-- 대량 DXF 묶음 생성과 화면 진입 버튼 (`P2-B09`)
+- 대량 DXF 묶음 생성과 그 화면 (`P2-B09`)
 - PDF·라벨 생성 (`P2-B07`, `P2-B08`)
 - 데이터 이전에서 오는 기존 파일 연결 (`P2-C05`)
 - 운영 서버 구성 변경과 실제 배포 (`P2-C08`)
@@ -135,7 +145,8 @@ DELETE /api/v1/files/:fileId          soft delete
 | `B02-05` | soft delete와 `storage.cleanup` 정기 작업 (`DONE` — 2026-08-22) |
 | `B02-06` | `dxf.export`와 동기 DXF 경로를 저장소에 연결 (`DONE` — 2026-08-22) |
 | `B02-07` | 감사 이벤트와 배포·백업 문서 (`DONE` — 2026-08-22) |
-| `B02-08` | 화면 테스트 가이드와 사용자 검수 (`IN_PROGRESS` — [가이드](../P2-B02-screen-test-guide.md) 작성 완료, 사용자 검수 대기) |
+| `B02-08` | 화면 테스트 가이드와 사용자 검수 (`IN_PROGRESS` — 화면 구현과 [가이드](../P2-B02-screen-test-guide.md) 완료, 사용자 검수 대기) |
+| `B02-09` | 수주 첨부 화면과 작업 큐 내려받기 (`DONE` — 2026-08-22) |
 
 ## 7.1 검증 결과
 
@@ -144,7 +155,7 @@ DELETE /api/v1/files/:fileId          soft delete
 | 단위 | `npm test` | 성공 — 329건 (저장소 키·환경설정 9건, DXF 보관 성공·실패 2건 추가) |
 | PostgreSQL·저장소 통합 | `npm run test:integration` | 성공 — 93건 (파일 9건, 저장소 8건 추가) |
 | 저장소 단독 | `npm run test:storage` | 성공 — 실제 MinIO 상대 |
-| E2E | `npm run test:e2e` | 성공 — 33개 시나리오 (파일 API 5건 추가) |
+| E2E | `npm run test:e2e` | 성공 — 34개 시나리오 (파일 API 5건, 첨부 화면 1건 추가) |
 | lint·typecheck | `npm run lint`, `npm run typecheck` | 성공 |
 | migration | `npm run db:migrate:check` | 차이 없음. 기존 `FileAsset` 모델을 쓴다 |
 | build | `npm run build` | 성공 |
@@ -188,4 +199,5 @@ E2E가 확인하는 것은 다음과 같다. 실제 브라우저 session 과 pre
 | 2026-08-22 | `B02-06` 완료. 동기·queue 양쪽 DXF 경로가 바이트를 저장소에 보관하고 `contentRetained`가 `true`가 된다. 저장 실패는 출력 자체를 막지 않고 `PENDING`과 감사로 남긴다 | Claude |
 | 2026-08-22 | `B02-07` 완료. 배포 가이드에 저장소 서비스·환경변수·백업 대상과 복구 순서·정리 정책을 적었다 | Claude |
 | 2026-08-22 | 검수 중 발견: `READY`인데 바이트가 없는 행(저장소 도입 전 생성분)에 URL을 발급해 사용자가 저장소의 XML 오류를 보게 됐다. 발급 전에 객체 존재를 확인하고 없으면 `PENDING`으로 되돌리도록 고쳤다 | 사용자·Claude |
+| 2026-08-22 | 콘솔 검수는 의미가 없다는 사용자 판단에 따라 범위를 넓혀 수주 `첨부` 탭과 작업 큐 내려받기 버튼을 만들었다. `FileAsset.salesOrderId` 와 migration 을 추가하고 검수 가이드를 화면 기준으로 다시 썼다 | 사용자·Claude |
 | 2026-08-22 | 화면 테스트 가이드 작성. 파일 기능을 쓰는 화면이 아직 없어 `P2-B01`과 같이 콘솔 API 검수로 한다. 사용자용 진입점은 `P2-B09`에서 만든다 | 사용자·Claude |

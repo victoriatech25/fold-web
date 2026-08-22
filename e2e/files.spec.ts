@@ -198,3 +198,51 @@ test("없는 파일과 잘못된 식별자는 구분해서 거절한다", async 
   const malformed = await api(page, "/api/v1/files/not-a-uuid");
   expect(malformed.status).toBe(400);
 });
+
+test("수주 첨부 탭에서 파일을 올리고 내려받고 지운다", async ({ page }) => {
+  await login(page);
+  await page.getByRole("link", { name: "수주 등록/조회" }).click();
+  await page.getByRole("button", { name: "새 수주" }).click();
+  const createDialog = page.getByRole("dialog", { name: "새 수주" });
+  await createDialog.getByLabel("새 수주 거래처").selectOption({ index: 1 });
+  await createDialog.getByRole("button", { name: "수주 등록" }).click();
+  await expect(page).toHaveURL(/\/orders\/[0-9a-f-]+$/);
+
+  await page.getByRole("tab", { name: /첨부/ }).click();
+  await expect(page.getByRole("heading", { name: "첨부 파일" })).toBeVisible();
+  await expect(page.getByText("첨부한 파일이 없습니다.")).toBeVisible();
+
+  // 브라우저가 저장소로 바로 올리는 실제 경로를 그대로 거친다.
+  await page.getByLabel("첨부 파일 선택").setInputFiles({
+    name: "현장 사진.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("첨부 화면 검증 내용", "utf8"),
+  });
+  await page.getByRole("alertdialog", { name: "첨부 완료" }).getByRole("button", { name: "확인" }).click();
+
+  const row = page.getByRole("listitem").filter({ hasText: "현장 사진.txt" });
+  await expect(row).toBeVisible();
+  await expect(row).not.toContainText("업로드 미완료");
+
+  // 버튼이 만든 주소가 실제로 내용을 돌려주는지까지 본다.
+  // 새 탭은 곧바로 다운로드로 바뀌어 페이지 이벤트로는 확인할 수 없다.
+  const [ticketResponse] = await Promise.all([
+    page.waitForResponse(
+      (candidate) =>
+        candidate.url().includes("/downloads") && candidate.request().method() === "POST",
+    ),
+    row.getByRole("button", { name: "내려받기" }).click(),
+  ]);
+  const ticket = await ticketResponse.json();
+  expect(ticket.data.download.url).toContain("uploads/");
+  const downloaded = await page.request.get(ticket.data.download.url as string);
+  expect(downloaded.status()).toBe(200);
+  expect(await downloaded.text()).toBe("첨부 화면 검증 내용");
+
+  await row.getByRole("button", { name: "현장 사진.txt 삭제" }).click();
+  await page
+    .getByRole("alertdialog", { name: "첨부 파일 삭제" })
+    .getByRole("button", { name: "삭제" })
+    .click();
+  await expect(page.getByText("첨부한 파일이 없습니다.")).toBeVisible();
+});

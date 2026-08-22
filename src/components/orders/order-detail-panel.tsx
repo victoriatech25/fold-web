@@ -7,6 +7,7 @@ import { OrderRequestError, orderRequest } from "@/components/orders/order-api";
 import { OrderFoldItemsPanel } from "@/components/orders/order-fold-items-panel";
 import { OrderCalculationPanel } from "@/components/orders/order-calculation-panel";
 import { OrderStatusPanel, orderStatusLabels } from "@/components/orders/order-status-panel";
+import { OrderAttachmentsPanel } from "@/components/orders/order-attachments-panel";
 import { OrderHistoryPanel } from "@/components/orders/order-history-panel";
 import { StatusBadge } from "@/components/orders/order-list-panel";
 import { TabPanel, Tabs } from "@/components/ui/tabs";
@@ -71,6 +72,7 @@ export function OrderDetailPanel({
   const [historyVersion, setHistoryVersion] = useState(0);
   const [tab, setTab] = useState("basic");
   const [foldCount, setFoldCount] = useState(initialFoldItems.length);
+  const [attachmentCount, setAttachmentCount] = useState<number | null>(null);
   const [form, setForm] = useState(() => formFromOrder(initial));
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "error">("saved");
   const formRef = useRef(form);
@@ -263,6 +265,7 @@ export function OrderDetailPanel({
     { id: "folds", label: "절곡 작업", badge: foldCount },
     { id: "calc", label: "계산·금액" },
     { id: "status", label: "승인·생산" },
+    { id: "files", label: "첨부", badge: attachmentCount ?? undefined },
     { id: "history", label: "이력" },
   ];
 
@@ -419,6 +422,14 @@ export function OrderDetailPanel({
             setHistoryVersion((current) => current + 1);
           }}
           order={order}
+        />
+      </TabPanel>
+
+      <TabPanel id="files" value={tab}>
+        <OrderAttachmentsPanel
+          editable={canWrite && order.status !== "CANCELLED"}
+          onCountChange={setAttachmentCount}
+          orderId={order.id}
         />
       </TabPanel>
 

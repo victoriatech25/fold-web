@@ -6,7 +6,12 @@
 >
 > 검수자: 사용자 본인
 
-`P2-B02`는 기반 작업이라 파일을 올리고 내려받는 **화면이 아직 없다.** 사용자용 진입점은 이 저장소를 쓰는 `P2-B09` 대량 DXF와 수주 첨부에서 만든다. 그래서 이번 검수는 `P2-B01`과 같이 브라우저 콘솔에서 API를 직접 호출해 확인한다.
+파일 기능을 화면에서 직접 확인한다. 콘솔에서 API를 부르지 않는다.
+
+- **수주 상세 `첨부` 탭**: 파일 첨부·내려받기·삭제
+- **작업 큐**: 서버가 만든 DXF 내려받기
+
+계약 검증은 [`e2e/files.spec.ts`](../e2e/files.spec.ts) 6개 시나리오가 자동으로 돈다. 이 가이드는 자동 검증이 대신할 수 없는 것 — 실제 사용감, 저장소 장애, 시간이 걸리는 만료 — 에 집중한다.
 
 ## 1. 준비
 
@@ -24,239 +29,163 @@ npm run dev
 npm run worker
 ```
 
-**worker 는 코드를 바꿔도 스스로 다시 읽지 않는다.** 개발 서버(`next dev`)와 달리 watch 가 없으므로, 검수 중 서버 코드가 바뀌면 worker 를 껐다 다시 띄운다. 옛 코드로 도는 worker 는 작업을 성공시키면서도 새 동작을 하지 않아 원인을 찾기 어렵다. 기동 로그의 `types` 에 처리 가능한 작업 종류가 찍히므로 그것으로 확인한다.
+- 웹: `http://localhost:8000`
+- MinIO 콘솔: `http://127.0.0.1:9001` (`fold-web-local` / `fold-web-local-secret`)
+- 계정 정보는 [로컬 화면 테스트 계정](./local-screen-test-account.md)에 있다
+
+**worker 는 코드를 바꿔도 스스로 다시 읽지 않는다.** 검수 중 서버 코드가 바뀌면 껐다 다시 띄운다. 기동 로그의 `types` 로 확인한다.
 
 ```json
 {"event":"worker_started","types":["dxf.export","storage.cleanup"],...}
 ```
 
-- 웹: `http://localhost:8000`
-- MinIO 콘솔: `http://127.0.0.1:9001` (`fold-web-local` / `fold-web-local-secret`)
-- 계정 정보는 [로컬 화면 테스트 계정](./local-screen-test-account.md)에 있다
-
-**콘솔 코드는 반드시 서비스 화면(`localhost:8000`)에서 실행한다.** 서버가 요청 출처를 검사한다. 처음 붙여넣을 때 Chrome이 막으면 콘솔에 `allow pasting`을 직접 입력한 뒤 Enter를 누른다.
-
-아래 검수에서 공통으로 쓰는 도우미다. **페이지를 새로고침하거나 다른 화면으로 옮기면 사라지므로 그때마다 다시 실행한다.**
-
-```javascript
-window.t = {
-  async sha256(text) {
-    const bytes = new TextEncoder().encode(text);
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
-    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  },
-  async api(path, method = "GET", body) {
-    const response = await fetch(path, {
-      method,
-      headers: body ? { "content-type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    return { status: response.status, data: await response.json() };
-  },
-};
-```
-
 ## 2. 검수 항목
 
-### 2-1. DXF 바이트가 실제로 보관된다
+### 2-1. 수주에 파일을 첨부한다
 
-`P2-B01`까지는 DXF를 만들어도 바이트를 버렸다(`contentRetained: false`). 이제 보관한다.
+1. `영업관리` → `수주 등록/조회`에서 수주를 하나 열거나 새로 만든다.
+2. `첨부` 탭으로 간다.
+3. `파일 첨부`를 눌러 PDF나 이미지, txt 파일을 고른다.
 
-먼저 `설계·도면` → `템플릿`에서 게시된 절곡 개정을 열고 주소창의 개정 ID를 복사한다. 그 ID로 작업을 등록한다.
+기대 결과
+
+- 목록에 파일 이름·크기·시각이 나타나고 `첨부 완료` 팝업이 뜬다.
+- 탭 이름 옆 숫자가 늘어난다.
+- MinIO 콘솔의 bucket에 `uploads/{조직ID}/{연}/{월}/{파일ID}.{확장자}` 객체가 보인다.
+- `시스템` → `감사 로그`에 `파일 업로드 완료`가 남는다. 파일 내용은 로그에 없다.
+
+큰 파일(수 MB)도 한 번 올려 본다. 브라우저가 저장소로 바로 올리므로 앱 서버를 거치지 않는다.
+
+### 2-2. 첨부 파일을 내려받는다
+
+목록에서 `내려받기`를 누른다.
+
+기대 결과
+
+- 새 탭이 열리며 파일이 원래 이름으로 내려받아진다. 한글 파일명이 깨지지 않는다.
+- 내려받은 내용이 올린 것과 같다.
+
+### 2-3. 허용하지 않는 형식은 막는다
+
+파일 선택창은 pdf · png · jpg · txt만 보여준다. 다른 형식을 억지로 고른다.
+
+기대 결과
+
+- 목록이 늘어나지 않고 빨간 안내가 뜬다.
+
+### 2-4. 첨부를 지우면 목록에서 사라진다
+
+`삭제`를 누르고 확인 팝업을 승인한다.
+
+기대 결과
+
+- 목록에서 사라지고 탭 숫자가 줄어든다.
+- 팝업에 30일 안에는 되돌릴 수 있다는 안내가 있다.
+- **MinIO 콘솔에는 객체가 그대로 있다.** 유예 기간이라 아직 지우지 않는다.
+- 감사 로그에 `파일 삭제`가 남는다.
+
+### 2-5. 취소된 수주에는 첨부할 수 없다
+
+수주를 취소한 뒤 `첨부` 탭을 연다.
+
+기대 결과
+
+- `파일 첨부`와 `삭제` 버튼이 보이지 않는다.
+- 이미 있는 파일은 여전히 내려받을 수 있다.
+
+### 2-6. 서버가 만든 DXF를 작업 큐에서 내려받는다
+
+`설계·도면` → `템플릿`에서 게시된 절곡 개정 ID를 확인한 뒤 작업을 등록한다. 이 한 줄만 콘솔에서 실행한다. 사용자용 진입 버튼은 `P2-B09` 대량 DXF에서 만든다.
 
 ```javascript
-await t.api("/api/v1/jobs", "POST", {
-  type: "dxf.export",
-  payload: { revisionId: "게시된 절곡 개정 ID" },
-  idempotencyKey: "b02-check-1",
-});
+await (await fetch("/api/v1/jobs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "dxf.export", payload: { revisionId: "게시된 절곡 개정 ID" }, idempotencyKey: `b02-${Date.now()}` }) })).json();
 ```
 
-기대 결과
-
-- `생산·출력` → `작업 큐`에서 작업이 `완료`가 된다.
-- 결과에 **`"contentRetained": true`** 가 있다. 이것이 이번 작업의 핵심이다.
-- MinIO 콘솔의 bucket에 `generated/{조직ID}/dxf/{checksum}.dxf` 객체가 보인다.
-
-### 2-2. 보관한 DXF를 다운로드 URL로 받는다
-
-**2-1을 이번에 실행해서 나온 `assetId`를 쓴다.** `P2-B01` 검수 때 만들어진 예전 작업 결과의 `assetId`를 쓰면 안 된다. 그때는 저장소가 없어 바이트를 버렸으므로 행만 있고 내용이 없다. 같은 개정을 다시 출력하면 같은 키에 바이트가 채워진다.
-
-```javascript
-const ticket = await t.api("/api/v1/files/작업결과의_assetId/downloads", "POST");
-ticket.data.data.download.url;
-```
+`생산·출력` → `작업 큐`로 간다.
 
 기대 결과
 
-- `expiresAt`이 지금부터 약 5분 뒤다.
-- URL을 새 탭에서 열면 DXF 파일이 원래 이름으로 내려받아진다. 한글 파일명이 깨지지 않는다.
-- 같은 개정을 편집기에서 직접 DXF로 내보낸 파일과 내용이 같다.
+- 작업이 `완료`가 되고, 결과 위에 **파일 이름과 `내려받기` 버튼**이 나타난다.
+- 누르면 DXF가 내려받아진다.
+- 결과 JSON의 `contentRetained`가 `true`다.
+- 편집기에서 같은 개정을 직접 내보낸 파일과 내용이 같다.
 
-### 2-3. 만료된 URL로는 받을 수 없다
+### 2-7. 다운로드 주소는 5분 뒤 만료된다
 
-2-2에서 받은 URL을 그대로 두고 **5분이 지난 뒤** 다시 연다.
-
-기대 결과
-
-- 파일이 내려오지 않고 오류가 뜬다. 새로 발급해야 받을 수 있다.
-
-### 2-4. 업로드 시작 → 올리기 → 완료
-
-첨부 파일(`OTHER` 종류)을 올린다.
-
-```javascript
-const text = "검수용 첨부 파일";
-const started = await t.api("/api/v1/files/uploads", "POST", {
-  kind: "OTHER",
-  fileName: "검수첨부.txt",
-  mediaType: "text/plain",
-  sizeBytes: new TextEncoder().encode(text).length,
-  checksumSha256: await t.sha256(text),
-});
-const fileId = started.data.data.file.id;
-
-await fetch(started.data.data.upload.url, {
-  method: "PUT",
-  headers: { "content-type": "text/plain" },
-  body: text,
-});
-
-await t.api(`/api/v1/files/${fileId}/complete`, "POST");
-```
+2-2나 2-6에서 열린 탭의 주소를 복사해 두고 **5분이 지난 뒤** 다시 연다.
 
 기대 결과
 
-- 시작 응답의 `status`가 `PENDING`이고 `upload.url`이 함께 온다.
-- 완료 응답의 `status`가 `READY`로 바뀐다.
-- `시스템` → `감사 로그`에서 `파일 업로드 완료`가 보인다. 파일 내용은 로그에 없다.
+- 파일이 내려오지 않는다. 화면에서 다시 누르면 새 주소가 발급되어 받아진다.
 
-### 2-5. 올리지 않고 완료를 요청하면 READY가 되지 않는다
-
-2-4의 첫 두 줄만 실행하고(업로드 PUT을 건너뛴다) 바로 완료를 요청한다.
-
-기대 결과
-
-- `409`와 `업로드가 아직 끝나지 않았습니다.`가 돌아온다.
-- 파일은 `PENDING`으로 남는다.
-
-### 2-6. 선언한 내용과 다른 것을 올리면 거부한다
-
-길이는 같고 내용만 다르게 올린다.
-
-```javascript
-const declared = "AAAAAAAAAA";
-const actual = "BBBBBBBBBB";
-const started = await t.api("/api/v1/files/uploads", "POST", {
-  kind: "OTHER",
-  fileName: "불일치.txt",
-  mediaType: "text/plain",
-  sizeBytes: 10,
-  checksumSha256: await t.sha256(declared),
-});
-await fetch(started.data.data.upload.url, {
-  method: "PUT",
-  headers: { "content-type": "text/plain" },
-  body: actual,
-});
-await t.api(`/api/v1/files/${started.data.data.file.id}/complete`, "POST");
-```
-
-기대 결과
-
-- `409`와 `checksum·크기와 일치하지 않습니다`가 돌아온다.
-- MinIO 콘솔에서 그 객체가 지워져 있다. 깨진 바이트를 남기지 않는다.
-- 감사 로그에 `파일 업로드 거부`가 남는다.
-
-크기까지 다르게 올리면 그 전에 저장소가 먼저 거절한다. presigned URL 서명에 선언한 크기가 들어가기 때문이다.
-
-### 2-7. 허용하지 않는 종류와 형식은 막는다
-
-```javascript
-await t.api("/api/v1/files/uploads", "POST", {
-  kind: "DXF",
-  fileName: "직접만든.dxf",
-  mediaType: "application/dxf",
-  sizeBytes: 10,
-  checksumSha256: await t.sha256("x"),
-});
-```
-
-기대 결과
-
-- `400`이 돌아온다. `DXF`는 서버가 만드는 파일이라 직접 올릴 수 없다.
-- `fileName`을 `실행파일.exe`, `mediaType`을 `application/octet-stream`으로 바꿔도 `400`이다.
-
-### 2-8. 삭제는 표시만 하고 객체는 남는다
-
-2-4에서 올린 파일을 지운다.
-
-```javascript
-await t.api(`/api/v1/files/${fileId}`, "DELETE");
-await t.api(`/api/v1/files/${fileId}`);
-```
-
-기대 결과
-
-- 삭제 응답의 `status`가 `DELETED`다.
-- 이어진 조회는 `404`다. 화면에서 사라진다.
-- **MinIO 콘솔에는 객체가 그대로 있다.** 유예 30일 안에는 되돌릴 수 있다.
-- 감사 로그에 `파일 삭제`가 남고 `purgeAfter`(30일 뒤)가 적혀 있다.
-
-### 2-9. 정리 작업이 유예가 끝난 것만 지운다
-
-정리를 queue 작업으로 돌린다. 유예를 `0`으로 주면 방금 지운 것도 대상이 된다.
-
-```javascript
-await t.api("/api/v1/jobs", "POST", {
-  type: "storage.cleanup",
-  payload: { graceDays: 0 },
-  idempotencyKey: "b02-cleanup-1",
-});
-```
-
-기대 결과
-
-- `작업 큐`에 `파일 저장소 정리`가 나타나고 `완료`가 된다.
-- 결과에 `purgedDeleted`가 1 이상이다.
-- 2-8의 객체가 MinIO 콘솔에서 사라진다. **`FileAsset` 행은 남는다** — 무엇이 있었는지 추적할 수 있어야 한다.
-- 감사 로그에 `파일 실제 삭제`가 남는다.
-- 2-1에서 만든 DXF는 그대로 있다. 삭제 표시가 없으므로 대상이 아니다.
-
-기본값(`payload: {}`)으로 실행하면 아무것도 지워지지 않아야 한다. 유예 30일·보존 90일이 지난 파일이 아직 없기 때문이다.
-
-### 2-10. 저장소가 죽어도 DXF 출력은 멈추지 않는다
-
-저장소를 내린 뒤 편집기에서 DXF를 내보낸다.
+### 2-8. 저장소가 죽어도 업무는 멈추지 않는다
 
 ```bash
 docker compose stop storage
 ```
 
+1. 편집기에서 DXF를 내보낸다.
+2. 수주 `첨부` 탭에서 파일을 올려 본다.
+3. 이미 있는 첨부의 `내려받기`를 눌러 본다.
+
 기대 결과
 
-- **DXF 파일은 평소대로 내려받아진다.** 업무가 멈추지 않는다.
-- 서버 로그에 `DXF storage write failed`가 찍힌다.
-- 그 파일의 다운로드 URL 요청은 `409`이고 `파일 내용이 저장소에 없습니다.`가 돌아온다. 저장소의 XML 오류가 사용자에게 그대로 나오지 않는다.
+- **DXF는 평소대로 내려받아진다.** 출력 업무가 멈추지 않는다.
+- 첨부 업로드는 실패하고 화면에 오류가 뜬다. 목록이 더러워지지 않는다.
+- `내려받기`는 `파일 내용이 저장소에 없습니다.` 안내를 준다. 저장소의 XML 오류가 그대로 나오지 않는다.
 
-확인이 끝나면 다시 올린다.
+확인이 끝나면 되살린다.
 
 ```bash
 docker compose start storage
 ```
 
-같은 개정을 다시 내보내면 이번에는 보관되어 `READY`가 된다.
+### 2-9. 정리 작업이 유예가 끝난 것만 지운다
 
-### 2-11. 남의 조직·권한 없는 사용자
+2-4에서 지운 파일을 대상으로 정리를 돌린다. 정기 실행이라 화면 버튼을 두지 않았다.
 
-`admin.manage` 권한이 없고 `order.read`만 가진 계정으로 로그인해 2-2의 다운로드 URL 발급을 요청한다.
+```javascript
+await (await fetch("/api/v1/jobs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "storage.cleanup", payload: { graceDays: 0 }, idempotencyKey: `cleanup-${Date.now()}` }) })).json();
+```
 
 기대 결과
 
-- 조회 권한만 있으면 다운로드는 되지만 삭제(`DELETE`)는 `403`이다. 지우는 것은 올릴 수 있는 사람만 한다.
-- 다른 조직 계정으로는 같은 `fileId`에 `404`가 돌아온다. 파일이 있다는 사실 자체를 알려주지 않는다.
+- `작업 큐`에 `파일 저장소 정리`가 나타나고 `완료`가 된다. 결과의 `purgedDeleted`가 1 이상이다.
+- 2-4의 객체가 MinIO 콘솔에서 사라진다.
+- 지우지 않은 첨부와 2-6의 DXF는 그대로 있다.
+- 감사 로그에 `파일 실제 삭제`가 남는다.
 
-## 3. 실패 기록 양식
+기본값(`payload: {}`)으로 실행하면 아무것도 지워지지 않아야 한다.
+
+### 2-10. 권한과 조직 경계
+
+`order.read`만 있고 `order.edit`이 없는 계정으로 같은 수주를 연다.
+
+기대 결과
+
+- 목록과 `내려받기`는 보이지만 `파일 첨부`·`삭제`는 없다. 지우는 것은 올릴 수 있는 사람만 한다.
+
+### 2-11. 좁은 화면
+
+브라우저 폭을 390px로 줄이고 `첨부` 탭과 `작업 큐`를 본다.
+
+기대 결과
+
+- 가로 스크롤이 생기지 않는다.
+- 파일 이름이 길어도 줄이 깨지지 않고 버튼이 잘리지 않는다.
+
+## 3. 자동 검증이 이미 덮는 것
+
+아래는 [`e2e/files.spec.ts`](../e2e/files.spec.ts)와 통합 테스트가 매번 확인하므로 손으로 다시 하지 않아도 된다.
+
+- 업로드 3단계와 다운로드 왕복, 삭제 후 조회·발급 차단
+- 올리지 않고 완료 요청 시 `PENDING` 유지
+- 내용이 선언과 다르면 완료 거부와 객체 삭제
+- 서버 생성물 종류·허용하지 않는 확장자·잘못된 checksum 형식 거절
+- 없는 파일과 잘못된 식별자 구분
+- 조직 경계, 유예 기간 객체 유지, 정리 작업의 실제 삭제
+
+## 4. 실패 기록 양식
 
 | 항목 | 내용 |
 |---|---|

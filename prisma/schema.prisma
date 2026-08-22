@@ -579,6 +579,7 @@ model SalesOrder {
   approvedCalculationSnapshot   SalesOrderCalculationSnapshot?  @relation("SalesOrderApprovedCalculation", fields: [approvedCalculationSnapshotId], references: [id], onDelete: Restrict)
   foldItems                     SalesOrderFoldItem[]
   calculationSnapshots          SalesOrderCalculationSnapshot[]
+  attachments                   FileAsset[]
 
   @@unique([organizationId, orderNumber])
   @@index([organizationId, status, updatedAt])
@@ -1072,6 +1073,8 @@ model FoldRevision {
 model FileAsset {
   id             String          @id @default(uuid()) @db.Uuid
   organizationId String          @db.Uuid
+  // 수주에 붙는 첨부 파일. 서버 생성물처럼 수주와 무관한 파일은 비어 있다.
+  salesOrderId   String?         @db.Uuid
   kind           FileAssetKind
   status         FileAssetStatus @default(PENDING)
   storageKey     String          @unique @db.VarChar(500)
@@ -1086,7 +1089,9 @@ model FileAsset {
   updatedAt      DateTime        @updatedAt @db.Timestamptz(6)
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   uploadedBy     User?           @relation("FileAssetUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  salesOrder     SalesOrder?     @relation(fields: [salesOrderId], references: [id], onDelete: Restrict)
 
+  @@index([organizationId, salesOrderId, status])
   @@index([organizationId, kind, status])
   @@index([organizationId, checksumSha256])
   @@index([uploadedById])

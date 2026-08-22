@@ -17,6 +17,7 @@ import { StorageError } from "@/server/storage/storage-error";
 
 const fileSelect = {
   id: true,
+  salesOrderId: true,
   kind: true,
   status: true,
   storageKey: true,
@@ -40,6 +41,7 @@ function toFileDto(row: FileRow) {
     id: row.id,
     kind: row.kind,
     kindLabel: fileKindPolicy(row.kind).label,
+    salesOrderId: row.salesOrderId,
     status: row.status,
     fileName: row.fileName,
     mediaType: row.mediaType,
@@ -59,6 +61,8 @@ export type StartUploadInput = {
   mediaType: string;
   sizeBytes: number;
   checksumSha256: string;
+  /** 수주 첨부로 올릴 때의 수주 ID. 없으면 조직에만 속한 파일이다. */
+  salesOrderId?: string | null;
   requestId: string;
 };
 
@@ -108,6 +112,20 @@ export async function startUpload(
     );
   }
 
+  // 첨부는 조직 안의 실제 수주에만 붙일 수 있다.
+  let salesOrderId: string | null = null;
+  if (input.salesOrderId) {
+    const order = await database.salesOrder.findFirst({
+      where: { id: input.salesOrderId, organizationId: context.organizationId },
+      select: { id: true, status: true },
+    });
+    if (!order) throw new FileError("NOT_FOUND", "수주를 찾을 수 없습니다.");
+    if (order.status === "CANCELLED") {
+      throw new FileError("CONFLICT", "취소된 수주에는 파일을 붙일 수 없습니다.");
+    }
+    salesOrderId = order.id;
+  }
+
   const fileId = randomUUID();
   const storageKey = uploadObjectKey({
     organizationId: context.organizationId,
@@ -118,6 +136,7 @@ export async function startUpload(
     data: {
       id: fileId,
       organizationId: context.organizationId,
+      salesOrderId,
       kind: input.kind,
       status: "PENDING",
       storageKey,
@@ -225,6 +244,31 @@ export async function completeUpload(
     },
   });
   return toFileDto(ready);
+}
+
+/** 수주에 붙은 첨부 목록. 지운 파일과 완료되지 않은 업로드는 빼고 준다. */
+export async function listOrderAttachments(
+  database: PrismaClient,
+  context: AuthenticatedContext,
+  salesOrderId: string,
+): Promise<FileAssetDto[]> {
+  const order = await database.salesOrder.findFirst({
+    where: { id: salesOrderId, organizationId: context.organizationId },
+    select: { id: true },
+  });
+  if (!order) throw new FileError("NOT_FOUND", "수주를 찾을 수 없습니다.");
+  requirePermission(context, "order.read");
+  const rows = await database.fileAsset.findMany({
+    where: {
+      organizationId: context.organizationId,
+      salesOrderId,
+      deletedAt: null,
+      status: { in: ["PENDING", "READY"] },
+    },
+    select: fileSelect,
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map(toFileDto);
 }
 
 /** 파일 metadata 조회. 조직 경계를 서버에서 다시 본다(`D2-B02-D`). */
