@@ -236,6 +236,8 @@ export const auditActionCatalog = {
   "file.uploaded": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "FileAsset", label: "파일 업로드 완료" },
   "file.upload_rejected": { category: "DATA_CHANGE", defaultOutcome: "FAILURE", defaultSource: "WEB", entityType: "FileAsset", label: "파일 업로드 거부" },
   "file.download_url_issued": { category: "OUTPUT", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "FileAsset", label: "파일 다운로드 주소 발급" },
+  "file.deleted": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "FileAsset", label: "파일 삭제" },
+  "file.purged": { category: "SYSTEM", defaultOutcome: "SUCCESS", defaultSource: "SYSTEM", entityType: "FileAsset", label: "파일 실제 삭제" },
   "material.created": {
     category: "DATA_CHANGE",
     defaultOutcome: "SUCCESS",

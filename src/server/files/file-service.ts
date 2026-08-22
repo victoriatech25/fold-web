@@ -294,3 +294,43 @@ export async function issueDownloadUrl(
     download: { url: signed.url, expiresAt: signed.expiresAt.toISOString() },
   };
 }
+
+/** soft delete 유예 일수와 재생성 가능한 산출물의 보존 일수(`D2-B02-I`, `D2-B02-J`). */
+export const deleteGraceDays = 30;
+export const regenerableRetentionDays = 90;
+
+/**
+ * 화면에서 지우면 `deletedAt`만 찍는다(`D2-B02-I`).
+ * 객체는 유예 기간 동안 남아 있어 실수로 지운 도면을 되돌릴 시간이 있다.
+ */
+export async function deleteFile(
+  database: PrismaClient,
+  context: AuthenticatedContext,
+  fileId: string,
+  requestId: string,
+): Promise<FileAssetDto> {
+  const row = await database.fileAsset.findFirst({
+    where: { id: fileId, organizationId: context.organizationId, deletedAt: null },
+    select: fileSelect,
+  });
+  if (!row) throw new FileError("NOT_FOUND", "파일을 찾을 수 없습니다.");
+  // 지우는 것은 올릴 수 있는 사람만 한다. 조회 권한만으로는 지울 수 없다.
+  requirePermission(context, fileKindPolicy(row.kind).uploadPermission);
+
+  const now = new Date();
+  const purgeAfter = new Date(now.getTime() + deleteGraceDays * 24 * 60 * 60 * 1_000);
+  const deleted = await database.fileAsset.update({
+    where: { id: row.id },
+    data: { status: "DELETED", deletedAt: now },
+    select: fileSelect,
+  });
+  await writeAuditEvent(database, {
+    organizationId: context.organizationId,
+    actorUserId: context.userId,
+    action: "file.deleted",
+    entityId: row.id,
+    requestId,
+    metadata: { kind: row.kind, purgeAfter: purgeAfter.toISOString() },
+  });
+  return toFileDto(deleted);
+}

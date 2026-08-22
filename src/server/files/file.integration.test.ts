@@ -7,7 +7,14 @@ import type { AuthenticatedContext } from "@/server/auth/auth-types";
 import { readStorageRuntimeConfig } from "@/server/config/storage-env";
 import { disconnectPrisma, getPrisma } from "@/server/db/prisma";
 import { FileError } from "@/server/files/file-error";
-import { completeUpload, getFile, issueDownloadUrl, startUpload } from "@/server/files/file-service";
+import {
+  completeUpload,
+  deleteFile,
+  getFile,
+  issueDownloadUrl,
+  startUpload,
+} from "@/server/files/file-service";
+import { runStorageCleanup } from "@/server/files/file-cleanup";
 import { createS3FileStorage, ensureBucket } from "@/server/storage/s3-file-storage";
 import type { FileStorage } from "@/server/storage/file-storage";
 
@@ -311,6 +318,91 @@ integration.sequential("file upload integration", () => {
     await expect(
       issueDownloadUrl(prisma, stranger, started.file.id, "file-download-3-url", storage),
     ).rejects.toThrow();
+  });
+
+  async function uploadReady(fileName: string, contents: string) {
+    const body = new TextEncoder().encode(contents);
+    const started = await startUpload(
+      prisma,
+      context,
+      {
+        kind: "OTHER",
+        fileName,
+        mediaType: "text/plain",
+        sizeBytes: body.byteLength,
+        checksumSha256: sha256(body),
+        requestId: `upload-${fileName}`,
+      },
+      storage,
+    );
+    await putSigned(started.upload.url, body, "text/plain");
+    await completeUpload(prisma, context, started.file.id, `complete-${fileName}`, storage);
+    return started.file.id;
+  }
+
+  it("삭제는 표시만 하고 객체는 유예 기간 동안 남는다", async () => {
+    const fileId = await uploadReady("삭제대상.txt", "지울 파일");
+    const deleted = await deleteFile(prisma, context, fileId, "delete-1");
+    expect(deleted.status).toBe("DELETED");
+
+    const row = await prisma.fileAsset.findUniqueOrThrow({ where: { id: fileId } });
+    expect(row.deletedAt).not.toBeNull();
+    // 객체는 아직 남아 있어야 되돌릴 수 있다.
+    expect(await storage.head(row.storageKey)).not.toBeNull();
+
+    // 목록·조회에서는 보이지 않는다.
+    await expect(getFile(prisma, context, fileId)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("유예가 끝나면 정리 작업이 객체를 실제로 지운다", async () => {
+    const fileId = await uploadReady("유예만료.txt", "유예 지난 파일");
+    await deleteFile(prisma, context, fileId, "delete-2");
+    const row = await prisma.fileAsset.findUniqueOrThrow({ where: { id: fileId } });
+
+    // 유예 안에는 건드리지 않는다.
+    const early = await runStorageCleanup(
+      prisma,
+      { organizationId: context.organizationId, requestId: "cleanup-early" },
+      storage,
+    );
+    expect(early.purgedDeleted).toBe(0);
+    expect(await storage.head(row.storageKey)).not.toBeNull();
+
+    // 31일 뒤 시점으로 보면 지운다.
+    const later = new Date(Date.now() + 31 * 24 * 60 * 60 * 1_000);
+    const result = await runStorageCleanup(
+      prisma,
+      { organizationId: context.organizationId, requestId: "cleanup-late", now: later },
+      storage,
+    );
+    expect(result.purgedDeleted).toBeGreaterThanOrEqual(1);
+    expect(await storage.head(row.storageKey)).toBeNull();
+
+    const purged = await prisma.fileAsset.findUniqueOrThrow({ where: { id: fileId } });
+    // 행은 남겨 무엇이 있었는지 추적할 수 있게 한다.
+    expect((purged.metadata as Record<string, unknown>).purgeReason).toBe("DELETED_GRACE_EXPIRED");
+
+    const audit = await prisma.auditEvent.findFirst({
+      where: { organizationId: context.organizationId, action: "file.purged", entityId: fileId },
+    });
+    expect(audit).not.toBeNull();
+  });
+
+  it("보존 기간이 지나도 업로드본은 자동으로 지우지 않는다", async () => {
+    const fileId = await uploadReady("오래된업로드.txt", "원본밖에 없는 파일");
+    const row = await prisma.fileAsset.findUniqueOrThrow({ where: { id: fileId } });
+
+    const farFuture = new Date(Date.now() + 400 * 24 * 60 * 60 * 1_000);
+    await runStorageCleanup(
+      prisma,
+      { organizationId: context.organizationId, requestId: "cleanup-retention", now: farFuture },
+      storage,
+    );
+
+    // OTHER 는 재생성할 수 없는 종류라 보존 기간 정리 대상이 아니다.
+    expect(await storage.head(row.storageKey)).not.toBeNull();
+    const kept = await prisma.fileAsset.findUniqueOrThrow({ where: { id: fileId } });
+    expect(kept.deletedAt).toBeNull();
   });
 
   it("권한이 없으면 업로드를 시작할 수 없다", async () => {

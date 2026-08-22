@@ -226,6 +226,12 @@ type AuditPayloadByAction = {
   "file.download_url_issued": {
     metadata: { kind: string; expiresAt: string };
   };
+  "file.deleted": {
+    metadata: { kind: string; purgeAfter: string };
+  };
+  "file.purged": {
+    metadata: { kind: string; reason: "DELETED_GRACE_EXPIRED" | "RETENTION_EXPIRED" };
+  };
   "material.created": { after: MaterialAuditSnapshot };
   "material.updated": { before: MaterialAuditSnapshot; after: MaterialAuditSnapshot };
   "material.variant_created": { after: MaterialVariantAuditSnapshot };
