@@ -135,7 +135,26 @@ DELETE /api/v1/files/:fileId          soft delete
 | `B02-05` | soft delete와 `storage.cleanup` 정기 작업 (`DONE` — 2026-08-22) |
 | `B02-06` | `dxf.export`와 동기 DXF 경로를 저장소에 연결 (`DONE` — 2026-08-22) |
 | `B02-07` | 감사 이벤트와 배포·백업 문서 (`DONE` — 2026-08-22) |
-| `B02-08` | 화면 테스트 가이드와 사용자 검수 |
+| `B02-08` | 화면 테스트 가이드와 사용자 검수 (`IN_PROGRESS` — [가이드](../P2-B02-screen-test-guide.md) 작성 완료, 사용자 검수 대기) |
+
+## 7.1 검증 결과
+
+| 검증 | 명령 | 결과 |
+|---|---|---|
+| 단위 | `npm test` | 성공 — 329건 (저장소 키·환경설정 9건, DXF 보관 성공·실패 2건 추가) |
+| PostgreSQL·저장소 통합 | `npm run test:integration` | 성공 — 93건 (파일 9건, 저장소 8건 추가) |
+| 저장소 단독 | `npm run test:storage` | 성공 — 실제 MinIO 상대 |
+| lint·typecheck | `npm run lint`, `npm run typecheck` | 성공 |
+| migration | `npm run db:migrate:check` | 차이 없음. 기존 `FileAsset` 모델을 쓴다 |
+| build | `npm run build` | 성공 |
+
+통합 테스트가 확인하는 것은 다음과 같다.
+
+- 저장·재읽기 checksum 일치, checksum 불일치 저장 거부, presigned 업로드·다운로드 왕복, 만료된 URL 거부
+- 업로드 시작→완료 전이와 감사, 중단 시 `PENDING` 유지, 내용 불일치 시 `FAILED`와 객체 삭제
+- 다른 조직·권한 없는 사용자 차단, 서버 생성물 종류와 허용하지 않는 형식 거부
+- soft delete 후 유예 기간 객체 유지, 유예 만료 뒤 정리 작업의 실제 삭제, 업로드본 자동 정리 제외
+- queue 경로 DXF 보관과 다운로드 URL 왕복
 
 ## 8. 위험과 대응
 
@@ -159,3 +178,4 @@ DELETE /api/v1/files/:fileId          soft delete
 | 2026-08-22 | `B02-05` 완료. soft delete 와 `storage.cleanup` 작업 종류를 만들었다. 고아 객체 정리는 저장소 목록 조회가 필요해 후속으로 남긴다 | Claude |
 | 2026-08-22 | `B02-06` 완료. 동기·queue 양쪽 DXF 경로가 바이트를 저장소에 보관하고 `contentRetained`가 `true`가 된다. 저장 실패는 출력 자체를 막지 않고 `PENDING`과 감사로 남긴다 | Claude |
 | 2026-08-22 | `B02-07` 완료. 배포 가이드에 저장소 서비스·환경변수·백업 대상과 복구 순서·정리 정책을 적었다 | Claude |
+| 2026-08-22 | 화면 테스트 가이드 작성. 파일 기능을 쓰는 화면이 아직 없어 `P2-B01`과 같이 콘솔 API 검수로 한다. 사용자용 진입점은 `P2-B09`에서 만든다 | 사용자·Claude |
