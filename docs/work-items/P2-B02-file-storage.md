@@ -1,6 +1,6 @@
 # P2-B02 파일 저장소 상세계획
 
-> 상태: `IN_PROGRESS` — `B02-02`~`B02-06` 완료, `B02-07` 감사·배포 문서 착수 대기
+> 상태: `VERIFYING` — `B02-02`~`B02-07` 완료, `B02-08` 화면 테스트 가이드와 사용자 검수 대기
 >
 > 우선순위: `P2-B02`
 >
@@ -114,15 +114,15 @@ DELETE /api/v1/files/:fileId          soft delete
 
 ## 6. 완료 기준
 
-- [ ] 업로드한 파일을 다시 내려받으면 checksum이 같다.
-- [ ] 다른 조직의 `fileId`와 storageKey로는 metadata도 다운로드 URL도 얻을 수 없다.
-- [ ] 권한이 없는 사용자가 다운로드 URL을 요청하면 거부된다.
-- [ ] 업로드를 중간에 끊으면 `PENDING`으로 남고 `READY`가 되지 않는다.
-- [ ] `dxf.export` 작업 결과로 실제 파일을 내려받을 수 있고 동기 경로와 checksum이 같다.
-- [ ] soft delete한 파일은 목록에서 사라지지만 유예 기간 안에는 객체가 남아 있다.
-- [ ] 만료된 URL로는 받을 수 없다.
+- [x] 업로드한 파일을 다시 내려받으면 checksum이 같다.
+- [x] 다른 조직의 `fileId`와 storageKey로는 metadata도 다운로드 URL도 얻을 수 없다.
+- [x] 권한이 없는 사용자가 다운로드 URL을 요청하면 거부된다.
+- [x] 업로드를 중간에 끊으면 `PENDING`으로 남고 `READY`가 되지 않는다.
+- [x] `dxf.export` 작업 결과로 실제 파일을 내려받을 수 있고 동기 경로와 checksum이 같다.
+- [x] soft delete한 파일은 목록에서 사라지지만 유예 기간 안에는 객체가 남아 있다.
+- [x] 만료된 URL로는 받을 수 없다.
 - [ ] 단위·PostgreSQL 통합·API·Playwright·lint·typecheck·migration·build를 통과한다.
-- [ ] 백업 대상과 복구 절차가 배포 가이드에 적혀 있다.
+- [x] 백업 대상과 복구 절차가 배포 가이드에 적혀 있다.
 
 ## 7. 구현 순서(안)
 
@@ -134,7 +134,7 @@ DELETE /api/v1/files/:fileId          soft delete
 | `B02-04` | 다운로드 URL 발급과 권한·조직 경계 (`DONE` — 2026-08-22) |
 | `B02-05` | soft delete와 `storage.cleanup` 정기 작업 (`DONE` — 2026-08-22) |
 | `B02-06` | `dxf.export`와 동기 DXF 경로를 저장소에 연결 (`DONE` — 2026-08-22) |
-| `B02-07` | 감사 이벤트와 배포·백업 문서 |
+| `B02-07` | 감사 이벤트와 배포·백업 문서 (`DONE` — 2026-08-22) |
 | `B02-08` | 화면 테스트 가이드와 사용자 검수 |
 
 ## 8. 위험과 대응
@@ -158,3 +158,4 @@ DELETE /api/v1/files/:fileId          soft delete
 | 2026-08-22 | `B02-04` 완료. 다운로드 URL 발급에 권한·조직 경계·상태 검사와 발급 감사를 붙였다. 감사 분류는 schema 에 `DATA_ACCESS`가 없어 기존 DXF 출력과 같은 `OUTPUT`을 쓴다 | Claude |
 | 2026-08-22 | `B02-05` 완료. soft delete 와 `storage.cleanup` 작업 종류를 만들었다. 고아 객체 정리는 저장소 목록 조회가 필요해 후속으로 남긴다 | Claude |
 | 2026-08-22 | `B02-06` 완료. 동기·queue 양쪽 DXF 경로가 바이트를 저장소에 보관하고 `contentRetained`가 `true`가 된다. 저장 실패는 출력 자체를 막지 않고 `PENDING`과 감사로 남긴다 | Claude |
+| 2026-08-22 | `B02-07` 완료. 배포 가이드에 저장소 서비스·환경변수·백업 대상과 복구 순서·정리 정책을 적었다 | Claude |

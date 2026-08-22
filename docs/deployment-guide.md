@@ -73,6 +73,56 @@ npm run worker
 배포 스크립트는 `docker compose pull`과 `up -d`로 두 서비스를 함께 교체한다. 상태 확인은 `app` 컨테이너의 `/api/health`로 하며, worker는 헬스체크 대상이 아니다. worker가 뜨지 않아도 웹 기능은 계속 동작하고 작업만 큐에 쌓인다.
 운영 리버스 프록시의 upstream은 `http://127.0.0.1:10000`으로 설정한다.
 
+### 파일 저장소 서비스
+
+`P2-B02`부터 S3 호환 object storage가 필요하다. 제품은 MinIO 자가 호스팅으로 확정했다(`D2-B02-A`). 새 클라우드 자원과 청구를 만들지 않으면서 설계 문서의 S3 호환 출발점을 지킨다.
+
+**현재 상태**: 로컬 `compose.yaml`에만 `storage` 서비스가 있다. **운영 서버 적용은 `P2-C08` 배포 작업에서 한다.** 그때까지 운영에는 아무것도 만들지 않는다.
+
+로컬 실행은 다음과 같다.
+
+```bash
+docker compose up -d storage
+```
+
+`app`과 `worker`가 함께 쓰는 환경변수다. 둘 다 같은 값을 받아야 한다.
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `STORAGE_ENDPOINT` | 없음(필수) | S3 호환 주소. 로컬은 `http://127.0.0.1:9000` |
+| `STORAGE_BUCKET` | 없음(필수) | bucket 이름. 형식을 기동 시점에 검사한다 |
+| `STORAGE_ACCESS_KEY_ID` | 없음(필수) | 접속 키 |
+| `STORAGE_SECRET_ACCESS_KEY` | 없음(필수) | 접속 비밀키 |
+| `STORAGE_REGION` | `us-east-1` | MinIO는 의미가 없으나 SDK가 요구한다 |
+| `STORAGE_FORCE_PATH_STYLE` | `true` | MinIO는 가상 호스트 주소를 쓰지 않는다 |
+| `STORAGE_DOWNLOAD_URL_TTL_SECONDS` | `300` | 다운로드 presigned URL 만료 |
+| `STORAGE_UPLOAD_URL_TTL_SECONDS` | `600` | 업로드 presigned URL 만료 |
+| `STORAGE_MAX_FILE_BYTES` | `104857600` | 단일 파일 상한. 종류별 상한과 함께 작은 쪽이 적용된다 |
+
+필수 값이 없으면 저장소를 쓰는 첫 호출에서 막힌다. DXF 출력은 저장에 실패해도 응답으로 바이트를 내보내므로 업무가 멈추지는 않지만, `FileAsset`이 `PENDING`으로 남아 나중에 내려받을 수 없다.
+
+### 백업 대상
+
+**DB만 백업하면 파일이 통째로 빠진다.** 두 가지를 같은 절차에서 함께 받는다.
+
+| 대상 | 내용 | 빠지면 생기는 일 |
+|---|---|---|
+| PostgreSQL | `FileAsset` 행(키·크기·checksum·소유 조직) | 파일이 저장소에 있어도 누구 것인지 알 수 없다 |
+| 저장소 볼륨 | 실제 바이트 | 행은 있는데 내려받으면 없다 |
+
+복구는 **DB를 먼저 되돌리고 저장소를 그 시점 이후로 맞춘다.** 저장소가 앞서 있으면 고아 객체만 남고, DB가 앞서 있으면 `READY`인데 받을 수 없는 행이 생긴다. 후자가 더 나쁘다.
+
+checksum이 `FileAsset`에 있으므로 복구 뒤 무결성을 대조할 수 있다. 대조에서 어긋난 행은 재생성 가능한 종류(`DXF`, `PDF`, 미리보기)면 원본에서 다시 만들고, 업로드본이면 사용자에게 다시 받아야 한다.
+
+### 저장소 정리
+
+종료된 파일 정리는 `storage.cleanup` 작업으로 queue에서 돈다(`D2-B02-K`). 별도 cron을 두지 않는다.
+
+- soft delete 후 30일이 지난 파일의 객체를 지운다
+- 재생성 가능한 산출물은 만든 지 90일이 지나면 지운다. 원본에서 다시 만들 수 있다
+- 사용자 업로드본은 보존 기간이 지나도 자동으로 지우지 않는다
+- 객체를 지운 뒤에도 `FileAsset` 행은 남겨 무엇이 있었는지 추적한다
+
 ## 2단계: GitHub CI
 
 상태: 완료

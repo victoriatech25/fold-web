@@ -110,6 +110,29 @@ integration.sequential("s3 file storage integration", () => {
     expect(sha256(await storage.get(key))).toBe(checksumSha256);
   });
 
+  it("만료된 URL로는 받을 수 없다", async () => {
+    const body = new TextEncoder().encode("만료 확인");
+    const checksumSha256 = sha256(body);
+    const key = generatedObjectKey({ organizationId, kind: "dxf", checksumSha256, extension: "dxf" });
+    await storage.put({ key, body, mediaType: "application/dxf", checksumSha256 });
+
+    // 만료를 1초로 잡은 별도 storage 로 서명한다.
+    const shortLived = createS3FileStorage({
+      ...readStorageRuntimeConfig(),
+      downloadUrlTtlSeconds: 1,
+    });
+    const signed = await shortLived.signDownloadUrl({
+      key,
+      fileName: "만료.dxf",
+      mediaType: "application/dxf",
+    });
+    expect((await fetch(signed.url)).status).toBe(200);
+
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    const expired = await fetch(signed.url);
+    expect(expired.status).toBeGreaterThanOrEqual(400);
+  });
+
   it("삭제한 객체는 사라진다", async () => {
     const body = new TextEncoder().encode("to be deleted");
     const checksumSha256 = sha256(body);
