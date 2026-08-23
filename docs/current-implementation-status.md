@@ -4,7 +4,7 @@
 >
 > 기준: P1과 P2-A01~P2-A11, P2-B01, P2-B02 사용자 검수·승인 완료. P2-B03~P2-B05 구현 완료. 다음은 P2-B05 화면 검수.
 >
-> 인계 요약: [2026-08-22 작업 인계](./handover-2026-08-22.md)
+> 인계 요약: [2026-08-23 작업 인계](./handover-2026-08-23.md)
 >
 > MFC 참조 프로젝트: `/Users/kyhoon/Library/Mobile Documents/com~apple~CloudDocs/회사/hicomtech/도면`
 >
