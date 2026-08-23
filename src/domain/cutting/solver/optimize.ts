@@ -28,11 +28,26 @@ export const DEFAULT_TIME_BUDGET_MS = 30_000;
 /** 한 번의 최적화에서 열 수 있는 원판 장수 상한. 잘못된 입력에서 무한히 돌지 않게 한다. */
 const MAX_SHEETS = 2_000;
 
+/**
+ * 사용자가 손으로 지시한 고정 배치(`D2-B05-J`).
+ * 부품 하나를 통째로 그 원판에 놓으라는 뜻이다. 수량이 2 이상이면 전부 간다.
+ */
+export type CuttingPin = { partId: string; sheetIndex: number };
+
 export type OptimizeOptions = {
   timeBudgetMs?: number;
   /** 시간 측정을 바꿔 끼울 수 있게 열어 둔다. 테스트에서 쓴다. */
   now?: () => number;
+  pins?: CuttingPin[];
 };
+
+/** 고정 지시를 지킬 수 없을 때 던진다. 결과를 억지로 내지 않는다(`D2-B05-F`). */
+export class CuttingPinError extends Error {
+  constructor(readonly partIds: string[]) {
+    super(`고정한 부품을 지정한 원판에 놓을 수 없습니다: ${partIds.join(", ")}`);
+    this.name = "CuttingPinError";
+  }
+}
 
 type PlacedSheet = {
   spec: SheetSpec;
@@ -48,6 +63,8 @@ type Plan = {
   usedArea: bigint;
   totalArea: bigint;
   cutCount: number;
+  /** 고정했는데 결국 놓지 못한 부품. 있으면 이 계획은 쓸 수 없다. */
+  pinViolations: string[];
 };
 
 /**
@@ -58,6 +75,9 @@ type Plan = {
  * 계획이 최선으로 뽑힌다.
  */
 function comparePlans(left: Plan, right: Plan, objective: CuttingObjective): number {
+  if (left.pinViolations.length !== right.pinViolations.length) {
+    return left.pinViolations.length - right.pinViolations.length;
+  }
   if (left.leftover.length !== right.leftover.length) {
     return left.leftover.length - right.leftover.length;
   }
@@ -92,6 +112,7 @@ function chooseSheet(
   usage: Map<string, number>,
   kerf: bigint,
   strategy: PackStrategy,
+  required: ReadonlySet<PartUnit>,
 ): PlacedSheet | null {
   let best: PlacedSheet | null = null;
 
@@ -99,8 +120,8 @@ function chooseSheet(
     const used = usage.get(spec.sheetItemId) ?? 0;
     if (spec.availableCount !== null && used >= spec.availableCount) continue;
 
-    const packing = packSheet(remaining, spec, kerf, strategy);
-    if (packing.placements.length === 0) continue;
+    const packing = packSheet(remaining, spec, kerf, strategy, required);
+    if (packing === null || packing.placements.length === 0) continue;
 
     const candidate: PlacedSheet = {
       spec,
@@ -137,13 +158,26 @@ function buildPlan(
   specs: SheetSpec[],
   kerf: bigint,
   strategy: PackStrategy,
+  pinnedSheetByPart: ReadonlyMap<string, number>,
 ): Plan {
   const usage = new Map<string, number>();
   const sheets: PlacedSheet[] = [];
   let remaining = units;
 
   while (remaining.length > 0 && sheets.length < MAX_SHEETS) {
-    const chosen = chooseSheet(remaining, specs, usage, kerf, strategy);
+    const sheetIndex = sheets.length;
+    // 다른 원판에 고정된 단위는 이번 장의 후보에서 뺀다. 그러지 않으면
+    // 자리가 남을 때 solver 가 먼저 집어가 고정 지시가 무의미해진다.
+    const pool = remaining.filter((unit) => {
+      const pinned = pinnedSheetByPart.get(unit.partId);
+      return pinned === undefined || pinned === sheetIndex;
+    });
+    const required = new Set(
+      pool.filter((unit) => pinnedSheetByPart.get(unit.partId) === sheetIndex),
+    );
+    if (pool.length === 0) break;
+
+    const chosen = chooseSheet(pool, specs, usage, kerf, strategy, required);
     if (!chosen) break;
 
     sheets.push(chosen);
@@ -158,6 +192,13 @@ function buildPlan(
     usedArea: sheets.reduce((total, sheet) => total + sheet.usedArea, ZERO),
     totalArea: sheets.reduce((total, sheet) => total + sheet.spec.totalArea, ZERO),
     cutCount: sheets.reduce((total, sheet) => total + sheet.cutCount, 0),
+    pinViolations: [
+      ...new Set(
+        remaining
+          .filter((unit) => pinnedSheetByPart.has(unit.partId))
+          .map((unit) => unit.partId),
+      ),
+    ],
   };
 }
 
@@ -260,14 +301,19 @@ export function optimizeCutting(input: CuttingInput, options: OptimizeOptions = 
   const specs = toSheetSpecs(input.sheets);
   const kerf = toUnits(input.options.bladeKerfMm);
 
+  const pinnedSheetByPart = new Map((options.pins ?? []).map((pin) => [pin.partId, pin.sheetIndex]));
+
   // 첫 전략은 시간과 무관하게 반드시 한 번 돌린다. 결과가 없는 것보다 낫다.
   const [first, ...rest] = packStrategies;
-  let best = buildPlan(units, specs, kerf, first);
+  let best = buildPlan(units, specs, kerf, first, pinnedSheetByPart);
   for (const strategy of rest) {
     if (now() - startedAt >= budget) break;
-    const plan = buildPlan(units, specs, kerf, strategy);
+    const plan = buildPlan(units, specs, kerf, strategy, pinnedSheetByPart);
     if (comparePlans(plan, best, input.options.objective) < 0) best = plan;
   }
+
+  // 어느 전략도 고정 지시를 지키지 못했다면 결과를 내지 않는다.
+  if (best.pinViolations.length > 0) throw new CuttingPinError(best.pinViolations);
 
   return toResult(best, input, specs);
 }

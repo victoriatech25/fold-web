@@ -134,8 +134,17 @@ export function packSheet(
   sheet: SheetSpec,
   kerf: bigint,
   strategy: PackStrategy,
-): SheetPacking {
-  const ordered = sortUnits(units, strategy.order);
+  /**
+   * 이 원판에 반드시 놓여야 하는 단위(`D2-B05-J` 고정). 하나라도 못 놓으면
+   * 이 원판으로는 고정 지시를 지킬 수 없다는 뜻이라 `null` 을 낸다.
+   */
+  required: ReadonlySet<PartUnit> = new Set(),
+): SheetPacking | null {
+  // 고정된 단위를 먼저 놓는다. 자리를 남은 조각에 맡기면 지시를 못 지킬 수 있다.
+  const ordered = [
+    ...sortUnits(units.filter((unit) => required.has(unit)), strategy.order),
+    ...sortUnits(units.filter((unit) => !required.has(unit)), strategy.order),
+  ];
   const freeRects: Rect[] = [{ ...sheet.usable }];
   const placements: UnitPlacement[] = [];
   const placed = new Set<PartUnit>();
@@ -175,6 +184,10 @@ export function packSheet(
     const { children, cuts } = splitFreeRect(free, best.orientation, kerf, strategy.split);
     freeRects.splice(best.freeIndex, 1, ...children);
     cutCount += cuts;
+  }
+
+  for (const unit of required) {
+    if (!placed.has(unit)) return null;
   }
 
   return {

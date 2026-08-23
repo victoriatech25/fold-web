@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { OrderRequestError, orderRequest } from "@/components/orders/order-api";
 import { OrderFoldItemsPanel } from "@/components/orders/order-fold-items-panel";
 import { OrderCalculationPanel } from "@/components/orders/order-calculation-panel";
+import { OrderCuttingPanel } from "@/components/orders/order-cutting-panel";
+import type { CuttingPlanDto } from "@/server/cutting/cutting-plan-service";
 import { OrderStatusPanel, orderStatusLabels } from "@/components/orders/order-status-panel";
 import { OrderAttachmentsPanel } from "@/components/orders/order-attachments-panel";
 import { OrderHistoryPanel } from "@/components/orders/order-history-panel";
@@ -51,6 +53,8 @@ export function OrderDetailPanel({
   options,
   canWrite,
   canApprove,
+  canOptimizeCutting,
+  initialCuttingPlans,
   initialFoldItems,
   foldOptions,
   initialCalculation,
@@ -60,6 +64,8 @@ export function OrderDetailPanel({
   options: OrderFormOptionsDto;
   canWrite: boolean;
   canApprove: boolean;
+  canOptimizeCutting: boolean;
+  initialCuttingPlans: CuttingPlanDto[];
   initialFoldItems: OrderFoldItemDto[];
   foldOptions: OrderFoldOptionsDto;
   initialCalculation: OrderCalculationStateDto;
@@ -423,6 +429,7 @@ export function OrderDetailPanel({
           }}
           order={order}
         />
+        <OrderCuttingPanel canOptimize={canOptimizeCutting} initialPlans={initialCuttingPlans} order={order} />
       </TabPanel>
 
       <TabPanel id="files" value={tab}>

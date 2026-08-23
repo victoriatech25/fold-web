@@ -9,7 +9,7 @@ import {
   type CuttingSheet,
 } from "@/domain/cutting/schema";
 import { validateCuttingResult } from "@/domain/cutting/validate";
-import { CUTTING_ENGINE_VERSION, optimizeCutting } from "./optimize";
+import { CUTTING_ENGINE_VERSION, CuttingPinError, optimizeCutting } from "./optimize";
 
 function part(overrides: Partial<CuttingPart> & Pick<CuttingPart, "id">): CuttingPart {
   return {
@@ -192,6 +192,36 @@ describe("optimizeCutting", () => {
 
     expect(validateCuttingResult(request, result)).toEqual([]);
     expect(result.sheets[0].remnants.length).toBeGreaterThan(0);
+  });
+
+  it("고정한 부품을 지정한 원판에 놓는다", () => {
+    const request = input({
+      parts: [
+        part({ id: "part-1", widthMm: "1200", lengthMm: "1200" }),
+        part({ id: "part-2", widthMm: "1200", lengthMm: "1200" }),
+      ],
+    });
+
+    // 고정하지 않으면 두 부품이 한 장에 들어간다.
+    expect(optimizeCutting(request).summary.sheetCount).toBe(1);
+
+    const pinned = optimizeCutting(request, { pins: [{ partId: "part-2", sheetIndex: 1 }] });
+    expect(validateCuttingResult(request, pinned)).toEqual([]);
+    expect(pinned.summary.sheetCount).toBe(2);
+    expect(pinned.sheets[1].placements.map((placement) => placement.partId)).toEqual(["part-2"]);
+    expect(pinned.sheets[0].placements.map((placement) => placement.partId)).toEqual(["part-1"]);
+  });
+
+  it("지킬 수 없는 고정 지시는 결과를 내지 않고 알린다", () => {
+    const request = input({
+      parts: [part({ id: "part-1", widthMm: "1220", lengthMm: "2440" })],
+      sheets: [sheet({ availableCount: 1 })],
+    });
+
+    // 쓸 수 있는 원판이 한 장뿐이라 둘째 장에 고정할 수 없다.
+    expect(() => optimizeCutting(request, { pins: [{ partId: "part-1", sheetIndex: 1 }] })).toThrow(
+      CuttingPinError,
+    );
   });
 
   it("시간 상한을 넘겨도 유효한 결과를 낸다", () => {

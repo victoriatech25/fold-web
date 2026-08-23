@@ -211,6 +211,18 @@ type AuditPayloadByAction = {
   "job.retried": {
     metadata: { type: string; previousAttempt: number };
   };
+  // 재단 입력·배치 원문은 남기지 않는다. 어떤 수주·재질을 몇 번째로 돌렸는지만 남긴다.
+  "cutting.plan_created": {
+    metadata: { salesOrderId: string; materialVariantId: string; partCount: number; sheetCandidateCount: number };
+  };
+  "cutting.revision_created": {
+    metadata: { revisionNumber: number; pinnedPartCount: number; jobId: string };
+  };
+  "cutting.approved": {
+    before: { status: string; lockVersion: number };
+    after: { status: string; lockVersion: number };
+    metadata: { revisionNumber: number; sheetCount: number; yieldPercent: string };
+  };
   // 파일 내용은 남기지 않는다(`D2-B02-L`). 종류·크기·checksum 까지만 남긴다.
   "file.uploaded": {
     metadata: { kind: string; sizeBytes: number; checksumSha256: string };

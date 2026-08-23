@@ -66,7 +66,7 @@ const modules: NavigationModule[] = [
     label: "생산·출력",
     items: [
       { href: "/jobs", icon: ListChecks, label: "작업 큐" },
-      { icon: Factory, label: "생산·절단", planned: true },
+      { href: "/cutting", icon: Factory, label: "생산·절단", permission: "cutting.optimize" },
       { icon: Printer, label: "출력·이력", planned: true },
     ],
   },

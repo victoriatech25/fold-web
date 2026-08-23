@@ -131,6 +131,19 @@ enum SalesOrderStatus {
   CANCELLED
 }
 
+enum CuttingPlanStatus {
+  PENDING
+  CALCULATED
+  APPROVED
+  FAILED
+}
+
+enum CuttingPlanRevisionStatus {
+  QUEUED
+  SUCCEEDED
+  FAILED
+}
+
 enum SurchargeBaseType {
   PROCESSING_ONLY
 }
@@ -205,6 +218,8 @@ model Organization {
   auditEvents                AuditEvent[]
   legacyMappings             LegacyMapping[]
   jobs                       JobQueue[]
+  cuttingPlans               CuttingPlan[]
+  cuttingPlanRevisions       CuttingPlanRevision[]
 
   @@index([status])
 }
@@ -371,6 +386,9 @@ model OrganizationMembership {
   removedSalesOrderFoldItems    SalesOrderFoldItem[]            @relation("SalesOrderFoldItemRemover")
   createdSalesOrderCalculations SalesOrderCalculationSnapshot[] @relation("SalesOrderCalculationCreator")
   requestedJobs                 JobQueue[]                      @relation("JobQueueRequester")
+  createdCuttingPlans           CuttingPlan[]                   @relation("CuttingPlanCreator")
+  approvedCuttingPlans          CuttingPlan[]                   @relation("CuttingPlanApprover")
+  createdCuttingPlanRevisions   CuttingPlanRevision[]           @relation("CuttingPlanRevisionCreator")
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -580,6 +598,7 @@ model SalesOrder {
   foldItems                     SalesOrderFoldItem[]
   calculationSnapshots          SalesOrderCalculationSnapshot[]
   attachments                   FileAsset[]
+  cuttingPlans                  CuttingPlan[]
 
   @@unique([organizationId, orderNumber])
   @@index([organizationId, status, updatedAt])
@@ -731,6 +750,7 @@ model MaterialVariant {
   material              Material               @relation(fields: [materialId], references: [id], onDelete: Restrict)
   ruleRevisions         MaterialRuleRevision[]
   sheetItems            SheetItem[]
+  cuttingPlans          CuttingPlan[]
   foldPriceRates        FoldPriceRate[]
 
   @@unique([organizationId, code])
@@ -1121,6 +1141,7 @@ model JobQueue {
   updatedAt               DateTime               @updatedAt @db.Timestamptz(6)
   organization            Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   requestedByMembership   OrganizationMembership @relation("JobQueueRequester", fields: [requestedByMembershipId], references: [id], onDelete: Restrict)
+  cuttingPlanRevisions    CuttingPlanRevision[]
 
   @@unique([organizationId, type, idempotencyKey])
   @@index([status, priority, availableAt, id], map: "JobQueue_claim_idx")
@@ -1186,4 +1207,76 @@ model LegacyMapping {
   @@unique([organizationId, sourceSystem, sourceTable, legacyKey])
   @@index([organizationId, entityType, entityId])
   @@index([sourceSystem, sourceTable])
+}
+
+/**
+ * 재단 작업(`P2-B05`). 수주 하나와 재질 변형 하나가 한 작업이다(`D2-B05-I`).
+ * 재단 입력은 만들 때 통째로 얼려 둔다. 기준정보가 나중에 바뀌어도 승인된
+ * 결과를 그때 입력으로 다시 설명할 수 있어야 한다(`D2-B05-D`).
+ */
+model CuttingPlan {
+  id                     String                    @id @default(uuid()) @db.Uuid
+  organizationId         String                    @db.Uuid
+  salesOrderId           String                    @db.Uuid
+  materialVariantId      String                    @db.Uuid
+  status                 CuttingPlanStatus         @default(PENDING)
+  contractVersion        String                    @db.VarChar(50)
+  input                  Json                      @db.JsonB
+  inputChecksumSha256    String                    @db.Char(64)
+  nextRevisionNumber     Int                       @default(1)
+  currentRevisionId      String?                   @unique @db.Uuid
+  approvedRevisionId     String?                   @unique @db.Uuid
+  approvedAt             DateTime?                 @db.Timestamptz(6)
+  approvedByMembershipId String?                   @db.Uuid
+  lockVersion            Int                       @default(1)
+  createdByMembershipId  String                    @db.Uuid
+  createdAt              DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                  @updatedAt @db.Timestamptz(6)
+  organization           Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  salesOrder             SalesOrder                @relation(fields: [salesOrderId], references: [id], onDelete: Restrict)
+  materialVariant        MaterialVariant           @relation(fields: [materialVariantId], references: [id], onDelete: Restrict)
+  createdByMembership    OrganizationMembership    @relation("CuttingPlanCreator", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+  approvedByMembership   OrganizationMembership?   @relation("CuttingPlanApprover", fields: [approvedByMembershipId], references: [id], onDelete: Restrict)
+  currentRevision        CuttingPlanRevision?      @relation("CuttingPlanCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: Restrict)
+  approvedRevision       CuttingPlanRevision?      @relation("CuttingPlanApprovedRevision", fields: [approvedRevisionId], references: [id], onDelete: Restrict)
+  revisions              CuttingPlanRevision[]     @relation("CuttingPlanRevisions")
+
+  @@unique([salesOrderId, materialVariantId])
+  @@index([organizationId, status, updatedAt], map: "CuttingPlan_organization_status_idx")
+  @@index([organizationId, salesOrderId], map: "CuttingPlan_organization_order_idx")
+}
+
+/**
+ * 재단 실행 한 번. 다시 돌리면 덮어쓰지 않고 개정이 쌓인다(`D2-B05-H`).
+ * `pins` 는 사용자가 손으로 지시한 고정 배치다(`D2-B05-J`).
+ */
+model CuttingPlanRevision {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  organizationId        String                    @db.Uuid
+  cuttingPlanId         String                    @db.Uuid
+  revisionNumber        Int
+  status                CuttingPlanRevisionStatus @default(QUEUED)
+  jobId                 String?                   @db.Uuid
+  pins                  Json                      @db.JsonB
+  engineVersion         String?                   @db.VarChar(50)
+  result                Json?                     @db.JsonB
+  sheetCount            Int?
+  usedAreaM2            Decimal?                  @db.Decimal(18, 8)
+  totalAreaM2           Decimal?                  @db.Decimal(18, 8)
+  yieldPercent          Decimal?                  @db.Decimal(6, 2)
+  unplacedQuantity      Int?
+  failureReason         String?                   @db.VarChar(500)
+  createdByMembershipId String                    @db.Uuid
+  createdAt             DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime                  @updatedAt @db.Timestamptz(6)
+  organization          Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  cuttingPlan           CuttingPlan               @relation("CuttingPlanRevisions", fields: [cuttingPlanId], references: [id], onDelete: Cascade)
+  job                   JobQueue?                 @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  createdByMembership   OrganizationMembership    @relation("CuttingPlanRevisionCreator", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+  currentOfPlan         CuttingPlan?              @relation("CuttingPlanCurrentRevision")
+  approvedOfPlan        CuttingPlan?              @relation("CuttingPlanApprovedRevision")
+
+  @@unique([cuttingPlanId, revisionNumber], map: "CuttingPlanRevision_plan_revision_key")
+  @@index([organizationId, cuttingPlanId, revisionNumber], map: "CuttingPlanRevision_plan_number_idx")
+  @@index([jobId])
 }
