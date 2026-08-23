@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import legacySamples from "@/domain/cutting/fixtures/legacy-input-samples.json";
+import { cuttingSampleSchema } from "@/domain/cutting/sample";
+import { optimizeCutting } from "@/domain/cutting/solver/optimize";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { ServerFoldDocumentV1 } from "@/domain/fold-document/schema";
 import type { AuthenticatedContext } from "@/server/auth/auth-types";
@@ -40,15 +43,20 @@ integration.sequential("job queue integration", () => {
 
     // worker는 session이 없어 membership의 실제 role·permission을 다시 읽는다.
     // 그래서 통합 테스트에서도 진짜 role 행이 있어야 한다.
-    const permission = await prisma.permission.upsert({
-      where: { key: "output.print" },
-      update: {},
-      create: { key: "output.print", description: "출력 실행" },
-    });
+    const permissions = await Promise.all(
+      [
+        { key: "output.print", description: "출력 실행" },
+        { key: "cutting.optimize", description: "절단 최적화 실행" },
+      ].map((entry) =>
+        prisma.permission.upsert({ where: { key: entry.key }, update: {}, create: entry }),
+      ),
+    );
     const role = await prisma.role.create({
       data: { organizationId: organization.id, key: "JOB-OPERATOR", name: "작업 운영자", system: false },
     });
-    await prisma.rolePermission.create({ data: { roleId: role.id, permissionId: permission.id } });
+    await prisma.rolePermission.createMany({
+      data: permissions.map((permission) => ({ roleId: role.id, permissionId: permission.id })),
+    });
     await prisma.membershipRole.create({ data: { membershipId: membership.id, roleId: role.id } });
 
     context = {
@@ -61,7 +69,7 @@ integration.sequential("job queue integration", () => {
       organizationCode: organization.code,
       organizationName: organization.name,
       roleKeys: ["JOB-OPERATOR"],
-      permissions: ["output.print"],
+      permissions: ["output.print", "cutting.optimize"],
       expiresAt: new Date("2027-01-01T00:00:00Z"),
     };
 
@@ -265,6 +273,48 @@ integration.sequential("job queue integration", () => {
     const sameOrgOther: AuthenticatedContext = { ...context, membershipId: otherMembership.id };
     expect((await listJobs(prisma, sameOrgOther, {})).items).toHaveLength(0);
     expect((await listJobs(prisma, context, {})).items.map((item) => item.id)).toContain(job.id);
+  });
+
+  it("재단 최적화를 작업으로 돌리면 직접 호출한 결과와 같은 결과가 남는다", async () => {
+    await prisma.jobQueue.deleteMany({ where: { organizationId: context.organizationId } });
+    const sample = cuttingSampleSchema.parse(legacySamples[0]);
+    const direct = optimizeCutting(sample.input);
+
+    const { job } = await enqueueJob(prisma, context, {
+      type: "cutting.optimize",
+      payload: { input: sample.input },
+      idempotencyKey: "cutting-sample-1",
+      requestId: "job-cutting-sample-1",
+    });
+    expect(job.summary).toContain(`부품 ${sample.input.parts.length}종`);
+
+    const processed = await processNextJob(prisma, "worker-cutting");
+    expect(processed).toMatchObject({ jobId: job.id, outcome: "SUCCEEDED" });
+
+    const finished = await getJob(prisma, context, job.id);
+    expect(finished.progressPercent).toBe(100);
+    expect(finished.result).toMatchObject({
+      engineVersion: direct.engineVersion,
+      summary: {
+        sheetCount: direct.summary.sheetCount,
+        yieldPercent: direct.summary.yieldPercent,
+        unplacedParts: [],
+      },
+    });
+  });
+
+  it("계약을 어긴 재단 입력은 큐에 들어가지 못한다", async () => {
+    await prisma.jobQueue.deleteMany({ where: { organizationId: context.organizationId } });
+    const sample = cuttingSampleSchema.parse(legacySamples[0]);
+    await expect(
+      enqueueJob(prisma, context, {
+        type: "cutting.optimize",
+        // 원판이 없으면 배치할 자리가 없다. 계약 검사에서 걸러진다.
+        payload: { input: { ...sample.input, sheets: [] } },
+        idempotencyKey: "cutting-invalid",
+        requestId: "job-cutting-invalid",
+      }),
+    ).rejects.toBeInstanceOf(JobError);
   });
 
   it("does not expose raw payload through the API dto", async () => {

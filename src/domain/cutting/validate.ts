@@ -6,6 +6,7 @@ import {
   type CuttingResult,
   type CuttingSheet,
 } from "@/domain/cutting/schema";
+import { squareUnitsToM2, toUnits } from "@/domain/cutting/units";
 
 export type CuttingViolationCode =
   | "CONTRACT_VERSION_MISMATCH"
@@ -31,30 +32,6 @@ export type CuttingViolation = {
 };
 
 const ZERO = BigInt(0);
-// 내부 길이 단위는 mm 의 1/10^6 이다. Decimal 정책의 소수 6자리가 그대로 담긴다.
-const AREA_SCALE = BigInt(100_000_000);
-// 1㎡ = 10^6 ㎟ = 10^6 × (10^6)^2 내부 단위² = 10^18.
-const SQUARE_UNITS_PER_SQUARE_METRE = BigInt(10) ** BigInt(18);
-
-/**
- * 길이를 내부 정수 단위로 바꾼다.
- * 기하 검사에서 부동소수를 쓰면 경계에서 판정이 흔들린다(`D2-B03-B`).
- */
-function toUnits(value: string): bigint {
-  const negative = value.startsWith("-");
-  const unsigned = negative ? value.slice(1) : value;
-  const [integer, fraction = ""] = unsigned.split(".");
-  const scaled = BigInt(`${integer}${fraction.padEnd(6, "0").slice(0, 6)}`);
-  return negative ? -scaled : scaled;
-}
-
-/** 내부 단위 넓이를 ㎡ 문자열로 바꾼다. 소수 8자리까지 남긴다. */
-function squareUnitsToM2(value: bigint): string {
-  const scaled = (value * AREA_SCALE) / SQUARE_UNITS_PER_SQUARE_METRE;
-  const integer = scaled / AREA_SCALE;
-  const fraction = (scaled % AREA_SCALE).toString().padStart(8, "0").replace(/0+$/, "");
-  return fraction ? `${integer}.${fraction}` : `${integer}`;
-}
 
 type Rect = { x: bigint; y: bigint; width: bigint; height: bigint };
 
