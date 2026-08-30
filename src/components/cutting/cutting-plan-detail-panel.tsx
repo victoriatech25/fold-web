@@ -238,6 +238,34 @@ export function CuttingPlanDetailPanel({
     }
   }
 
+  async function cancelApproval() {
+    const reason = await popup.prompt({
+      title: "재단 승인 취소",
+      message:
+        "승인을 풀고 계산 완료 상태로 되돌립니다. 이 재단의 원판 사용 실적은 무효로 표시되고, 여기서 나온 잔재는 폐기됩니다. 이 재단이 쓴 잔재는 다시 쓸 수 있게 돌아옵니다.",
+      inputLabel: "승인 취소 사유",
+      required: true,
+      maxLength: 500,
+      confirmText: "승인 취소",
+      variant: "danger",
+    });
+    if (reason === null) return;
+
+    setBusy(true);
+    setError("");
+    try {
+      await cuttingRequest<CuttingPlanDto>(`/api/v1/cutting-plans/${plan.id}/approval/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ reason, expectedLockVersion: plan.lockVersion }),
+      });
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "승인을 취소하지 못했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const revision = plan.currentRevision;
   const unplaced = plan.result?.summary.unplacedParts ?? [];
 
@@ -330,9 +358,22 @@ export function CuttingPlanDetailPanel({
       ) : null}
 
       {approved ? (
-        <p className="rounded border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-bold text-teal-900">
-          {plan.approvedByName ?? "승인자"}가 승인했습니다. 승인된 재단은 다시 계산할 수 없습니다.
-        </p>
+        <div className="flex flex-wrap items-center gap-2 rounded border border-teal-200 bg-teal-50 px-3 py-2">
+          <p className="text-xs font-bold text-teal-900">
+            {plan.approvedByName ?? "승인자"}가 승인했습니다. 승인된 재단은 다시 계산할 수 없습니다.
+            원판 사용 실적이 남았습니다.
+          </p>
+          {canApprove ? (
+            <button
+              className="ml-auto rounded border border-red-300 px-3 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"
+              disabled={busy}
+              onClick={() => void cancelApproval()}
+              type="button"
+            >
+              승인 취소
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {plan.result ? (

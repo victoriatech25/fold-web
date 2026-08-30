@@ -67,6 +67,8 @@ const modules: NavigationModule[] = [
     items: [
       { href: "/jobs", icon: ListChecks, label: "작업 큐" },
       { href: "/cutting", icon: Factory, label: "생산·절단", permission: "cutting.optimize" },
+      { href: "/cutting/usage", icon: FileSpreadsheet, label: "원판 사용 실적", permission: "cutting.optimize" },
+      { href: "/cutting/remnants", icon: Layers3, label: "잔재", permission: "cutting.optimize" },
       { icon: Printer, label: "출력·이력", planned: true },
     ],
   },

@@ -10,6 +10,7 @@ import { Prisma } from "@/generated/prisma/client";
 import type { PrismaClient, SalesOrderStatus } from "@/generated/prisma/client";
 import { buildCuttingInputs } from "./cutting-input-builder";
 import { CuttingError } from "./cutting-error";
+import { recordSheetUsageForApproval, voidSheetUsageForPlan } from "./sheet-usage-service";
 
 type Database = PrismaClient | Prisma.TransactionClient;
 
@@ -406,6 +407,17 @@ export async function approveCuttingPlan(
     if (claimed.count !== 1) {
       throw new CuttingError("CONFLICT", "재단 작업이 다른 화면에서 변경되었습니다.");
     }
+    // 승인이 곧 원판을 쓴 것이다. 같은 트랜잭션에서 실적을 남긴다(`D2-B06-A`).
+    const usage = await recordSheetUsageForApproval(tx, {
+      organizationId: context.organizationId,
+      salesOrderId: plan.salesOrderId,
+      cuttingPlanId: plan.id,
+      cuttingPlanRevisionId: revision.id,
+      orderNumber: plan.salesOrder.orderNumber,
+      materialCode: plan.materialVariant.code,
+      materialVariantId: plan.materialVariantId,
+      revisionNumber: revision.revisionNumber,
+    });
     await writeAuditEvent(tx, {
       organizationId: context.organizationId,
       actorUserId: context.userId,
@@ -418,12 +430,81 @@ export async function approveCuttingPlan(
         revisionNumber: revision.revisionNumber,
         sheetCount: revision.sheetCount ?? 0,
         yieldPercent: revision.yieldPercent?.toString() ?? "0",
+        sheetUsageCount: usage.usageCount,
+        remnantCount: usage.remnantCount,
       },
     });
     return tx.cuttingPlan.findFirstOrThrow({ where: { id: plan.id }, select: planSelect });
   });
 
   return toPlanDto(approved);
+}
+
+/**
+ * 재단 승인을 취소한다(`D2-B06-F`).
+ *
+ * `P2-B05` 는 승인을 되돌리는 길을 두지 않았다. 실적이 붙으면서 필요해졌다.
+ * 잘못 승인한 것을 되돌릴 수 없으면 틀린 실적이 그대로 남기 때문이다.
+ * 사유를 반드시 받는다. 무엇 때문에 되돌렸는지가 실적보다 오래 남는다.
+ */
+export async function cancelCuttingApproval(
+  prisma: PrismaClient,
+  context: AuthenticatedContext,
+  input: { planId: string; reason: string; expectedLockVersion: number; requestId: string },
+): Promise<CuttingPlanDto> {
+  requirePermission(context, "cutting.approve");
+  const reason = input.reason.trim();
+  if (!reason) {
+    throw new CuttingError("INVALID_REQUEST", "승인 취소 사유를 입력해 주세요.");
+  }
+  const plan = await loadPlan(prisma, context.organizationId, input.planId);
+  if (plan.status !== "APPROVED") {
+    throw new CuttingError("CONFLICT", "승인된 재단 작업만 취소할 수 있습니다.");
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.cuttingPlan.updateMany({
+      where: {
+        id: plan.id,
+        organizationId: context.organizationId,
+        lockVersion: input.expectedLockVersion,
+        status: "APPROVED",
+      },
+      data: {
+        status: "CALCULATED",
+        approvedRevisionId: null,
+        approvedAt: null,
+        approvedByMembershipId: null,
+        lockVersion: { increment: 1 },
+      },
+    });
+    if (claimed.count !== 1) {
+      throw new CuttingError("CONFLICT", "재단 작업이 다른 화면에서 변경되었습니다.");
+    }
+    const reverted = await voidSheetUsageForPlan(tx, {
+      organizationId: context.organizationId,
+      cuttingPlanId: plan.id,
+      reason,
+    });
+    await writeAuditEvent(tx, {
+      organizationId: context.organizationId,
+      actorUserId: context.userId,
+      action: "cutting.approval_cancelled",
+      entityId: plan.id,
+      requestId: input.requestId,
+      before: { status: "APPROVED", lockVersion: plan.lockVersion },
+      after: { status: "CALCULATED", lockVersion: plan.lockVersion + 1 },
+      metadata: {
+        reason,
+        voidedUsageCount: reverted.voidedCount,
+        discardedRemnantCount: reverted.discardedRemnantCount,
+        restoredRemnantCount: reverted.restoredRemnantCount,
+      },
+    });
+    return tx.cuttingPlan.findFirstOrThrow({ where: { id: plan.id }, select: planSelect });
+  });
+
+  return toPlanDto(updated);
 }
 
 /** worker 가 결과를 돌려줄 때 부른다. 개정과 작업 상태를 함께 옮긴다. */

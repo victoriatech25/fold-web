@@ -13,10 +13,17 @@ import { transitionOrder } from "@/server/orders/order-transition-service";
 import { CuttingError } from "./cutting-error";
 import {
   approveCuttingPlan,
+  cancelCuttingApproval,
   createCuttingPlansForOrder,
   getCuttingPlan,
   rerunCuttingPlan,
 } from "./cutting-plan-service";
+import { buildCuttingInputs } from "./cutting-input-builder";
+import {
+  listSheetRemnants,
+  listSheetUsageForOrder,
+  summarizeSheetUsageByPeriod,
+} from "./sheet-usage-service";
 
 const integration = process.env.RUN_DB_INTEGRATION === "1" ? describe : describe.skip;
 
@@ -35,6 +42,7 @@ integration.sequential("cutting plan integration", () => {
   let customerId: string;
   let sourceRevisionId: string;
   let planId: string;
+  let planOrderId: string;
 
   /**
    * 큐는 조직을 가리지 않으므로 앞선 파일이 남긴 작업이 먼저 잡힐 수 있다.
@@ -153,6 +161,7 @@ integration.sequential("cutting plan integration", () => {
       data: {
         organizationId: organization.id, materialVariantId: variant.id, code: "CUT-SHEET",
         name: "1220×2440", widthMm: "1220", lengthMm: "2440", isDefault: true,
+        standardPurchaseCostKrw: "50000",
       },
     });
 
@@ -218,6 +227,7 @@ integration.sequential("cutting plan integration", () => {
     });
     expect(plans).toHaveLength(1);
     planId = plans[0].id;
+    planOrderId = order.id;
     expect(plans[0].status).toBe("PENDING");
 
     const queued = await getCuttingPlan(prisma, context, planId);
@@ -293,5 +303,91 @@ integration.sequential("cutting plan integration", () => {
         requestId: "cutting-approve-denied",
       }),
     ).rejects.toThrow();
+  });
+
+  it("승인하면 원판 사용 실적과 잔재가 남는다", async () => {
+    const usage = await listSheetUsageForOrder(prisma, context, planOrderId);
+    expect(usage.items).toHaveLength(1);
+    const [record] = usage.items;
+    expect(record.status).toBe("ACTIVE");
+    expect(record.fromRemnant).toBe(false);
+    // 개정 2 는 원판 두 장을 썼다. 장수와 원가가 그대로 붙는다(`D2-B06-I`).
+    expect(record.sheetCount).toBe(2);
+    expect(record.unitCostKrw).toBe("50000");
+    expect(record.totalCostKrw).toBe("100000");
+    // 밀도 2700, 두께 1mm, 1220×2440 이면 한 장이 약 8.04kg 이다.
+    expect(Number(record.unitWeightKg)).toBeCloseTo(8.04, 1);
+    expect(usage.totals.sheetCount).toBe(2);
+    expect(Number(usage.totals.placedAreaM2)).toBeGreaterThan(0);
+
+    // 기간 집계에서도 같은 실적이 보인다.
+    const period = await summarizeSheetUsageByPeriod(prisma, context, {});
+    expect(period.items.some((item) => item.code === "CUT-SHEET")).toBe(true);
+
+    const remnants = await listSheetRemnants(prisma, context, { status: "AVAILABLE" });
+    expect(remnants.items.length).toBeGreaterThan(0);
+    expect(remnants.items[0].code.startsWith("R-")).toBe(true);
+    expect(remnants.items[0].originCuttingPlanId).toBe(planId);
+  });
+
+  it("남아 있는 잔재는 다음 재단의 원판 후보로 실린다", async () => {
+    const builds = await buildCuttingInputs(prisma, {
+      organizationId: context.organizationId,
+      salesOrderId: planOrderId,
+    });
+    const [build] = builds;
+    const remnantSheets = build.input.sheets.filter((sheet) =>
+      sheet.sheetItemId.startsWith("remnant:"),
+    );
+    expect(remnantSheets.length).toBeGreaterThan(0);
+    // 조각은 하나뿐이라 장수가 1 이고, 이미 잘린 것이라 trim 을 다시 빼지 않는다.
+    expect(remnantSheets[0].availableCount).toBe(1);
+    expect(remnantSheets[0].trimLeftMm).toBe("0");
+  });
+
+  it("승인을 취소하면 실적은 무효가 되고 잔재는 폐기된다", async () => {
+    const before = await getCuttingPlan(prisma, context, planId);
+    const cancelled = await cancelCuttingApproval(prisma, context, {
+      planId,
+      reason: "현장에서 원판을 바꿔 달라고 했다",
+      expectedLockVersion: before.lockVersion,
+      requestId: "cutting-approval-cancel",
+    });
+    expect(cancelled.status).toBe("CALCULATED");
+    expect(cancelled.approvedRevisionId).toBeNull();
+
+    const usage = await listSheetUsageForOrder(prisma, context, planOrderId);
+    // 지우지 않는다. 무효로 남는다(`D2-B06-F`).
+    expect(usage.items).toHaveLength(1);
+    expect(usage.items[0].status).toBe("VOID");
+    expect(usage.items[0].voidReason).toBe("현장에서 원판을 바꿔 달라고 했다");
+    expect(usage.totals.sheetCount).toBe(0);
+
+    const available = await listSheetRemnants(prisma, context, { status: "AVAILABLE" });
+    expect(available.items).toHaveLength(0);
+    const discarded = await listSheetRemnants(prisma, context, { status: "DISCARDED" });
+    expect(discarded.items.length).toBeGreaterThan(0);
+
+    // 무효가 된 실적은 기간 집계에서도 빠진다.
+    const period = await summarizeSheetUsageByPeriod(prisma, context, {});
+    expect(period.totals.sheetCount).toBe(0);
+
+    const events = await prisma.auditEvent.findMany({
+      where: { organizationId: context.organizationId, action: "cutting.approval_cancelled" },
+      select: { entityId: true },
+    });
+    expect(events.map((event) => event.entityId)).toContain(planId);
+  });
+
+  it("승인되지 않은 재단은 취소할 수 없다", async () => {
+    const plan = await getCuttingPlan(prisma, context, planId);
+    await expect(
+      cancelCuttingApproval(prisma, context, {
+        planId,
+        reason: "이미 풀린 것을 또 푼다",
+        expectedLockVersion: plan.lockVersion,
+        requestId: "cutting-approval-cancel-twice",
+      }),
+    ).rejects.toBeInstanceOf(CuttingError);
   });
 });
