@@ -8,7 +8,7 @@ import { useCommonPopup } from "@/components/ui/common-popup";
 import type { CuttingPlanDetailDto, CuttingPlanDto } from "@/server/cutting/cutting-plan-service";
 import { cuttingRequest, planStatusLabels, planStatusStyles } from "./cutting-plan-list-panel";
 
-/** 원판 하나를 화면 폭에 맞춰 그린다. 좌표는 왼쪽 아래가 원점이라 y를 뒤집는다. */
+/** 원판 하나를 화면 폭에 맞춰 그린다. 긴 쪽을 가로로, 배치 원점을 좌상단으로 놓는다. */
 function SheetFigure({
   input,
   result,
@@ -32,6 +32,25 @@ function SheetFigure({
   const length = Number(sheet.lengthMm);
   const partById = new Map(input.parts.map((part) => [part.id, part]));
 
+  // 긴 쪽이 가로로 놓이게 그린다.
+  const landscape = length > width;
+
+  /**
+   * 재단 좌표(왼쪽 아래 원점, y는 위쪽)를 화면 좌표로 옮긴다.
+   * 어느 쪽이든 배치 원점이 화면 좌상단에 오고 긴 쪽이 가로로 놓인다.
+   *
+   * - 세로가 긴 원판: 시계 방향으로 90도 눕힌다.
+   * - 가로가 긴 원판: 그대로 두고 y를 위에서 아래로 읽는다.
+   *
+   * 좌표를 새로 계산하지 않고 보는 방향만 바꾼다. solver 결과는 그대로다.
+   */
+  function toScreen(xMm: string, yMm: string, boxWidth: number, boxLength: number) {
+    const x = Number(xMm);
+    const y = Number(yMm);
+    if (landscape) return { x: y, y: x, width: boxLength, height: boxWidth };
+    return { x, y, width: boxWidth, height: boxLength };
+  }
+
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex flex-wrap items-baseline gap-2">
@@ -44,45 +63,54 @@ function SheetFigure({
 
       <svg
         aria-label={`원판 ${sheetIndex + 1} 배치`}
-        className="w-full max-w-md border border-slate-300 bg-slate-50"
+        className={`w-full border border-slate-300 bg-slate-50 ${landscape ? "max-w-2xl" : "max-w-md"}`}
         role="img"
-        viewBox={`0 0 ${width} ${length}`}
+        viewBox={landscape ? `0 0 ${length} ${width}` : `0 0 ${width} ${length}`}
       >
-        {sheetResult.remnants.map((remnant, index) => (
-          <rect
-            fill="#f1f5f9"
-            height={Number(remnant.lengthMm)}
-            key={`remnant-${index}`}
-            stroke="#94a3b8"
-            strokeDasharray="20 20"
-            strokeWidth={4}
-            width={Number(remnant.widthMm)}
-            x={Number(remnant.xMm)}
-            y={length - Number(remnant.yMm) - Number(remnant.lengthMm)}
-          />
-        ))}
+        {sheetResult.remnants.map((remnant, index) => {
+          const box = toScreen(
+            remnant.xMm,
+            remnant.yMm,
+            Number(remnant.widthMm),
+            Number(remnant.lengthMm),
+          );
+          return (
+            <rect
+              fill="#f1f5f9"
+              height={box.height}
+              key={`remnant-${index}`}
+              stroke="#94a3b8"
+              strokeDasharray="20 20"
+              strokeWidth={4}
+              width={box.width}
+              x={box.x}
+              y={box.y}
+            />
+          );
+        })}
         {sheetResult.placements.map((placement, index) => {
           const part = partById.get(placement.partId);
           if (!part) return null;
           const partWidth = Number(placement.rotated ? part.lengthMm : part.widthMm);
           const partLength = Number(placement.rotated ? part.widthMm : part.lengthMm);
           const pinned = pinnedPartIds.has(placement.partId);
+          const box = toScreen(placement.xMm, placement.yMm, partWidth, partLength);
           return (
             <g key={`placement-${index}`}>
               <rect
                 fill={pinned ? "#99f6e4" : "#ccfbf1"}
-                height={partLength}
+                height={box.height}
                 stroke={pinned ? "#0f766e" : "#14b8a6"}
                 strokeWidth={pinned ? 10 : 4}
-                width={partWidth}
-                x={Number(placement.xMm)}
-                y={length - Number(placement.yMm) - partLength}
+                width={box.width}
+                x={box.x}
+                y={box.y}
               />
               <text
                 fill="#134e4a"
-                fontSize={Math.max(28, Math.min(partWidth, partLength) / 6)}
-                x={Number(placement.xMm) + partWidth / 2}
-                y={length - Number(placement.yMm) - partLength / 2}
+                fontSize={Math.max(28, Math.min(box.width, box.height) / 6)}
+                x={box.x + box.width / 2}
+                y={box.y + box.height / 2}
                 textAnchor="middle"
               >
                 {part.label}
