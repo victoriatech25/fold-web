@@ -46,11 +46,22 @@
 | ID | 결정 | 안 | 근거 |
 |---|---|---|---|
 | `D2-B03-D` | 부품 | `{ id, label, widthMm, lengthMm, quantity, rotationAllowed, grainDirection }`. 부품은 직사각형만 다룬다 | 절곡 전개 결과는 직사각형 외곽으로 재단한다. 비직사각형 중첩 배치는 이번 범위가 아니다 |
-| `D2-B03-E` | 원판 | `SheetItem` 에서 온 `{ sheetItemId, widthMm, lengthMm, trim{4변}, rotationPolicy, grainAxis, minRemnant*, availableCount }`. `availableCount` 가 없으면 무제한으로 본다 | 기준정보를 다시 정의하지 않고 그대로 실는다. 재고 연동은 `P2-B06` 범위다 |
+| `D2-B03-E` | 원판 | `SheetItem` 에서 온 `{ sheetItemId, widthMm, lengthMm, trim{4변}, rotationPolicy, grainAxis, minRemnant*, availableCount }`. `availableCount` 가 없으면 무제한으로 본다 | 기준정보를 거의 그대로 싣는다. 다만 `rotationPolicy` 는 값이 다르다(아래 3.2.1). 재고 연동은 `P2-B06` 범위다 |
 | `D2-B03-F` | 칼날 | `bladeKerfMm` 하나를 입력에 둔다. 부품과 부품 사이, 부품과 trim 경계 사이에 모두 적용한다 | 칼날 두께를 빼먹으면 계산상 맞는 배치가 현장에서 안 맞는다 |
 | `D2-B03-G` | 회전 | 원판의 `rotationPolicy` 와 부품의 `rotationAllowed` 를 **둘 다 만족할 때만** 90도 회전한다 | 어느 한쪽이 금지하면 금지다. 결 방향이 있는 재질에서 회전은 불량으로 이어진다 |
 | `D2-B03-H` | 결 방향 | 원판 `grainAxis` 가 `NONE` 이 아니면 부품 `grainDirection` 이 같은 축이어야 한다. 어긋나면 배치하지 않고 제약 위반으로 보고한다 | 조용히 돌려 배치하면 현장에서 발견된다 |
 | `D2-B03-I` | trim | 원판 4변 trim 을 뺀 영역만 배치에 쓴다. trim 영역은 손실로 집계한다 | 이미 `SheetItem` 기준정보에 있다 |
+
+#### 3.2.1 `rotationPolicy` 는 기준정보와 값이 다르다
+
+`D2-B03-E` 를 처음 쓸 때 "기준정보와 같은 값" 으로 적었으나 **사실과 다르다.** 바로잡는다.
+
+| 위치 | 값 |
+|---|---|
+| 기준정보 `SheetItem.rotationPolicy` | `FREE` \| `KEEP_GRAIN` |
+| 계약 `sheet.rotationPolicy` | `FREE` \| `FIXED` |
+
+**코드는 맞다.** 재단 입력 빌더가 옮기며, 지킬 결이 없으면 `FREE` 로 내린다. 계약이 결(grain)이라는 개념을 모르는 채 "돌려도 되는가" 만 알면 되게 만든 것이 이 차이의 이유다.
 
 ### 3.3 재단 방식과 결과
 
