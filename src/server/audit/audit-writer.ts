@@ -226,22 +226,13 @@ type AuditPayloadByAction = {
       sheetCount: number;
       yieldPercent: string;
       sheetUsageCount: number;
-      remnantCount: number;
     };
   };
   // 되돌린 실적의 건수를 남긴다. 무엇이 무효가 됐는지 나중에 셀 수 있어야 한다.
   "cutting.approval_cancelled": {
     before: { status: string; lockVersion: number };
     after: { status: string; lockVersion: number };
-    metadata: {
-      reason: string;
-      voidedUsageCount: number;
-      discardedRemnantCount: number;
-      restoredRemnantCount: number;
-    };
-  };
-  "cutting.remnant_discarded": {
-    metadata: { code: string; reason: string; areaM2: string };
+    metadata: { reason: string; voidedUsageCount: number };
   };
   // 파일 내용은 남기지 않는다(`D2-B02-L`). 종류·크기·checksum 까지만 남긴다.
   "file.uploaded": {

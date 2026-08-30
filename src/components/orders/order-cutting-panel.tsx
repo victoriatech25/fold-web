@@ -143,14 +143,7 @@ export function OrderCuttingPanel({
                   className={`border-t border-slate-100 ${item.status === "VOID" ? "text-slate-400 line-through" : ""}`}
                   key={item.id}
                 >
-                  <td className="px-3 py-1.5">
-                    {item.label}
-                    {item.fromRemnant ? (
-                      <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-900">
-                        잔재
-                      </span>
-                    ) : null}
-                  </td>
+                  <td className="px-3 py-1.5">{item.label}</td>
                   <td className="px-3 py-1.5 text-right">{item.sheetCount}</td>
                   <td className="px-3 py-1.5 text-right">{Number(item.lossAreaM2).toFixed(3)} ㎡</td>
                   <td className="px-3 py-1.5 text-right">{item.yieldPercent}%</td>

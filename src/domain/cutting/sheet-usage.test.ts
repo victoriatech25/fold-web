@@ -7,11 +7,7 @@ import {
   type CuttingSheet,
 } from "@/domain/cutting/schema";
 import { optimizeCutting } from "@/domain/cutting/solver/optimize";
-import {
-  readRemnantId,
-  summarizeSheetUsage,
-  toRemnantSheetKey,
-} from "./sheet-usage";
+import { summarizeSheetUsage } from "./sheet-usage";
 
 function sheet(overrides: Partial<CuttingSheet> = {}): CuttingSheet {
   return {
@@ -107,7 +103,7 @@ describe("summarizeSheetUsage", () => {
     expect(breakdown.yieldPercent).toBe("37.5");
   });
 
-  it("잔재 면적을 손실에서 떼어 낸다", () => {
+  it("남은 조각도 손실로 센다", () => {
     const breakdown = summarizeSheetUsage(
       input(),
       result({
@@ -126,12 +122,10 @@ describe("summarizeSheetUsage", () => {
     );
 
     const [item] = breakdown.items;
-    expect(item.remnantAreaM2).toBe("0.5");
-    // 2㎡ 에서 배치 1㎡ 와 잔재 0.5㎡ 를 뺀 나머지가 손실이다.
-    expect(item.lossAreaM2).toBe("0.5");
-    expect(item.remnants).toEqual([
-      { sheetIndex: 0, xMm: "0", yMm: "1000", widthMm: "1000", lengthMm: "500", areaM2: "0.5" },
-    ]);
+    // 다시 쓰지 않으므로 남은 조각을 따로 세지 않는다(`D2-B06-H` (가)).
+    // 2㎡ 에서 배치 1㎡ 를 뺀 1㎡ 가 전부 손실이다.
+    expect(item.lossAreaM2).toBe("1");
+    expect(item.placedAreaM2).toBe("1");
   });
 
   it("여러 규격을 쓰면 규격별로 나눠 센다", () => {
@@ -183,17 +177,5 @@ describe("summarizeSheetUsage", () => {
     expect(summary.totalAreaM2).toBe("2");
     expect(summary.placedAreaM2).toBe("1");
     expect(summary.yieldPercent).toBe("50");
-  });
-});
-
-describe("잔재 원판 후보 id", () => {
-  it("접두사를 붙였다 뗀다", () => {
-    const key = toRemnantSheetKey("2f0e1b6e-0000-4000-8000-000000000000");
-    expect(key).toBe("remnant:2f0e1b6e-0000-4000-8000-000000000000");
-    expect(readRemnantId(key)).toBe("2f0e1b6e-0000-4000-8000-000000000000");
-  });
-
-  it("원판 품목 id 는 잔재가 아니다", () => {
-    expect(readRemnantId("2f0e1b6e-0000-4000-8000-000000000000")).toBeNull();
   });
 });

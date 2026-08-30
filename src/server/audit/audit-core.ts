@@ -237,7 +237,6 @@ export const auditActionCatalog = {
   "cutting.revision_created": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "CuttingPlan", label: "재단 개정 실행" },
   "cutting.approved": { category: "APPROVAL", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "CuttingPlan", label: "재단 결과 승인" },
   "cutting.approval_cancelled": { category: "APPROVAL", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "CuttingPlan", label: "재단 승인 취소" },
-  "cutting.remnant_discarded": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "SheetRemnant", label: "잔재 폐기" },
   "file.uploaded": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "FileAsset", label: "파일 업로드 완료" },
   "file.upload_rejected": { category: "DATA_CHANGE", defaultOutcome: "FAILURE", defaultSource: "WEB", entityType: "FileAsset", label: "파일 업로드 거부" },
   "file.download_url_issued": { category: "OUTPUT", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "FileAsset", label: "파일 다운로드 주소 발급" },

@@ -20,18 +20,8 @@ import type { CuttingInput, CuttingResult, CuttingSheet } from "./schema";
 const AREA_SCALE = 8;
 const PERCENT_SCALE = 2;
 
-export type SheetUsageRemnant = {
-  /** 이 잔재가 몇 번째 장에서 나왔는지. 사람이 찾을 때 쓴다. */
-  sheetIndex: number;
-  xMm: string;
-  yMm: string;
-  widthMm: string;
-  lengthMm: string;
-  areaM2: string;
-};
-
 export type SheetUsageSummary = {
-  /** 계약의 원판 후보 id. 잔재를 후보로 실었으면 `remnant:<id>` 형태다. */
+  /** 계약의 원판 후보 id. 지금은 원판 품목 id 그대로다. */
   sheetKey: string;
   label: string;
   widthMm: string;
@@ -42,13 +32,15 @@ export type SheetUsageSummary = {
   totalAreaM2: string;
   /** 부품이 실제로 덮은 면적. */
   placedAreaM2: string;
-  /** 잔재로 남은 면적(`D2-B06-C` 판정을 넘은 것만). */
-  remnantAreaM2: string;
-  /** 나머지 전부. trim 과 자투리를 포함한다. */
+  /**
+   * 부품이 덮지 않은 면적 전부. trim·자투리·쓸 만한 크기로 남은 조각을 모두 포함한다.
+   *
+   * 남은 조각을 따로 세지 않는다(`D2-B06-H` 2026-08-30 (가)로 환원). 다시 쓰지
+   * 않는 조각을 손실과 나눠 보이면 "이건 다음에 쓸 수 있다" 는 오해가 남는다.
+   */
   lossAreaM2: string;
   /** 배치면적 ÷ 총면적. */
   yieldPercent: string;
-  remnants: SheetUsageRemnant[];
 };
 
 export type SheetUsageBreakdown = {
@@ -56,7 +48,6 @@ export type SheetUsageBreakdown = {
   totalSheetCount: number;
   totalAreaM2: string;
   placedAreaM2: string;
-  remnantAreaM2: string;
   lossAreaM2: string;
   yieldPercent: string;
 };
@@ -81,14 +72,13 @@ function quantizeArea(value: string): string {
 }
 
 /**
- * 남은 면적을 손실로 본다. 음수가 나오면 0 으로 자른다.
+ * 부품이 덮지 않은 면적을 손실로 본다. 음수가 나오면 0 으로 자른다.
  *
- * solver 의 잔재는 배치 뒤 남은 빈 사각형이라 배치면적과 겹치지 않지만,
- * 반올림이 겹치면 총면적을 아주 조금 넘을 수 있다. 그때 손실을 음수로 두면
- * 화면에서 읽을 수 없는 값이 된다.
+ * 반올림이 겹치면 배치면적이 총면적을 아주 조금 넘을 수 있다. 그때 손실을
+ * 음수로 두면 화면에서 읽을 수 없는 값이 된다.
  */
-function loss(total: string, placed: string, remnant: string): string {
-  const rest = subtractCanonicalDecimals(subtractCanonicalDecimals(total, placed), remnant);
+function loss(total: string, placed: string): string {
+  const rest = subtractCanonicalDecimals(total, placed);
   return rest.startsWith("-") ? "0" : rest;
 }
 
@@ -119,48 +109,33 @@ export function summarizeSheetUsage(
       sheetCount: 0,
       totalAreaM2: "0",
       placedAreaM2: "0",
-      remnantAreaM2: "0",
       lossAreaM2: "0",
       yieldPercent: "0",
-      remnants: [],
     };
-
-    const remnantArea = sheet.remnants.reduce(
-      (total, remnant) => addCanonicalDecimals(total, remnant.areaM2),
-      "0",
-    );
 
     current.sheetCount += 1;
     current.totalAreaM2 = addCanonicalDecimals(current.totalAreaM2, area(spec));
     current.placedAreaM2 = addCanonicalDecimals(current.placedAreaM2, sheet.usedAreaM2);
-    current.remnantAreaM2 = addCanonicalDecimals(current.remnantAreaM2, remnantArea);
-    current.remnants.push(
-      ...sheet.remnants.map((remnant) => ({ sheetIndex: sheet.sheetIndex, ...remnant })),
-    );
     items.set(sheet.sheetItemId, current);
   }
 
   let totalSheetCount = 0;
   let totalAreaM2 = "0";
   let placedAreaM2 = "0";
-  let remnantAreaM2 = "0";
 
   for (const item of items.values()) {
     item.totalAreaM2 = quantizeArea(item.totalAreaM2);
     item.placedAreaM2 = quantizeArea(item.placedAreaM2);
-    item.remnantAreaM2 = quantizeArea(item.remnantAreaM2);
-    item.lossAreaM2 = quantizeArea(loss(item.totalAreaM2, item.placedAreaM2, item.remnantAreaM2));
+    item.lossAreaM2 = quantizeArea(loss(item.totalAreaM2, item.placedAreaM2));
     item.yieldPercent = percent(item.placedAreaM2, item.totalAreaM2);
 
     totalSheetCount += item.sheetCount;
     totalAreaM2 = addCanonicalDecimals(totalAreaM2, item.totalAreaM2);
     placedAreaM2 = addCanonicalDecimals(placedAreaM2, item.placedAreaM2);
-    remnantAreaM2 = addCanonicalDecimals(remnantAreaM2, item.remnantAreaM2);
   }
 
   totalAreaM2 = quantizeArea(totalAreaM2);
   placedAreaM2 = quantizeArea(placedAreaM2);
-  remnantAreaM2 = quantizeArea(remnantAreaM2);
 
   return {
     // 사람이 읽는 순서는 많이 쓴 원판부터다.
@@ -170,22 +145,8 @@ export function summarizeSheetUsage(
     totalSheetCount,
     totalAreaM2,
     placedAreaM2,
-    remnantAreaM2,
-    lossAreaM2: quantizeArea(loss(totalAreaM2, placedAreaM2, remnantAreaM2)),
+    lossAreaM2: quantizeArea(loss(totalAreaM2, placedAreaM2)),
     yieldPercent: percent(placedAreaM2, totalAreaM2),
   };
 }
 
-/** 잔재 후보를 계약의 원판 id 로 옮길 때 쓰는 접두사. 계약은 고치지 않는다(`D2-B06-H`). */
-export const REMNANT_SHEET_PREFIX = "remnant:" as const;
-
-export function toRemnantSheetKey(remnantId: string): string {
-  return `${REMNANT_SHEET_PREFIX}${remnantId}`;
-}
-
-/** 원판 후보 id 가 잔재를 가리키면 그 잔재 id 를, 아니면 `null` 을 준다. */
-export function readRemnantId(sheetKey: string): string | null {
-  return sheetKey.startsWith(REMNANT_SHEET_PREFIX)
-    ? sheetKey.slice(REMNANT_SHEET_PREFIX.length)
-    : null;
-}

@@ -413,10 +413,6 @@ export async function approveCuttingPlan(
       salesOrderId: plan.salesOrderId,
       cuttingPlanId: plan.id,
       cuttingPlanRevisionId: revision.id,
-      orderNumber: plan.salesOrder.orderNumber,
-      materialCode: plan.materialVariant.code,
-      materialVariantId: plan.materialVariantId,
-      revisionNumber: revision.revisionNumber,
     });
     await writeAuditEvent(tx, {
       organizationId: context.organizationId,
@@ -431,7 +427,6 @@ export async function approveCuttingPlan(
         sheetCount: revision.sheetCount ?? 0,
         yieldPercent: revision.yieldPercent?.toString() ?? "0",
         sheetUsageCount: usage.usageCount,
-        remnantCount: usage.remnantCount,
       },
     });
     return tx.cuttingPlan.findFirstOrThrow({ where: { id: plan.id }, select: planSelect });
@@ -494,12 +489,7 @@ export async function cancelCuttingApproval(
       requestId: input.requestId,
       before: { status: "APPROVED", lockVersion: plan.lockVersion },
       after: { status: "CALCULATED", lockVersion: plan.lockVersion + 1 },
-      metadata: {
-        reason,
-        voidedUsageCount: reverted.voidedCount,
-        discardedRemnantCount: reverted.discardedRemnantCount,
-        restoredRemnantCount: reverted.restoredRemnantCount,
-      },
+      metadata: { reason, voidedUsageCount: reverted.voidedCount },
     });
     return tx.cuttingPlan.findFirstOrThrow({ where: { id: plan.id }, select: planSelect });
   });

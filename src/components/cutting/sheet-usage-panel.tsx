@@ -44,10 +44,6 @@ function TotalsRow({ totals }: { totals: SheetUsageTotals }) {
         <dd className="font-bold">{area(totals.placedAreaM2)}</dd>
       </div>
       <div>
-        <dt className="text-slate-500">잔재</dt>
-        <dd className="font-bold">{area(totals.remnantAreaM2)}</dd>
-      </div>
-      <div>
         <dt className="text-slate-500">손실</dt>
         <dd className="font-bold">{area(totals.lossAreaM2)}</dd>
       </div>
@@ -151,9 +147,6 @@ export function SheetUsagePanel({
             원판 필터 해제
           </button>
         ) : null}
-        <Link className="ml-auto text-xs text-teal-800 underline" href="/cutting/remnants">
-          잔재 보기
-        </Link>
       </div>
 
       {error ? (
@@ -175,7 +168,6 @@ export function SheetUsagePanel({
               <th className="px-3 py-2 text-right">장수</th>
               <th className="px-3 py-2 text-right">총면적</th>
               <th className="px-3 py-2 text-right">배치</th>
-              <th className="px-3 py-2 text-right">잔재</th>
               <th className="px-3 py-2 text-right">손실</th>
               <th className="px-3 py-2 text-right">수율</th>
               <th className="px-3 py-2 text-right">중량</th>
@@ -185,7 +177,7 @@ export function SheetUsagePanel({
           <tbody>
             {overview.items.length === 0 ? (
               <tr>
-                <td className="px-3 py-6 text-center text-slate-500" colSpan={9}>
+                <td className="px-3 py-6 text-center text-slate-500" colSpan={8}>
                   이 기간에 승인된 재단이 없습니다.
                 </td>
               </tr>
@@ -198,7 +190,6 @@ export function SheetUsagePanel({
                   <td className="px-3 py-2 text-right">{item.totals.sheetCount}</td>
                   <td className="px-3 py-2 text-right">{area(item.totals.totalAreaM2)}</td>
                   <td className="px-3 py-2 text-right">{area(item.totals.placedAreaM2)}</td>
-                  <td className="px-3 py-2 text-right">{area(item.totals.remnantAreaM2)}</td>
                   <td className="px-3 py-2 text-right">{area(item.totals.lossAreaM2)}</td>
                   <td className="px-3 py-2 text-right font-bold">{item.totals.yieldPercent}%</td>
                   <td className="px-3 py-2 text-right">{weight(item.totals.totalWeightKg)}</td>
@@ -240,14 +231,7 @@ export function SheetUsagePanel({
                       {row.orderNumber}
                     </Link>
                   </td>
-                  <td className="px-3 py-2">
-                    {row.label}
-                    {row.fromRemnant ? (
-                      <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-900">
-                        잔재
-                      </span>
-                    ) : null}
-                  </td>
+                  <td className="px-3 py-2">{row.label}</td>
                   <td className="px-3 py-2 text-right">{row.sheetCount}</td>
                   <td className="px-3 py-2 text-right">{row.yieldPercent}%</td>
                   <td className="px-3 py-2 text-right">{money(row.totalCostKrw)}</td>

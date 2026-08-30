@@ -150,13 +150,6 @@ enum SheetUsageStatus {
   VOID
 }
 
-/// 잔재 개체의 상태(`D2-B06-H`). 소진과 폐기를 구분해야 왜 사라졌는지 남는다.
-enum SheetRemnantStatus {
-  AVAILABLE
-  CONSUMED
-  DISCARDED
-}
-
 enum SurchargeBaseType {
   PROCESSING_ONLY
 }
@@ -234,7 +227,6 @@ model Organization {
   cuttingPlans               CuttingPlan[]
   cuttingPlanRevisions       CuttingPlanRevision[]
   sheetUsageRecords          SheetUsageRecord[]
-  sheetRemnants              SheetRemnant[]
 
   @@index([status])
 }
@@ -768,7 +760,6 @@ model MaterialVariant {
   sheetItems            SheetItem[]
   cuttingPlans          CuttingPlan[]
   foldPriceRates        FoldPriceRate[]
-  sheetRemnants         SheetRemnant[]
 
   @@unique([organizationId, code])
   @@unique([materialId, thicknessMm])
@@ -813,7 +804,6 @@ model SheetItem {
   priceRates              SheetPriceRate[]
   salesOrderFoldItems     SalesOrderFoldItem[]
   usageRecords            SheetUsageRecord[]
-  remnants                SheetRemnant[]
 
   @@unique([organizationId, code])
   @@index([organizationId, active, deletedAt])
@@ -1260,8 +1250,6 @@ model CuttingPlan {
   approvedRevision       CuttingPlanRevision?    @relation("CuttingPlanApprovedRevision", fields: [approvedRevisionId], references: [id], onDelete: Restrict)
   revisions              CuttingPlanRevision[]   @relation("CuttingPlanRevisions")
   sheetUsageRecords      SheetUsageRecord[]
-  producedRemnants       SheetRemnant[]          @relation("SheetRemnantOrigin")
-  consumedRemnants       SheetRemnant[]          @relation("SheetRemnantConsumer")
 
   @@unique([salesOrderId, materialVariantId])
   @@index([organizationId, status, updatedAt], map: "CuttingPlan_organization_status_idx")
@@ -1311,6 +1299,8 @@ model CuttingPlanRevision {
  * 과거 실적이 흔들리지 않는다(`D2-B06-E`).
  * 보유 수량은 관리하지 않는다(`D2-B06-G` (가)). 이 표는 그 자체로 수불 원장의
  * 출고 쪽 모양이라 나중에 입고를 얹을 때 버릴 것이 없다.
+ * 남은 조각도 개체로 남기지 않는다(`D2-B06-H` 2026-08-30 (가)로 환원). 현장에서
+ * 다시 쓰지 않는다는 것이 확인됐고, 쓰지 않는 것을 세면 틀린 숫자만 쌓인다.
  */
 model SheetUsageRecord {
   id                    String              @id @default(uuid()) @db.Uuid
@@ -1320,13 +1310,9 @@ model SheetUsageRecord {
   cuttingPlanRevisionId String              @db.Uuid
   sheetItemId           String              @db.Uuid
   /**
-   * 계약에 실렸던 원판 후보 id 원문. 잔재를 썼으면 `remnant:<id>` 다.
+   * 계약에 실렸던 원판 후보 id 원문. 지금은 원판 품목 id 그대로다.
    */
   sheetKey              String              @db.VarChar(150)
-  /**
-   * 잔재를 원판 대신 쓴 줄이면 그 잔재를 가리킨다.
-   */
-  sourceRemnantId       String?             @db.Uuid
   status                SheetUsageStatus    @default(ACTIVE)
   label                 String              @db.VarChar(200)
   widthMm               Decimal             @db.Decimal(18, 6)
@@ -1334,7 +1320,9 @@ model SheetUsageRecord {
   sheetCount            Int
   totalAreaM2           Decimal             @db.Decimal(18, 8)
   placedAreaM2          Decimal             @db.Decimal(18, 8)
-  remnantAreaM2         Decimal             @db.Decimal(18, 8)
+  /**
+   * 부품이 덮지 않은 면적 전부. trim 과 자투리를 모두 담는다(`D2-B06-H` (가)).
+   */
   lossAreaM2            Decimal             @db.Decimal(18, 8)
   yieldPercent          Decimal             @db.Decimal(6, 2)
   /**
@@ -1362,42 +1350,4 @@ model SheetUsageRecord {
   @@index([organizationId, sheetItemId, status], map: "SheetUsageRecord_sheet_item_idx")
   @@index([salesOrderId], map: "SheetUsageRecord_order_idx")
   @@index([cuttingPlanId])
-}
-
-/**
- * 재단하고 남은 조각 하나(`D2-B06-H` (나)).
- * 재고를 세려고 두는 것이 아니라 다음 재단의 원판 후보로 쓰려고 둔다.
- * 실물과 어긋날 수 있어 사용자가 직접 폐기할 수 있어야 한다.
- */
-model SheetRemnant {
-  id                      String             @id @default(uuid()) @db.Uuid
-  organizationId          String             @db.Uuid
-  sheetItemId             String             @db.Uuid
-  materialVariantId       String             @db.Uuid
-  /**
-   * 어디서 나온 조각인지 사람이 읽는 이름. 수주번호와 장 번호로 만든다.
-   */
-  code                    String             @db.VarChar(80)
-  status                  SheetRemnantStatus @default(AVAILABLE)
-  widthMm                 Decimal            @db.Decimal(18, 6)
-  lengthMm                Decimal            @db.Decimal(18, 6)
-  areaM2                  Decimal            @db.Decimal(18, 8)
-  originCuttingPlanId     String?            @db.Uuid
-  consumedByCuttingPlanId String?            @db.Uuid
-  consumedAt              DateTime?          @db.Timestamptz(6)
-  discardedAt             DateTime?          @db.Timestamptz(6)
-  discardReason           String?            @db.VarChar(500)
-  lockVersion             Int                @default(1)
-  createdAt               DateTime           @default(now()) @db.Timestamptz(6)
-  updatedAt               DateTime           @updatedAt @db.Timestamptz(6)
-  organization            Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  sheetItem               SheetItem          @relation(fields: [sheetItemId], references: [id], onDelete: Restrict)
-  materialVariant         MaterialVariant    @relation(fields: [materialVariantId], references: [id], onDelete: Restrict)
-  originCuttingPlan       CuttingPlan?       @relation("SheetRemnantOrigin", fields: [originCuttingPlanId], references: [id], onDelete: SetNull)
-  consumedByCuttingPlan   CuttingPlan?       @relation("SheetRemnantConsumer", fields: [consumedByCuttingPlanId], references: [id], onDelete: SetNull)
-
-  @@unique([organizationId, code], map: "SheetRemnant_organization_code_key")
-  @@index([organizationId, materialVariantId, status], map: "SheetRemnant_variant_status_idx")
-  @@index([organizationId, sheetItemId, status], map: "SheetRemnant_sheet_item_idx")
-  @@index([originCuttingPlanId])
 }

@@ -41,7 +41,7 @@ test("생산·절단 화면을 열고 승인 전 수주는 재단을 거부한�
   expect(body.scroll).toBeLessThanOrEqual(body.client + 1);
 });
 
-test("원판 사용 실적과 잔재 화면을 연다", async ({ page }) => {
+test("원판 사용 실적 화면을 연다", async ({ page }) => {
   await login(page);
 
   await page.getByRole("link", { name: "원판 사용 실적" }).first().click();
@@ -50,36 +50,28 @@ test("원판 사용 실적과 잔재 화면을 연다", async ({ page }) => {
   // 승인된 재단이 없는 계정이라 빈 상태가 보인다. 빈 화면도 읽혀야 한다.
   await expect(page.getByText("원판별 합계")).toBeVisible();
 
-  await page.getByRole("link", { name: "잔재 보기" }).click();
-  await expect(page).toHaveURL("/cutting/remnants");
-  await expect(page.getByRole("heading", { name: "잔재" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "남아 있음" })).toBeVisible();
-
   // 좁은 화면에서도 가로로 밀리지 않는다.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await expect(page.getByRole("heading", { name: "잔재" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "원판 사용 실적" })).toBeVisible();
   const body = await page.evaluate(() => ({ scroll: document.body.scrollWidth, client: document.body.clientWidth }));
   expect(body.scroll).toBeLessThanOrEqual(body.client + 1);
 });
 
-test("사용 실적 API 는 기간을 검증하고 무효 기록을 세지 않는다", async ({ page }) => {
+test("사용 실적 API 는 기간을 검증한다", async ({ page }) => {
   await login(page);
 
   const result = await page.evaluate(async () => {
     const invalid = await fetch("/api/v1/sheet-usage?from=2026-13-40");
     const valid = await fetch("/api/v1/sheet-usage?from=2026-08-01&to=2026-08-31");
-    const remnants = await fetch("/api/v1/sheet-remnants?status=WRONG");
     return {
       invalidStatus: invalid.status,
       validStatus: valid.status,
       validBody: await valid.json(),
-      remnantStatus: remnants.status,
     };
   });
 
   expect(result.invalidStatus).toBe(400);
-  expect(result.remnantStatus).toBe(400);
   expect(result.validStatus).toBe(200);
   expect(result.validBody.data.totals).toHaveProperty("yieldPercent");
 });

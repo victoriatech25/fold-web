@@ -18,12 +18,7 @@ import {
   getCuttingPlan,
   rerunCuttingPlan,
 } from "./cutting-plan-service";
-import { buildCuttingInputs } from "./cutting-input-builder";
-import {
-  listSheetRemnants,
-  listSheetUsageForOrder,
-  summarizeSheetUsageByPeriod,
-} from "./sheet-usage-service";
+import { listSheetUsageForOrder, summarizeSheetUsageByPeriod } from "./sheet-usage-service";
 
 const integration = process.env.RUN_DB_INTEGRATION === "1" ? describe : describe.skip;
 
@@ -305,12 +300,11 @@ integration.sequential("cutting plan integration", () => {
     ).rejects.toThrow();
   });
 
-  it("승인하면 원판 사용 실적과 잔재가 남는다", async () => {
+  it("승인하면 원판 사용 실적이 남는다", async () => {
     const usage = await listSheetUsageForOrder(prisma, context, planOrderId);
     expect(usage.items).toHaveLength(1);
     const [record] = usage.items;
     expect(record.status).toBe("ACTIVE");
-    expect(record.fromRemnant).toBe(false);
     // 개정 2 는 원판 두 장을 썼다. 장수와 원가가 그대로 붙는다(`D2-B06-I`).
     expect(record.sheetCount).toBe(2);
     expect(record.unitCostKrw).toBe("50000");
@@ -324,28 +318,10 @@ integration.sequential("cutting plan integration", () => {
     const period = await summarizeSheetUsageByPeriod(prisma, context, {});
     expect(period.items.some((item) => item.code === "CUT-SHEET")).toBe(true);
 
-    const remnants = await listSheetRemnants(prisma, context, { status: "AVAILABLE" });
-    expect(remnants.items.length).toBeGreaterThan(0);
-    expect(remnants.items[0].code.startsWith("R-")).toBe(true);
-    expect(remnants.items[0].originCuttingPlanId).toBe(planId);
   });
 
-  it("남아 있는 잔재는 다음 재단의 원판 후보로 실린다", async () => {
-    const builds = await buildCuttingInputs(prisma, {
-      organizationId: context.organizationId,
-      salesOrderId: planOrderId,
-    });
-    const [build] = builds;
-    const remnantSheets = build.input.sheets.filter((sheet) =>
-      sheet.sheetItemId.startsWith("remnant:"),
-    );
-    expect(remnantSheets.length).toBeGreaterThan(0);
-    // 조각은 하나뿐이라 장수가 1 이고, 이미 잘린 것이라 trim 을 다시 빼지 않는다.
-    expect(remnantSheets[0].availableCount).toBe(1);
-    expect(remnantSheets[0].trimLeftMm).toBe("0");
-  });
 
-  it("승인을 취소하면 실적은 무효가 되고 잔재는 폐기된다", async () => {
+  it("승인을 취소하면 실적이 무효가 된다", async () => {
     const before = await getCuttingPlan(prisma, context, planId);
     const cancelled = await cancelCuttingApproval(prisma, context, {
       planId,
@@ -362,11 +338,6 @@ integration.sequential("cutting plan integration", () => {
     expect(usage.items[0].status).toBe("VOID");
     expect(usage.items[0].voidReason).toBe("현장에서 원판을 바꿔 달라고 했다");
     expect(usage.totals.sheetCount).toBe(0);
-
-    const available = await listSheetRemnants(prisma, context, { status: "AVAILABLE" });
-    expect(available.items).toHaveLength(0);
-    const discarded = await listSheetRemnants(prisma, context, { status: "DISCARDED" });
-    expect(discarded.items.length).toBeGreaterThan(0);
 
     // 무효가 된 실적은 기간 집계에서도 빠진다.
     const period = await summarizeSheetUsageByPeriod(prisma, context, {});

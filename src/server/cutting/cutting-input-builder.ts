@@ -9,7 +9,6 @@ import {
   type CuttingPart,
   type CuttingSheet,
 } from "@/domain/cutting/schema";
-import { toRemnantSheetKey } from "@/domain/cutting/sheet-usage";
 import { calculateFoldProfileDocument } from "@/domain/fold-calculation";
 import { FoldDocumentValidationError } from "@/domain/fold-document/errors";
 import { projectCanonicalJsonV1 } from "@/domain/fold-document/canonical";
@@ -89,43 +88,6 @@ function toSheet(row: Prisma.SheetItemGetPayload<{ select: typeof sheetItemSelec
     minRemnantAreaM2: decimal(row.minRemnantAreaM2),
     // 보유 수량은 관리하지 않으므로 원판 자체에는 장수 제한이 없다(`D2-B06-G` (가)).
     availableCount: null,
-  };
-}
-
-const remnantSelect = {
-  id: true,
-  code: true,
-  widthMm: true,
-  lengthMm: true,
-  sheetItem: { select: sheetItemSelect },
-} as const satisfies Prisma.SheetRemnantSelect;
-
-/**
- * 남아 있는 잔재 하나를 원판 후보 하나로 옮긴다(`D2-B06-H`).
- *
- * 계약은 잔재라는 것을 모른다. `remnant:` 접두사를 붙인 원판 후보로 실어
- * solver 를 고치지 않고 후보에 넣는다. 조각은 하나뿐이라 장수는 1 이고,
- * 이미 잘라 낸 조각이라 trim 을 다시 빼지 않는다.
- *
- * 회전·결·잔재 기준은 태어난 원판 품목의 것을 그대로 따른다. 같은 판에서
- * 나온 조각이므로 결의 방향도 그 원판과 같다.
- */
-function toRemnantSheet(row: Prisma.SheetRemnantGetPayload<{ select: typeof remnantSelect }>): CuttingSheet {
-  return {
-    sheetItemId: toRemnantSheetKey(row.id),
-    label: `잔재 ${row.code}`,
-    widthMm: row.widthMm.toString(),
-    lengthMm: row.lengthMm.toString(),
-    trimTopMm: "0",
-    trimRightMm: "0",
-    trimBottomMm: "0",
-    trimLeftMm: "0",
-    rotationPolicy: toRotationPolicy(row.sheetItem),
-    grainAxis: row.sheetItem.grainAxis,
-    minRemnantWidthMm: decimal(row.sheetItem.minRemnantWidthMm),
-    minRemnantLengthMm: decimal(row.sheetItem.minRemnantLengthMm),
-    minRemnantAreaM2: decimal(row.sheetItem.minRemnantAreaM2),
-    availableCount: 1,
   };
 }
 
@@ -222,23 +184,11 @@ export async function buildCuttingInputs(
       );
     }
 
-    // 남아 있는 잔재를 먼저 쓰게 후보 앞자리에 놓는다(`D2-B06-H`).
-    const remnantRows = await database.sheetRemnant.findMany({
-      where: {
-        organizationId: options.organizationId,
-        materialVariantId,
-        status: "AVAILABLE",
-      },
-      select: remnantSelect,
-      orderBy: [{ areaM2: "asc" }, { code: "asc" }],
-      // 계약의 원판 후보 상한이 100 이라 절반까지만 잔재로 채운다.
-      take: 50,
-    });
 
     const input = cuttingInputSchema.parse({
       contractVersion: CUTTING_CONTRACT_VERSION,
       parts: variantItems.map(toPart),
-      sheets: [...remnantRows.map(toRemnantSheet), ...sheetRows.map(toSheet)],
+      sheets: sheetRows.map(toSheet),
       options: {
         // 실제 칼날 두께는 현장 확인이 남아 있다(`D2-B04-K`).
         bladeKerfMm: options.bladeKerfMm ?? "0",
