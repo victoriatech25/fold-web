@@ -58,6 +58,11 @@ export function OrderCuttingPanel({
       .catch(() => setUsage(null));
   }, [canOptimize, order.id, approvedCount]);
 
+  // 살아 있는 실적 가운데 원가가 실제로 붙은 것이 있는지. 총계를 보일지 가른다.
+  const hasCost = (usage?.items ?? []).some(
+    (item) => item.status === "ACTIVE" && item.totalCostKrw !== null,
+  );
+
   const hasPending = plans.some((plan) => plan.status === "PENDING");
   useEffect(() => {
     if (!hasPending) return;
@@ -120,38 +125,64 @@ export function OrderCuttingPanel({
       ) : null}
 
       {usage && usage.items.length > 0 ? (
-        <div className="mt-4 rounded border border-slate-200">
+        <div className="mt-4 overflow-x-auto rounded border border-slate-200">
           <p className="border-b border-slate-100 px-3 py-2 text-xs font-bold text-slate-600">
             원판 사용 실적 · 총 {usage.totals.sheetCount}장 · 수율 {usage.totals.yieldPercent}%
-            {usage.totals.totalCostKrw
+            {/* 원가를 아무도 안 채웠으면 총계도 비운다. `0원` 은 "공짜로 썼다" 로 읽힌다. */}
+            {hasCost && usage.totals.totalCostKrw
               ? ` · 참고 매입원가 ${Number(usage.totals.totalCostKrw).toLocaleString("ko-KR")}원`
               : ""}
           </p>
-          <table className="w-full text-xs">
+          <table className="w-full min-w-[38rem] text-xs">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-3 py-1.5 text-left">원판</th>
+                <th className="px-3 py-1.5 text-left">상태</th>
                 <th className="px-3 py-1.5 text-right">장수</th>
                 <th className="px-3 py-1.5 text-right">손실</th>
                 <th className="px-3 py-1.5 text-right">수율</th>
                 <th className="px-3 py-1.5 text-right">중량</th>
+                <th className="px-3 py-1.5 text-right">참고 원가</th>
               </tr>
             </thead>
             <tbody>
-              {usage.items.map((item) => (
-                <tr
-                  className={`border-t border-slate-100 ${item.status === "VOID" ? "text-slate-400 line-through" : ""}`}
-                  key={item.id}
-                >
-                  <td className="px-3 py-1.5">{item.label}</td>
-                  <td className="px-3 py-1.5 text-right">{item.sheetCount}</td>
-                  <td className="px-3 py-1.5 text-right">{Number(item.lossAreaM2).toFixed(3)} ㎡</td>
-                  <td className="px-3 py-1.5 text-right">{item.yieldPercent}%</td>
-                  <td className="px-3 py-1.5 text-right">
-                    {item.totalWeightKg === null ? "—" : `${Number(item.totalWeightKg).toFixed(1)} kg`}
-                  </td>
-                </tr>
-              ))}
+              {usage.items.map((item) => {
+                const voided = item.status === "VOID";
+                return (
+                  <tr
+                    className={`border-t border-slate-100 ${voided ? "text-slate-400" : ""}`}
+                    key={item.id}
+                  >
+                    <td className={`px-3 py-1.5 ${voided ? "line-through" : ""}`}>{item.label}</td>
+                    {/* 취소선만으로는 상태를 알 수 없다. 글자로도 말한다(UI 기준선 6항). */}
+                    <td className="px-3 py-1.5">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${
+                          voided ? "bg-slate-200 text-slate-600" : "bg-teal-100 text-teal-900"
+                        }`}
+                      >
+                        {voided ? "무효" : "사용"}
+                      </span>
+                      {voided && item.voidReason ? (
+                        <span className="ml-1.5 text-[11px] text-slate-500">{item.voidReason}</span>
+                      ) : null}
+                    </td>
+                    <td className={`px-3 py-1.5 text-right ${voided ? "line-through" : ""}`}>{item.sheetCount}</td>
+                    <td className={`px-3 py-1.5 text-right ${voided ? "line-through" : ""}`}>
+                      {Number(item.lossAreaM2).toFixed(3)} ㎡
+                    </td>
+                    <td className={`px-3 py-1.5 text-right ${voided ? "line-through" : ""}`}>{item.yieldPercent}%</td>
+                    <td className={`px-3 py-1.5 text-right ${voided ? "line-through" : ""}`}>
+                      {item.totalWeightKg === null ? "—" : `${Number(item.totalWeightKg).toFixed(1)} kg`}
+                    </td>
+                    <td className={`px-3 py-1.5 text-right ${voided ? "line-through" : ""}`}>
+                      {item.totalCostKrw === null
+                        ? "—"
+                        : `${Number(item.totalCostKrw).toLocaleString("ko-KR")}원`}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -350,6 +350,35 @@ integration.sequential("cutting plan integration", () => {
     expect(events.map((event) => event.entityId)).toContain(planId);
   });
 
+  it("승인을 취소한 개정을 다시 승인할 수 있다", async () => {
+    // 무효가 된 실적이 `(개정, 원판)` 자리를 계속 차지해 재승인이 유일 제약에 걸렸다.
+    // 겹쳐 쓰기는 살아 있는 실적에만 막는다.
+    const before = await getCuttingPlan(prisma, context, planId);
+    const approved = await approveCuttingPlan(prisma, context, {
+      planId,
+      revisionId: before.currentRevision!.id,
+      expectedLockVersion: before.lockVersion,
+      requestId: "cutting-approval-again",
+    });
+    expect(approved.status).toBe("APPROVED");
+
+    const usage = await listSheetUsageForOrder(prisma, context, planOrderId);
+    // 무효 하나와 살아 있는 하나가 함께 남는다. 왜 사라졌는지가 지워지지 않는다.
+    expect(usage.items).toHaveLength(2);
+    expect(usage.items.filter((item) => item.status === "ACTIVE")).toHaveLength(1);
+    expect(usage.items.filter((item) => item.status === "VOID")).toHaveLength(1);
+    expect(usage.totals.sheetCount).toBe(2);
+
+    // 다시 취소해 뒤 테스트의 전제를 되돌린다.
+    const reapproved = await getCuttingPlan(prisma, context, planId);
+    await cancelCuttingApproval(prisma, context, {
+      planId,
+      reason: "재승인 회귀 테스트를 되돌린다",
+      expectedLockVersion: reapproved.lockVersion,
+      requestId: "cutting-approval-cancel-again",
+    });
+  });
+
   it("승인되지 않은 재단은 취소할 수 없다", async () => {
     const plan = await getCuttingPlan(prisma, context, planId);
     await expect(

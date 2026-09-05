@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { cuttingRequest } from "@/components/cutting/cutting-plan-list-panel";
@@ -79,6 +80,7 @@ export function SheetUsagePanel({
   initialSheetItemId: string;
   initialTo: string;
 }) {
+  const router = useRouter();
   const [overview, setOverview] = useState(initial);
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
@@ -141,7 +143,12 @@ export function SheetUsagePanel({
           <button
             className="rounded border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700"
             disabled={busy}
-            onClick={() => setSheetItemId("")}
+            onClick={() => {
+              setSheetItemId("");
+              // 주소에서도 지운다. 화면은 전체인데 주소는 걸러진 채로 두면
+              // 새로고침에 필터가 되살아나고, 링크를 받은 사람은 다른 화면을 본다.
+              router.replace("/cutting/usage");
+            }}
             type="button"
           >
             원판 필터 해제
@@ -155,7 +162,11 @@ export function SheetUsagePanel({
         </p>
       ) : null}
 
-      <TotalsRow totals={overview.totals} />
+      {/*
+        실적이 없으면 총계를 그리지 않는다. `수율 0%` 는 "재단을 했는데 하나도 못 건졌다" 로,
+        `참고 매입원가 0원` 은 "공짜로 썼다" 로 읽힌다. 아래 표가 이미 없다고 말한다.
+      */}
+      {overview.items.length > 0 ? <TotalsRow totals={overview.totals} /> : null}
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         <table className="w-full min-w-[52rem] text-xs">

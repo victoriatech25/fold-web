@@ -118,8 +118,9 @@ async function resolveSheetItem(
 /**
  * 승인 시 사용 기록을 만든다.
  *
- * 승인 트랜잭션 안에서 부른다. 같은 개정을 두 번 승인하는 길은 없지만,
- * 유일 제약(`cuttingPlanRevisionId`+`sheetKey`)이 겹쳐 쓰기를 막는다.
+ * 승인 트랜잭션 안에서 부른다. 승인을 취소했다가 같은 개정을 다시 승인할 수 있으므로
+ * 같은 개정에 실적이 여러 겹 쌓인다. 살아 있는 것은 항상 하나뿐이며, 부분 유일 인덱스
+ * `SheetUsageRecord_one_active_per_revision_sheet_key` 가 그것을 보장한다.
  */
 export async function recordSheetUsageForApproval(
   database: Database,

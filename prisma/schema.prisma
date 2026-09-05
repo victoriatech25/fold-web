@@ -1345,7 +1345,10 @@ model SheetUsageRecord {
   cuttingPlanRevision   CuttingPlanRevision @relation(fields: [cuttingPlanRevisionId], references: [id], onDelete: Cascade)
   sheetItem             SheetItem           @relation(fields: [sheetItemId], references: [id], onDelete: Restrict)
 
-  @@unique([cuttingPlanRevisionId, sheetKey], map: "SheetUsageRecord_revision_sheet_key")
+  /// 겹쳐 쓰기는 살아 있는 실적에만 막는다. 무효 이력은 몇 겹이든 쌓인다(`D2-B06-F`).
+  /// 부분 유일 인덱스 `SheetUsageRecord_one_active_per_revision_sheet_key` 는 Prisma 스키마로
+  /// 표현되지 않아 migration SQL 에만 있다. `PriceBook`·`SheetItem` 과 같은 방식이다.
+  @@index([cuttingPlanRevisionId, sheetKey], map: "SheetUsageRecord_revision_sheet_key")
   @@index([organizationId, status, createdAt], map: "SheetUsageRecord_organization_status_idx")
   @@index([organizationId, sheetItemId, status], map: "SheetUsageRecord_sheet_item_idx")
   @@index([salesOrderId], map: "SheetUsageRecord_order_idx")
