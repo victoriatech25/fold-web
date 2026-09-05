@@ -9,6 +9,9 @@
 > 사용자 승인일: 2026-08-01
 >
 > MFC 참조 루트: `/Users/kyhoon/Library/Mobile Documents/com~apple~CloudDocs/회사/hicomtech/도면`
+>
+> 포트 안내: 이 문서를 쓸 당시 검수 서버는 `3001` 이었다. 지금은 `npm run dev` 가 `8000` 을 고정하므로 아래 주소의 `3001` 을 `8000` 으로 읽는다.
+>
 
 ## 1. 접속
 

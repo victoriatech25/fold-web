@@ -165,7 +165,8 @@ export function ServiceShell({
               const active = module.id === activeModule.id;
               return (
                 <Link
-                  aria-current={active ? "page" : undefined}
+                  // 모듈 탭은 화면이 아니라 지금 있는 구역이다. `page` 는 화면 메뉴만 쓴다.
+                  aria-current={active ? "location" : undefined}
                   className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition ${
                     active
                       ? "border-teal-700 text-teal-800"

@@ -4,6 +4,7 @@ import { FormEvent, useState, useTransition } from "react";
 
 import { adminRequest } from "@/components/admin/admin-api";
 import { QueryBar, QueryField } from "@/components/ui/query-bar";
+import type { AuditActionOption } from "@/server/audit/audit-core";
 import type {
   AuditEventDetailDto,
   AuditEventListDto,
@@ -142,14 +143,18 @@ function AuditDetail({
 }
 
 export function AuditLogPanel({
+  actionOptions,
   initialData,
   initialFrom,
   initialTo,
 }: {
+  /** 서버가 만든 작업 목록. 내부 코드를 사용자가 외워 치지 않게 한다. */
+  actionOptions: AuditActionOption[];
   initialData: AuditEventListDto;
   initialFrom: string;
   initialTo: string;
 }) {
+  const entityTypes = [...new Set(actionOptions.map((option) => option.entityType))].sort();
   const [pending, startTransition] = useTransition();
   const [items, setItems] = useState(initialData.items);
   const [nextCursor, setNextCursor] = useState(initialData.nextCursor);
@@ -226,9 +231,12 @@ export function AuditLogPanel({
         <QueryField label="종료일" width="w-36"><input className="field-control !mt-0 h-9" defaultValue={dateInputValue(new Date(initialTo))} name="to" required type="date" /></QueryField>
         <QueryField label="분류" width="w-36"><select className="field-control !mt-0 h-9 bg-white" defaultValue="" name="category"><option value="">전체</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></QueryField>
         <QueryField label="결과" width="w-28"><select className="field-control !mt-0 h-9 bg-white" defaultValue="" name="outcome"><option value="">전체</option>{Object.entries(outcomeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></QueryField>
-        <QueryField label="작업 코드" width="w-44"><input className="field-control !mt-0 h-9" maxLength={150} name="action" placeholder="admin.user_updated" /></QueryField>
+        <QueryField label="작업" width="w-56"><select className="field-control !mt-0 h-9 bg-white" defaultValue="" name="action">{<option value="">전체</option>}{Object.entries(categoryLabels).map(([category, categoryLabel]) => {
+          const options = actionOptions.filter((option) => option.category === category);
+          return options.length === 0 ? null : <optgroup key={category} label={categoryLabel}>{options.map((option) => <option key={option.action} value={option.action}>{option.label}</option>)}</optgroup>;
+        })}</select></QueryField>
         <QueryField label="행위자" width="w-40"><input className="field-control !mt-0 h-9" maxLength={100} name="actorQuery" placeholder="이름 또는 이메일" /></QueryField>
-        <QueryField label="대상 유형" width="w-32"><input className="field-control !mt-0 h-9" maxLength={100} name="entityType" placeholder="User" /></QueryField>
+        <QueryField label="대상 유형" width="w-40"><select className="field-control !mt-0 h-9 bg-white" defaultValue="" name="entityType"><option value="">전체</option>{entityTypes.map((entityType) => <option key={entityType} value={entityType}>{entityType}</option>)}</select></QueryField>
         <QueryField label="대상 ID" width="w-40"><input className="field-control !mt-0 h-9" maxLength={100} name="entityId" /></QueryField>
         <QueryField label="요청 ID" width="w-40"><input className="field-control !mt-0 h-9" maxLength={100} name="requestId" /></QueryField>
         <QueryField label="페이지 크기" width="w-28"><select className="field-control !mt-0 h-9 bg-white" defaultValue="25" name="limit"><option value="25">25건</option><option value="100">100건</option><option value="200">200건</option></select></QueryField>

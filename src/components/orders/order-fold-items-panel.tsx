@@ -4,22 +4,36 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { OrderRequestError, orderRequest } from "@/components/orders/order-api";
 import { useCommonPopup } from "@/components/ui/common-popup";
+import type { OrderCalculationStateDto } from "@/server/orders/order-calculation-service";
 import type { SalesOrderDto } from "@/server/orders/order-service";
 import type { OrderFoldItemDto, OrderFoldMutationResult, OrderFoldOptionsDto } from "@/server/orders/order-fold-service";
 
 type ItemMutation = OrderFoldMutationResult & { item: OrderFoldItemDto };
 type RemoveMutation = OrderFoldMutationResult & { removedItemId: string };
 
+/**
+ * 작업 카드에 붙는 계산 상태. 수주 전체 상태와 그 작업의 계산 결과가 함께 있어야
+ * "이 작업이 지금 얼마로 잡혀 있는지" 를 한 줄로 말할 수 있다.
+ */
+function itemCalculationNote(calculation: OrderCalculationStateDto, foldItemId: string) {
+  const row = calculation.snapshot?.items.find((item) => item.foldItemId === foldItemId);
+  if (!row) return "계산 전";
+  if (calculation.stale) return `재계산 필요 · 계산 버전 ${calculation.snapshot!.snapshotNumber} 기준 ${row.metrics.areaEachM2}㎡/개`;
+  return `계산 완료 · ${row.metrics.areaEachM2}㎡/개`;
+}
+
 export function OrderFoldItemsPanel({
   initialItems,
   options,
   editable,
+  calculation,
   getReadyOrder,
   onMutation,
 }: {
   initialItems: OrderFoldItemDto[];
   options: OrderFoldOptionsDto;
   editable: boolean;
+  calculation: OrderCalculationStateDto;
   getReadyOrder: () => Promise<SalesOrderDto | null>;
   onMutation: (result: OrderFoldMutationResult, activeItemCount: number, affectsCalculation: boolean) => void;
 }) {
@@ -219,7 +233,7 @@ export function OrderFoldItemsPanel({
                   <span className="text-xs font-bold text-teal-700">작업 {item.lineNumber} · {item.source.templateCode} · 개정 {item.source.revisionNumber}</span>
                   <strong className="mt-1 block text-base">{item.name}</strong>
                   <span className="mt-1 block text-sm text-slate-600">수량 {item.quantity} · {item.materialName} {item.thicknessMm}T{item.sheetName ? ` · ${item.sheetName}` : ""}</span>
-                  <span className="mt-1 block text-xs text-slate-500">{item.blockCount}개 블록 · {item.segmentCount}개 선/호 · 계산 전</span>
+                  <span className="mt-1 block text-xs text-slate-500">{item.blockCount}개 블록 · {item.segmentCount}개 선/호 · {itemCalculationNote(calculation, item.id)}</span>
                 </button>
                 {editable ? <div className="mt-3 flex flex-wrap gap-2 border-t pt-3"><button aria-label={`${item.name} 위로`} className="rounded border px-2 py-1 text-xs disabled:opacity-40" disabled={busy || index === 0} onClick={() => void move(item, -1)} type="button">↑ 위로</button><button aria-label={`${item.name} 아래로`} className="rounded border px-2 py-1 text-xs disabled:opacity-40" disabled={busy || index === items.length - 1} onClick={() => void move(item, 1)} type="button">↓ 아래로</button><button className="rounded border px-2 py-1 text-xs" disabled={busy} onClick={() => void copyItem(item)} type="button">복사</button><button className="rounded border border-red-300 px-2 py-1 text-xs text-red-700" disabled={busy} onClick={() => void removeItem(item)} type="button">제거</button></div> : null}
               </article>

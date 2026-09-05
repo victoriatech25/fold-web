@@ -48,11 +48,14 @@ export function StatusBadge({ status }: { status: string }) {
 
 export function OrderListPanel({
   initial,
+  initialStatuses = [],
   customers,
   owners,
   canWrite,
 }: {
   initial: OrderListPage;
+  /** 주소로 들어온 상태 조건. chip 이 처음부터 켜져 있어야 목록과 조건이 맞는다. */
+  initialStatuses?: string[];
   customers: Customer[];
   owners: Owner[];
   canWrite: boolean;
@@ -63,7 +66,7 @@ export function OrderListPanel({
   const [customerId, setCustomerId] = useState("");
   const [ownerMembershipId, setOwnerMembershipId] = useState("");
   const [query, setQuery] = useState("");
-  const [statuses, setStatuses] = useState<string[]>([]);
+  const [statuses, setStatuses] = useState<string[]>(initialStatuses);
   const [orderedFrom, setOrderedFrom] = useState("");
   const [orderedTo, setOrderedTo] = useState("");
   const [busy, setBusy] = useState(false);
@@ -283,7 +286,7 @@ export function OrderListPanel({
           <span className="text-xs text-slate-500">{items.length}건 표시</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[980px] text-sm">
             <thead className="bg-white text-xs text-slate-500">
               <tr className="border-b border-slate-200">
                 <th className="px-4 py-2.5 text-left font-bold">수주번호</th>
@@ -293,6 +296,8 @@ export function OrderListPanel({
                 <th className="px-4 py-2.5 text-left font-bold">담당자</th>
                 <th className="px-4 py-2.5 text-right font-bold">승인 총액</th>
                 <th className="px-4 py-2.5 text-left font-bold">상태</th>
+                {/* 정렬 기준을 열로 보여 준다. 기준이 화면에 없으면 목록 순서가 무작위로 보인다. */}
+                <th className="px-4 py-2.5 text-left font-bold">최근 변경 ↓</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -322,11 +327,14 @@ export function OrderListPanel({
                     <td className="px-4 py-2.5">
                       <StatusBadge status={order.status} />
                     </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500">
+                      {new Date(order.updatedAt).toLocaleString("ko-KR")}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="px-4 py-16 text-center text-sm text-slate-500" colSpan={7}>
+                  <td className="px-4 py-16 text-center text-sm text-slate-500" colSpan={8}>
                     조건에 맞는 수주가 없습니다. 조회조건을 바꾸거나 새 수주를 등록해 주세요.
                   </td>
                 </tr>

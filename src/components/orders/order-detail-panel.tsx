@@ -1,5 +1,6 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -308,9 +309,17 @@ export function OrderDetailPanel({
                 <button className="rounded border border-red-300 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50" disabled={saveState === "saving"} onClick={() => void cancel()} type="button">취소</button>
               </div>
             ) : null}
-            <p className={`text-xs ${saveState === "error" ? "text-red-700" : "text-slate-500"}`} role="status">
-              {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "변경 내용 저장 대기 중…" : saveState === "error" ? "저장 실패 · 저장 버튼으로 다시 시도하세요." : editable ? `저장됨 · ${new Date(order.updatedAt).toLocaleString("ko-KR")}` : `${orderStatusLabels[order.status]} 수주는 읽기 전용입니다.`}
-            </p>
+            {/* 읽기 전용은 저장 상태 문구로 흘리지 않는다. 입력이 왜 안 되는지 먼저 보여야 한다. */}
+            {editable ? (
+              <p className={`text-xs ${saveState === "error" ? "text-red-700" : "text-slate-500"}`} role="status">
+                {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "변경 내용 저장 대기 중…" : saveState === "error" ? "저장 실패 · 저장 버튼으로 다시 시도하세요." : `저장됨 · ${new Date(order.updatedAt).toLocaleString("ko-KR")}`}
+              </p>
+            ) : (
+              <p className="flex items-center gap-1.5 rounded border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-900" role="status">
+                <Lock aria-hidden="true" className="h-3.5 w-3.5" />
+                {orderStatusLabels[order.status]} 수주는 읽기 전용입니다.
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -389,6 +398,7 @@ export function OrderDetailPanel({
 
       <TabPanel id="folds" value={tab}>
         <OrderFoldItemsPanel
+          calculation={calculation}
           editable={editable}
           getReadyOrder={() => persist(form, true)}
           initialItems={initialFoldItems}

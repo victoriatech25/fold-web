@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { AuditLogPanel } from "@/components/admin/audit-log-panel";
+import { auditActionOptions } from "@/server/audit/audit-core";
 import { listAuditEvents } from "@/server/audit/audit-service";
 import { requirePermissionPage } from "@/server/auth/auth-dal";
 import { getPrisma } from "@/server/db/prisma";
@@ -25,6 +26,7 @@ export default async function AdminAuditLogsPage() {
         </p>
       </div>
       <AuditLogPanel
+        actionOptions={auditActionOptions()}
         initialData={data}
         initialFrom={from.toISOString()}
         initialTo={to.toISOString()}

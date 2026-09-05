@@ -2,6 +2,7 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
+  ClipboardList,
   Clock3,
   FilePenLine,
   Library,
@@ -31,8 +32,9 @@ export default async function Home() {
   const canReadTemplates = auth.permissions.includes("template.fold.read");
   const canEditTemplates = auth.permissions.includes("template.fold.edit");
   const canReadMasterData = auth.permissions.includes("master_data.read");
+  const canReadOrders = auth.permissions.includes("order.read");
 
-  const [draftCount, publishedCount, templateCount, recentDrafts, siteCount] =
+  const [draftCount, publishedCount, templateCount, recentDrafts, siteCount, openOrderCount, productionOrderCount] =
     await Promise.all([
       canReadTemplates
         ? prisma.foldRevision.count({
@@ -83,6 +85,24 @@ export default async function Home() {
               active: true,
               deletedAt: null,
               organizationId: auth.organizationId,
+            },
+          })
+        : Promise.resolve(0),
+      // 아직 금액이 확정되지 않아 손이 더 가야 하는 수주.
+      canReadOrders
+        ? prisma.salesOrder.count({
+            where: {
+              organizationId: auth.organizationId,
+              status: { in: ["DRAFT", "CALCULATED"] },
+            },
+          })
+        : Promise.resolve(0),
+      // 승인 이후 생산이 끝나기 전까지. 마감·취소는 세지 않는다.
+      canReadOrders
+        ? prisma.salesOrder.count({
+            where: {
+              organizationId: auth.organizationId,
+              status: { in: ["APPROVED", "PRODUCTION_REQUESTED", "IN_PRODUCTION"] },
             },
           })
         : Promise.resolve(0),
@@ -176,20 +196,21 @@ export default async function Home() {
               <ArrowRight aria-hidden="true" className="mt-4 h-4 w-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-teal-600" />
             </Link>
           ) : null}
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-200 text-slate-500">
-              <FilePenLine aria-hidden="true" className="h-5 w-5" />
-            </span>
-            <span className="mt-4 flex items-center gap-2 text-sm font-black text-slate-600">
-              수주·작업
-              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600">
-                준비 중
+          {canReadOrders ? (
+            <Link
+              className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md"
+              href="/orders"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
+                <ClipboardList aria-hidden="true" className="h-5 w-5" />
               </span>
-            </span>
-            <span className="mt-1 block text-xs leading-5 text-slate-500">
-              고객 주문에서 설계·계산·생산까지 연결할 예정입니다.
-            </span>
-          </div>
+              <span className="mt-4 block text-sm font-black">수주 등록/조회</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">
+                고객 주문을 등록하고 절곡·계산·승인을 이어서 처리합니다.
+              </span>
+              <ArrowRight aria-hidden="true" className="mt-4 h-4 w-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-teal-600" />
+            </Link>
+          ) : null}
         </div>
       </section>
 
@@ -247,6 +268,18 @@ export default async function Home() {
             <h2 className="text-base font-black">현재 서비스 현황</h2>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3">
+            {canReadOrders ? (
+              <>
+                <Link className="rounded-xl bg-slate-900 p-4 transition hover:bg-slate-800" href="/orders?statuses=DRAFT,CALCULATED">
+                  <p className="text-2xl font-black text-white">{openOrderCount}</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-300">진행 중 수주</p>
+                </Link>
+                <Link className="rounded-xl bg-teal-700 p-4 transition hover:bg-teal-800" href="/orders?statuses=APPROVED,PRODUCTION_REQUESTED,IN_PRODUCTION">
+                  <p className="text-2xl font-black text-white">{productionOrderCount}</p>
+                  <p className="mt-1 text-xs font-semibold text-teal-100">승인 후 생산</p>
+                </Link>
+              </>
+            ) : null}
             <div className="rounded-xl bg-teal-50 p-4">
               <p className="text-2xl font-black text-teal-900">{draftCount}</p>
               <p className="mt-1 text-xs font-semibold text-teal-700">설계 초안</p>

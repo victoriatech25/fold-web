@@ -107,13 +107,23 @@ export function visibleModules(permissions: readonly PermissionKey[]): Navigatio
     .filter((module) => module.href !== undefined || module.items.length > 0);
 }
 
-function matchesPath(pathname: string, href: string) {
+/** 이 화면에 딸린 하위 경로인지. `/cutting` 과 `/cutting/usage` 처럼 형제 화면은 제외한다. */
+function matchesPath(pathname: string, href: string, siblings: readonly string[] = []): boolean {
   if (href === "/") return pathname === href;
-  return pathname === href || pathname.startsWith(`${href}/`);
+  if (pathname === href) return true;
+  if (!pathname.startsWith(`${href}/`)) return false;
+  // 더 긴 형제 경로가 있으면 그쪽이 현재 화면이다. 둘 다 켜면 지금 어디인지 흐려진다.
+  return !siblings.some((sibling) => sibling.length > href.length && matchesPath(pathname, sibling));
 }
 
+/** 메뉴에 등록된 모든 화면 경로. 형제 경로를 가려내는 데 쓴다. */
+const allHrefs: string[] = modules.flatMap((module) => [
+  ...(module.href ? [module.href] : []),
+  ...module.items.flatMap((item) => (item.href ? [item.href] : [])),
+]);
+
 export function isCurrentPath(pathname: string, href: string) {
-  return matchesPath(pathname, href);
+  return matchesPath(pathname, href, allHrefs);
 }
 
 /** 현재 경로가 속한 모듈. 어디에도 속하지 않으면 업무 홈으로 본다. */

@@ -50,13 +50,15 @@ button {
   box-shadow: 0 0 0 2px #ccfbf1;
 }
 
-/* Disabled data remains readable while clearly indicating that it cannot be changed. */
+/* Disabled data remains readable while clearly indicating that it cannot be changed.
+   The ground is kept a step darker than white so a read-only screen reads as read-only
+   at a glance, not only when a field is clicked. */
 .field-control:disabled {
   cursor: not-allowed;
-  border-color: #ded3bf !important;
-  background-color: #f7f3ea !important;
-  color: #6b5b45 !important;
-  box-shadow: inset 0 0 0 1px #eee6d9;
+  border-color: #cdbfa4 !important;
+  background-color: #f0e8d7 !important;
+  color: #5c4d38 !important;
+  box-shadow: inset 0 0 0 1px #e3d8c2;
   opacity: 1;
 }
 

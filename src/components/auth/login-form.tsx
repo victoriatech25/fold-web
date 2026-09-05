@@ -79,11 +79,9 @@ export function LoginForm() {
           type="password"
         />
       </div>
-      <p
-        aria-live="polite"
-        className={`min-h-5 text-sm ${message ? "text-red-700" : "text-transparent"}`}
-      >
-        {message || "로그인 안내"}
+      {/* 자리는 늘 잡아 두되 내용은 비운다. 투명한 글씨는 눈에만 안 보이고 보조기기는 읽는다. */}
+      <p aria-live="polite" className="min-h-5 text-sm text-red-700">
+        {message}
       </p>
       <button
         className="h-11 w-full rounded-md bg-teal-700 text-sm font-bold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"

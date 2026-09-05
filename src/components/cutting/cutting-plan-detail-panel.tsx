@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CuttingInput, CuttingResult } from "@/domain/cutting/schema";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type { CuttingPlanDetailDto, CuttingPlanDto } from "@/server/cutting/cutting-plan-service";
-import { cuttingRequest, planStatusLabels, planStatusStyles } from "./cutting-plan-list-panel";
+import { cuttingRequest, planStatusLabels, planStatusStyles, revisionStatusLabels } from "./cutting-plan-list-panel";
 
 /** 원판 하나를 화면 폭에 맞춰 그린다. 긴 쪽을 가로로, 배치 원점을 좌상단으로 놓는다. */
 function SheetFigure({
@@ -242,7 +242,7 @@ export function CuttingPlanDetailPanel({
     const reason = await popup.prompt({
       title: "재단 승인 취소",
       message:
-        "승인을 풀고 계산 완료 상태로 되돌립니다. 이 재단의 원판 사용 실적은 무효로 표시되고, 여기서 나온 잔재는 폐기됩니다. 이 재단이 쓴 잔재는 다시 쓸 수 있게 돌아옵니다.",
+        "승인을 풀고 계산 완료 상태로 되돌립니다. 이 재단의 원판 사용 실적은 지우지 않고 무효로 표시하며, 무효가 된 실적은 기간 집계에서 빠집니다.",
       inputLabel: "승인 취소 사유",
       required: true,
       maxLength: 500,
@@ -272,7 +272,12 @@ export function CuttingPlanDetailPanel({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-baseline gap-2">
-        <h1 className="text-xl font-black">재단 {plan.orderNumber}</h1>
+        <h1 className="text-xl font-black">
+          재단{" "}
+          <Link className="text-teal-800 underline" href={`/orders/${plan.salesOrderId}`}>
+            {plan.orderNumber}
+          </Link>
+        </h1>
         <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${planStatusStyles[plan.status]}`}>
           {planStatusLabels[plan.status]}
         </span>
@@ -411,7 +416,7 @@ export function CuttingPlanDetailPanel({
             {plan.revisions.map((item) => (
               <tr className="border-t border-slate-100" key={item.id}>
                 <td className="px-4 py-2 font-bold">{item.revisionNumber}</td>
-                <td className="px-4 py-2">{item.status}</td>
+                <td className="px-4 py-2">{revisionStatusLabels[item.status]}</td>
                 <td className="px-4 py-2 text-right">{item.sheetCount ?? "-"}</td>
                 <td className="px-4 py-2 text-right">
                   {item.yieldPercent ? `${item.yieldPercent}%` : "-"}

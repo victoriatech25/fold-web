@@ -7,7 +7,7 @@ import type { AuthenticatedContext } from "@/server/auth/auth-types";
 import { requirePermission } from "@/server/authorization/authorization";
 import { enqueueJob } from "@/server/jobs/job-service";
 import { Prisma } from "@/generated/prisma/client";
-import type { PrismaClient, SalesOrderStatus } from "@/generated/prisma/client";
+import type { CuttingPlanStatus, PrismaClient, SalesOrderStatus } from "@/generated/prisma/client";
 import { buildCuttingInputs } from "./cutting-input-builder";
 import { CuttingError } from "./cutting-error";
 import { recordSheetUsageForApproval, voidSheetUsageForPlan } from "./sheet-usage-service";
@@ -312,13 +312,22 @@ function readPlanInput(planId: string, raw: unknown): CuttingInput {
 export async function listCuttingPlans(
   prisma: PrismaClient,
   context: AuthenticatedContext,
-  filter: { salesOrderId?: string; limit?: number } = {},
+  filter: {
+    salesOrderId?: string;
+    /** 수주번호 일부. 재단은 수주로 찾는 것이 현장 감각에 가깝다. */
+    q?: string;
+    statuses?: CuttingPlanStatus[];
+    limit?: number;
+  } = {},
 ): Promise<{ items: CuttingPlanDto[] }> {
   requirePermission(context, "cutting.optimize");
+  const q = filter.q?.trim();
   const rows = await prisma.cuttingPlan.findMany({
     where: {
       organizationId: context.organizationId,
       ...(filter.salesOrderId ? { salesOrderId: filter.salesOrderId } : {}),
+      ...(filter.statuses?.length ? { status: { in: filter.statuses } } : {}),
+      ...(q ? { salesOrder: { orderNumber: { contains: q, mode: "insensitive" as const } } } : {}),
     },
     select: planSelect,
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],

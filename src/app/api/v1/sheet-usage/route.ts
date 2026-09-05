@@ -6,10 +6,15 @@ import { summarizeSheetUsageByPeriod } from "@/server/cutting/sheet-usage-servic
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** 날짜만 받는다. 비어 있으면 기간을 걸지 않는다. */
+/**
+ * 날짜만 받는다. 비어 있으면 기간을 걸지 않는다.
+ *
+ * 경계는 KST 로 자른다. 실적이 걸린 `createdAt` 은 진짜 시각이라 서버 시간대를 따르면
+ * 배포 환경에 따라 집계가 하루씩 밀린다. 감사 로그 조회조건도 같은 기준을 쓴다.
+ */
 function readDate(value: string | null, endOfDay: boolean): Date | null | "INVALID" {
   if (!value) return null;
-  const parsed = new Date(endOfDay ? `${value}T23:59:59.999` : `${value}T00:00:00.000`);
+  const parsed = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}+09:00`);
   return Number.isNaN(parsed.getTime()) ? "INVALID" : parsed;
 }
 

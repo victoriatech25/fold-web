@@ -1,11 +1,14 @@
 "use client";
 
-import { Search } from "lucide-react";
-import type { FormEvent, ReactNode } from "react";
+import { Search, SlidersHorizontal } from "lucide-react";
+import { type FormEvent, type ReactNode, useId, useState } from "react";
 
 /**
  * 목록 화면 상단의 공통 조회조건 바다.
  * 조건은 한 줄에 모으고 `조회` 버튼을 오른쪽 끝에 고정해 화면마다 위치가 흔들리지 않게 한다.
+ *
+ * 좁은 화면에서는 접어 둔다. 조건이 세로로 다 펼쳐지면 목록을 보러 온 사람이
+ * 결과 첫 줄까지 한참 스크롤해야 한다.
  */
 export function QueryBar({
   actions,
@@ -20,12 +23,28 @@ export function QueryBar({
   onReset?: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const fieldsId = useId();
+  const [open, setOpen] = useState(false);
+
   return (
     <form
       className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
       onSubmit={onSubmit}
     >
-      <div className="flex flex-wrap items-end gap-3">
+      <button
+        aria-controls={fieldsId}
+        aria-expanded={open}
+        className="flex h-9 w-full items-center justify-center gap-1.5 rounded border border-slate-300 text-xs font-bold text-slate-600 lg:hidden"
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <SlidersHorizontal aria-hidden="true" className="h-3.5 w-3.5" />
+        조회조건 {open ? "닫기" : "열기"}
+      </button>
+      <div
+        className={`${open ? "mt-3 flex" : "hidden"} flex-wrap items-end gap-3 lg:mt-0 lg:flex`}
+        id={fieldsId}
+      >
         {children}
         <div className="ml-auto flex items-end gap-2">
           {actions}

@@ -269,9 +269,15 @@ export function JobListPanel({ initial }: { initial: JobPage }) {
               ) : null}
               {job.status === "SUCCEEDED" ? <JobResultFile job={job} /> : null}
               {job.status === "SUCCEEDED" && job.result ? (
-                <pre className="mt-3 overflow-x-auto rounded bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                  {JSON.stringify(job.result, null, 2)}
-                </pre>
+                // 실행 결과 원문은 문제를 파헤칠 때만 쓴다. 펼쳐 두면 좌표·UUID 가 화면을 덮는다.
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-xs font-bold text-slate-600 hover:text-slate-900">
+                    실행 결과 원문 보기
+                  </summary>
+                  <pre className="mt-2 max-h-80 overflow-auto rounded bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                    {JSON.stringify(job.result, null, 2)}
+                  </pre>
+                </details>
               ) : null}
             </article>
           ))

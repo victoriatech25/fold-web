@@ -640,3 +640,25 @@ export function isAuditAction(value: string): value is AuditAction {
 export function auditActionLabel(action: string): string {
   return isAuditAction(action) ? auditActionCatalog[action].label : action;
 }
+
+export type AuditActionOption = {
+  action: string;
+  label: string;
+  category: AuditCategory;
+  entityType: string;
+};
+
+/**
+ * 조회조건에서 고를 수 있는 작업 목록.
+ * 사용자가 `admin.user_updated` 같은 내부 코드를 외워 칠 이유가 없다.
+ */
+export function auditActionOptions(): AuditActionOption[] {
+  return Object.entries(auditActionCatalog)
+    .map(([action, entry]) => ({
+      action,
+      label: entry.label,
+      category: entry.category as AuditCategory,
+      entityType: entry.entityType,
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label, "ko-KR"));
+}

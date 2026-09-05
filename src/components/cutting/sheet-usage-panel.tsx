@@ -178,7 +178,10 @@ export function SheetUsagePanel({
             {overview.items.length === 0 ? (
               <tr>
                 <td className="px-3 py-6 text-center text-slate-500" colSpan={8}>
-                  이 기간에 승인된 재단이 없습니다.
+                  이 기간에 승인된 재단이 없습니다. 실적은 재단을 승인할 때 쌓입니다.{" "}
+                  <Link className="font-bold text-teal-800 underline" href="/cutting">
+                    생산·절단으로 이동
+                  </Link>
                 </td>
               </tr>
             ) : (
