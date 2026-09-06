@@ -58,6 +58,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Start MinIO for storage integration tests
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 -p 9001:9001 \
+            -e MINIO_ROOT_USER=fold-web-local \
+            -e MINIO_ROOT_PASSWORD=fold-web-local-secret \
+            minio/minio:RELEASE.2025-04-22T22-12-26Z server /data --console-address ":9001"
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:9000/minio/health/live > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "MinIO did not become ready in time" >&2
+          exit 1
+
       - name: Prepare isolated PostgreSQL roles and shadow database
         env:
           PGPASSWORD: postgres
