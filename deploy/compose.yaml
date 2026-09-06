@@ -10,6 +10,9 @@ services:
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN is required}
+      AUTH_RATE_LIMIT_SECRET: ${AUTH_RATE_LIMIT_SECRET:?AUTH_RATE_LIMIT_SECRET is required}
     security_opt:
       - no-new-privileges:true
     stop_grace_period: 20s
@@ -23,6 +26,7 @@ services:
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       # 긴 작업이 web용 5초 statement timeout에 끊기지 않도록 worker는 따로 잡는다.
       DATABASE_STATEMENT_TIMEOUT_MS: "${WORKER_DATABASE_STATEMENT_TIMEOUT_MS:-60000}"
       DATABASE_CONNECTION_LIMIT: "${WORKER_DATABASE_CONNECTION_LIMIT:-4}"
