@@ -18,8 +18,10 @@ test("업무 홈에서 실제 기능과 준비 중 기능을 구분하고 설계
 
   await expect(page.getByRole("heading", { name: "업무 홈" })).toBeVisible();
   await expect(page.getByRole("link", { name: /새 도면 설계/ })).toBeVisible();
-  await expect(page.getByText("수주·작업").first()).toBeVisible();
-  await expect(page.getByText("준비 중").first()).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "수주 등록/조회" }),
+  ).toBeVisible();
+  await expect(page.getByText("진행 중 수주").first()).toBeVisible();
   await expect(page.getByText("실제 서버 데이터만 집계합니다.")).toBeVisible();
 
   await page.getByRole("link", { name: /새 도면 설계/ }).click();

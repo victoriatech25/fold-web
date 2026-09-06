@@ -201,7 +201,7 @@ test("없는 파일과 잘못된 식별자는 구분해서 거절한다", async 
 
 test("수주 첨부 탭에서 파일을 올리고 내려받고 지운다", async ({ page }) => {
   await login(page);
-  await page.getByRole("link", { name: "수주 등록/조회" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "수주 등록/조회" }).click();
   await page.getByRole("button", { name: "새 수주" }).click();
   const createDialog = page.getByRole("dialog", { name: "새 수주" });
   await createDialog.getByLabel("새 수주 거래처").selectOption({ index: 1 });

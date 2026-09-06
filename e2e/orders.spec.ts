@@ -25,7 +25,7 @@ async function openTab(page: import("@playwright/test").Page, name: string | Reg
 
 test("수주 헤더를 생성·자동 저장·복사·취소하고 다시 조회한다", async ({ page }) => {
   await login(page);
-  await page.getByRole("link", { name: "수주 등록/조회" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "수주 등록/조회" }).click();
   await expect(page).toHaveURL(/\/orders$/);
   await expect(page.getByRole("heading", { name: "수주 목록" })).toBeVisible();
 
@@ -87,7 +87,7 @@ test("수주 헤더를 생성·자동 저장·복사·취소하고 다시 조회
 
 test("게시 절곡 개정을 수주 snapshot으로 추가하고 입력·복사·정렬·제거한다", async ({ page }) => {
   await login(page);
-  await page.getByRole("link", { name: "수주 등록/조회" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "수주 등록/조회" }).click();
   await page.getByRole("button", { name: "새 수주" }).click();
   const createDialog = page.getByRole("dialog", { name: "새 수주" });
   await createDialog.getByLabel("새 수주 거래처").selectOption({ label: "SCREEN-PRICE · 화면검수 가격 거래처" });
@@ -163,7 +163,7 @@ test("게시 절곡 개정을 수주 snapshot으로 추가하고 입력·복사�
   await expect(page.getByText("고정 계산 버전")).toContainText("2");
   await openTab(page, /절곡 작업/);
   await expect(page.getByLabel("수량")).toBeDisabled();
-  await expect(page.getByLabel("수량")).toHaveCSS("background-color", "rgb(247, 243, 234)");
+  await expect(page.getByLabel("수량")).toHaveCSS("background-color", "rgb(240, 232, 215)");
   await expect(page.getByLabel("수량")).toHaveCSS("cursor", "not-allowed");
 
   await openTab(page, "승인·생산");
