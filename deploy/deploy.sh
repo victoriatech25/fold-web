@@ -9,6 +9,18 @@ readonly previous_file="${deploy_dir}/.previous-image"
 
 cd "${deploy_dir}"
 
+# APP_IMAGE 한 줄만 갈아 끼운다. .env 에는 DATABASE_URL 같은 배포와
+# 무관한 설정도 함께 들어 있어서, 파일 전체를 새로 쓰면 그 값들이 지워진다.
+set_app_image() {
+  local value="$1"
+  touch "${env_file}"
+  if grep -q '^APP_IMAGE=' "${env_file}"; then
+    sed -i "s|^APP_IMAGE=.*|APP_IMAGE=${value}|" "${env_file}"
+  else
+    printf 'APP_IMAGE=%s\n' "${value}" >> "${env_file}"
+  fi
+}
+
 previous_image=""
 if [[ -f "${env_file}" ]]; then
   previous_image="$(sed -n 's/^APP_IMAGE=//p' "${env_file}" | head -n 1)"
@@ -18,8 +30,7 @@ if [[ -n "${previous_image}" && "${previous_image}" != "${image}" ]]; then
   printf '%s\n' "${previous_image}" > "${previous_file}"
 fi
 
-printf 'APP_IMAGE=%s\n' "${image}" > "${env_file}.tmp"
-mv "${env_file}.tmp" "${env_file}"
+set_app_image "${image}"
 
 rollback() {
   if [[ ! -s "${previous_file}" ]]; then
@@ -30,7 +41,7 @@ rollback() {
   local rollback_image
   rollback_image="$(head -n 1 "${previous_file}")"
   echo "Deployment failed. Rolling back to ${rollback_image}." >&2
-  printf 'APP_IMAGE=%s\n' "${rollback_image}" > "${env_file}"
+  set_app_image "${rollback_image}"
   docker compose pull
   docker compose up -d --no-build --remove-orphans
 }
