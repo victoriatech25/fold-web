@@ -18,6 +18,11 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN is required}
       AUTH_RATE_LIMIT_SECRET: ${AUTH_RATE_LIMIT_SECRET:?AUTH_RATE_LIMIT_SECRET is required}
+    # DATABASE_URL 이 호스트에 떠 있는 PostgreSQL을 가리킬 때, 컨테이너 안의
+    # `127.0.0.1`은 컨테이너 자신이라 호스트에 닿지 않는다. `host.docker.internal`을
+    # 쓰도록 DATABASE_URL 에 반영하고, 이 host 는 여기서 게이트웨이로 풀어준다.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     security_opt:
       - no-new-privileges:true
     stop_grace_period: 20s
@@ -40,6 +45,8 @@ services:
       # 긴 작업이 web용 5초 statement timeout에 끊기지 않도록 worker는 따로 잡는다.
       DATABASE_STATEMENT_TIMEOUT_MS: "${WORKER_DATABASE_STATEMENT_TIMEOUT_MS:-60000}"
       DATABASE_CONNECTION_LIMIT: "${WORKER_DATABASE_CONNECTION_LIMIT:-4}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     security_opt:
       - no-new-privileges:true
     # 돌고 있는 작업이 끝날 시간을 준다. 못 끝내도 lease 만료로 회수된다.

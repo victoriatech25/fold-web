@@ -13,6 +13,19 @@
 - 운영 서버와 동일한 `linux/amd64` 이미지 검증
 - 같은 이미지를 쓰는 `app`·`worker` 두 서비스의 Docker Compose 구성
 
+### 서버의 `.env`에 있어야 하는 값
+
+`deploy/compose.yaml`이 `${VAR:?...}` 로 필수 표시해 둔 값이다. 없으면 `docker compose config` 단계에서부터 바로 실패한다.
+
+| 변수 | 필요한 서비스 | 비고 |
+|---|---|---|
+| `APP_IMAGE` | app, worker | `deploy.sh`가 배포 때마다 이 줄만 갈아 끼운다. 다른 줄은 건드리지 않는다 |
+| `DATABASE_URL` | app, worker | PostgreSQL 이 이 서버 자신에 떠 있다면 호스트를 `127.0.0.1` 이 아니라 **`host.docker.internal`** 로 써야 한다. 컨테이너 안의 `127.0.0.1`은 컨테이너 자신이다 |
+| `APP_ORIGIN` | app | 실제 공개 도메인. `https://`, 운영에서는 HTTPS 필수 |
+| `AUTH_RATE_LIMIT_SECRET` | app | 32자 이상 임의 문자열 |
+
+`STORAGE_*`는 아직 필수가 아니다. 4절에 적은 대로 운영 저장소 적용은 `P2-C08`에서 한다.
+
 로컬 검증 명령:
 
 ```bash
