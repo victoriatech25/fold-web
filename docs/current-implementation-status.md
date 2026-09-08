@@ -625,3 +625,4 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 - [3D 모델 설계 및 단계 기록](./threejs-model-plan.md)
 - [편집기 수동 테스트 계획](./editor-test-plan.md)
 - [Docker 및 배포 가이드](./deployment-guide.md)
+- [2026-09-08 전체 점검](./project-audit-2026-09-08.md)
