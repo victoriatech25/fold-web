@@ -2,6 +2,7 @@
 
 import { FormEvent, useState, useTransition } from "react";
 
+import { formatDate, formatDateTimeSeconds } from "@/domain/format-date";
 import { adminRequest } from "@/components/admin/admin-api";
 import { QueryBar, QueryField } from "@/components/ui/query-bar";
 import type { AuditActionOption } from "@/server/audit/audit-core";
@@ -27,16 +28,7 @@ const outcomeLabels = {
   FAILURE: "실패",
 } as const;
 
-function dateInputValue(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${value.year}-${value.month}-${value.day}`;
-}
+const dateInputValue = formatDate;
 
 function startOfLocalDate(value: string): string {
   return new Date(`${value}T00:00:00+09:00`).toISOString();
@@ -46,13 +38,7 @@ function endOfLocalDate(value: string): string {
   return new Date(`${value}T23:59:59.999+09:00`).toISOString();
 }
 
-function formatOccurredAt(value: string): string {
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(new Date(value));
-}
+const formatOccurredAt = formatDateTimeSeconds;
 
 function createQuery(
   form: HTMLFormElement,

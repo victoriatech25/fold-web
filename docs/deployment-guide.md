@@ -14,6 +14,10 @@
 - 운영 서버와 동일한 `linux/amd64` 이미지 검증
 - 같은 이미지를 쓰는 `app`·`worker` 두 서비스의 Docker Compose 구성
 
+### 시간대
+
+이미지와 compose 의 세 서비스(`app`·`worker`·`migrate`) 모두 `TZ=Asia/Seoul` 이다(2026-09-08 점검 H2). `node:22-alpine` 기본은 UTC 라 로그·큐 시각이 9시간 어긋났다. 화면에 보이는 날짜·시각은 `src/domain/format-date.ts` 가 시간대를 `Asia/Seoul` 로 고정하고 로케일 문자열 없이 `2026-09-12 13:08` 꼴로 찍으므로 컨테이너 시간대와 무관하게 서버·브라우저가 같은 문자열을 낸다. 날짜를 새로 찍는 코드는 이 파일의 함수를 쓴다.
+
 ### 서버의 `.env`에 있어야 하는 값
 
 `deploy/compose.yaml`이 `${VAR:?...}` 로 필수 표시해 둔 값이다. 없으면 `docker compose config` 단계에서부터 바로 실패한다.
@@ -74,6 +78,7 @@ worker 전용 환경변수는 다음과 같다. DB 접속 정보는 `app`과 같
 | `WORKER_MAINTENANCE_INTERVAL_MS` | `60000` | lease 회수와 종료 작업 정리 주기 |
 | `WORKER_JOB_RETENTION_DAYS` | `90` | 끝난 작업을 큐 테이블에서 지우기까지의 기간 |
 | `WORKER_ID` | 호스트명 | 로그와 lease 소유자 표시에 쓴다 |
+| `WORKER_JOB_TYPES` | 비움(전부) | 이 worker 가 잡을 작업 종류를 쉼표로 제한한다. 예: `cutting.optimize,cutting.dxf`. 재단 전용 worker 를 따로 띄우거나, E2E 처럼 특정 작업을 건드리지 말아야 할 때 쓴다 |
 
 worker를 여러 개 띄워도 된다. `FOR UPDATE SKIP LOCKED`로 작업을 잡으므로 같은 작업을 두 번 처리하지 않는다.
 

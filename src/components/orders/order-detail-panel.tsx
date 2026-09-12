@@ -4,6 +4,7 @@ import { Lock } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatDateTime } from "@/domain/format-date";
 import { OrderRequestError, orderRequest } from "@/components/orders/order-api";
 import { OrderFoldItemsPanel } from "@/components/orders/order-fold-items-panel";
 import { OrderCalculationPanel } from "@/components/orders/order-calculation-panel";
@@ -312,7 +313,7 @@ export function OrderDetailPanel({
             {/* 읽기 전용은 저장 상태 문구로 흘리지 않는다. 입력이 왜 안 되는지 먼저 보여야 한다. */}
             {editable ? (
               <p className={`text-xs ${saveState === "error" ? "text-red-700" : "text-slate-500"}`} role="status">
-                {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "변경 내용 저장 대기 중…" : saveState === "error" ? "저장 실패 · 저장 버튼으로 다시 시도하세요." : `저장됨 · ${new Date(order.updatedAt).toLocaleString("ko-KR")}`}
+                {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "변경 내용 저장 대기 중…" : saveState === "error" ? "저장 실패 · 저장 버튼으로 다시 시도하세요." : `저장됨 · ${formatDateTime(order.updatedAt)}`}
               </p>
             ) : (
               <p className="flex items-center gap-1.5 rounded border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-900" role="status">

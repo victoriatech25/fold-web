@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { formatDateTime } from "@/domain/format-date";
 import { orderRequest } from "@/components/orders/order-api";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type { SalesOrderDto } from "@/server/orders/order-service";
@@ -78,7 +79,7 @@ export function OrderStatusPanel({ order, canApprove, onChanged }: { order: Sale
       {order.approvedAt ? (
         <div className="mt-4 grid gap-2 rounded border border-teal-200 bg-teal-50 p-3 text-sm text-teal-950 sm:grid-cols-2">
           <p>승인자 <strong>{order.approvedByName ?? "확인 불가"}</strong></p>
-          <p>승인 시각 <strong>{new Date(order.approvedAt).toLocaleString("ko-KR")}</strong></p>
+          <p>승인 시각 <strong>{formatDateTime(order.approvedAt)}</strong></p>
           <p>고정 계산 버전 <strong>{order.approvedCalculationSnapshotNumber}</strong></p>
           <p>결과 checksum <strong className="font-mono">{order.approvedCalculationResultChecksumSha256?.slice(0, 12)}</strong></p>
         </div>

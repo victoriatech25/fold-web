@@ -1,3 +1,4 @@
+import { formatDate } from "@/domain/format-date";
 import type { CuttingAnnotations } from "@/domain/cutting/annotations";
 import type { CuttingInput, CuttingSheetResult } from "@/domain/cutting/schema";
 import type { ManufacturingGeometry } from "@/domain/manufacturing-geometry";
@@ -227,12 +228,5 @@ export function alphaIndex(index: number): string {
 
 /** `yymmdd`. 서버 시간대가 아니라 Asia/Seoul 기준이다(점검 H2 와 같은 이유). */
 export function dateKeyOf(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "2-digit",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
-  return `${get("year")}${get("month")}${get("day")}`;
+  return formatDate(date).slice(2).replace(/-/g, "");
 }

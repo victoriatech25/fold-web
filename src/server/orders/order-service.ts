@@ -1,5 +1,6 @@
 import "server-only";
 
+import { formatDate } from "@/domain/format-date";
 import type { Prisma, PrismaClient, SalesOrderStatus } from "@/generated/prisma/client";
 import { requirePermission } from "@/server/authorization/authorization";
 import { writeAuditEvent } from "@/server/audit/audit-writer";
@@ -123,18 +124,10 @@ function databaseDate(value: string | null | undefined) {
 }
 
 function koreanDateParts(now: Date) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now);
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  const year = Number(value("year"));
+  const date = formatDate(now);
   return {
-    year,
-    orderedAt: new Date(`${year}-${value("month")}-${value("day")}T00:00:00.000Z`),
+    year: Number(date.slice(0, 4)),
+    orderedAt: new Date(`${date}T00:00:00.000Z`),
   };
 }
 

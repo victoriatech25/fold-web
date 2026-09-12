@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { formatDateTime } from "@/domain/format-date";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type { JobDto } from "@/server/jobs/job-service";
 
@@ -230,7 +231,7 @@ export function JobListPanel({ initial }: { initial: JobPage }) {
                   </div>
                   <p className="mt-1 truncate text-sm text-slate-700">{job.summary ?? "요약 없음"}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {job.requestedByName} · 등록 {new Date(job.createdAt).toLocaleString("ko-KR")} · 시도 {job.attempt}/{job.maxAttempts}
+                    {job.requestedByName} · 등록 {formatDateTime(job.createdAt)} · 시도 {job.attempt}/{job.maxAttempts}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">

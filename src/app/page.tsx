@@ -11,20 +11,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { formatMonthDayTime } from "@/domain/format-date";
 import { ServiceShell } from "@/components/app-shell/service-shell";
 import { requireAuthenticatedPage } from "@/server/auth/auth-dal";
 import { getPrisma } from "@/server/db/prisma";
 
 export const dynamic = "force-dynamic";
 
-function formatUpdatedAt(value: Date) {
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(value);
-}
+// 서버 컴포넌트라 클라이언트 재렌더가 없다. 시간대를 고정하지 않으면 컨테이너(UTC)
+// 시각이 그대로 보인다(점검 H2).
+const formatUpdatedAt = formatMonthDayTime;
 
 export default async function Home() {
   const auth = await requireAuthenticatedPage();

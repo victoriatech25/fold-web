@@ -15,6 +15,7 @@ import { reaction } from "mobx";
 import { observer } from "mobx-react-lite";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { formatDateTime } from "@/domain/format-date";
 import { CanvasWorkspace } from "@/components/canvas-workspace";
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
 import {
@@ -644,7 +645,7 @@ export const FoldDraftWorkspace = observer(function FoldDraftWorkspace({
         </div>
         {detail ? (
           <p className="mt-2 text-[11px] text-slate-500">
-            버전 {controllerRef.current?.currentLockVersion ?? detail.lockVersion} · 마지막 수정 {new Date(detail.updatedAt).toLocaleString("ko-KR")}
+            버전 {controllerRef.current?.currentLockVersion ?? detail.lockVersion} · 마지막 수정 {formatDateTime(detail.updatedAt)}
           </p>
         ) : (
           <p className="mt-2 text-[11px] text-amber-700">
@@ -667,7 +668,7 @@ export const FoldDraftWorkspace = observer(function FoldDraftWorkspace({
       {recovery ? (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           <AlertTriangle size={17} />
-          <span className="mr-auto">{new Date(recovery.savedAt).toLocaleString("ko-KR")}의 미저장 복구본이 있습니다.</span>
+          <span className="mr-auto">{formatDateTime(recovery.savedAt)}의 미저장 복구본이 있습니다.</span>
           <button type="button" onClick={applyRecovery} className="rounded bg-amber-700 px-3 py-1.5 text-xs font-bold text-white">복구</button>
           <button type="button" onClick={() => void discardRecovery()} className="rounded border border-amber-400 px-3 py-1.5 text-xs font-bold">버리기</button>
         </div>
@@ -695,7 +696,7 @@ export const FoldDraftWorkspace = observer(function FoldDraftWorkspace({
           {recentDrafts.length === 0 ? <p className="p-6 text-center text-sm text-slate-500">저장된 초안이 없습니다.</p> : recentDrafts.map((draft) => (
             <button key={draft.draftId} type="button" onClick={() => void openDraft(draft.draftId)} className="block w-full p-4 text-left hover:bg-slate-50">
               <span className="block text-sm font-bold text-slate-900">{draft.name}</span>
-              <span className="mt-1 block text-xs text-slate-500">{draft.documentType === "box" ? "박스" : "일반"} · v{draft.lockVersion} · {new Date(draft.updatedAt).toLocaleString("ko-KR")}</span>
+              <span className="mt-1 block text-xs text-slate-500">{draft.documentType === "box" ? "박스" : "일반"} · v{draft.lockVersion} · {formatDateTime(draft.updatedAt)}</span>
             </button>
           ))}
         </div>

@@ -9,6 +9,7 @@ services:
       - "127.0.0.1:10000:3000"
     environment:
       NODE_ENV: production
+      TZ: Asia/Seoul
       NEXT_TELEMETRY_DISABLED: "1"
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN is required}
@@ -32,6 +33,7 @@ services:
     command: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
     environment:
       NODE_ENV: production
+      TZ: Asia/Seoul
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       # DDL 권한이 있는 계정. 비워 두면 DATABASE_URL 로 실행한다.
       MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
@@ -48,6 +50,7 @@ services:
     command: ["node", "worker.mjs"]
     environment:
       NODE_ENV: production
+      TZ: Asia/Seoul
       NEXT_TELEMETRY_DISABLED: "1"
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       # 긴 작업이 web용 5초 statement timeout에 끊기지 않도록 worker는 따로 잡는다.

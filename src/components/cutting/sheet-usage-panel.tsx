@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { formatDateTime } from "@/domain/format-date";
 import { cuttingRequest } from "@/components/cutting/cutting-plan-list-panel";
 import type {
   SheetUsageDto,
@@ -249,7 +250,7 @@ export function SheetUsagePanel({
                   <td className="px-3 py-2 text-right">{row.sheetCount}</td>
                   <td className="px-3 py-2 text-right">{row.yieldPercent}%</td>
                   <td className="px-3 py-2 text-right">{money(row.totalCostKrw)}</td>
-                  <td className="px-3 py-2">{new Date(row.createdAt).toLocaleString("ko-KR")}</td>
+                  <td className="px-3 py-2">{formatDateTime(row.createdAt)}</td>
                 </tr>
               ))
             )}

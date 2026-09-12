@@ -55,9 +55,16 @@ async function main() {
   const maintenanceIntervalMs = Number(process.env.WORKER_MAINTENANCE_INTERVAL_MS ?? 60_000);
   const retentionDays = Number(process.env.WORKER_JOB_RETENTION_DAYS ?? 90);
   workerId = `${process.env.WORKER_ID ?? hostname()}-${process.pid}`;
+  // 비워 두면 등록된 종류를 전부 잡는다. 종류를 나눠 띄울 때(예: 재단 전용 worker) 쓴다.
+  const types = (process.env.WORKER_JOB_TYPES ?? "")
+    .split(",")
+    .map((type) => type.trim())
+    .filter((type) => type.length > 0);
+  const unknown = types.filter((type) => !jobTypes.includes(type));
+  if (unknown.length > 0) throw new Error(`알 수 없는 작업 종류: ${unknown.join(", ")}`);
 
   installShutdownHandlers();
-  log("worker_started", { types: jobTypes, idlePollMs, retentionDays });
+  log("worker_started", { types: types.length > 0 ? types : jobTypes, idlePollMs, retentionDays });
 
   let lastMaintenance = 0;
   while (running) {
@@ -70,7 +77,7 @@ async function main() {
         lastMaintenance = Date.now();
       }
       activeJob = true;
-      const processed = await processNextJob(getPrisma(), workerId);
+      const processed = await processNextJob(getPrisma(), workerId, { types });
       activeJob = false;
       if (processed) {
         log("job_processed", processed);

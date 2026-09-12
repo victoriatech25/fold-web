@@ -3,6 +3,7 @@
 import { Download, Paperclip, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { formatDateTime } from "@/domain/format-date";
 import { orderRequest } from "@/components/orders/order-api";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type { FileAssetDto } from "@/server/files/file-service";
@@ -178,7 +179,7 @@ export function OrderAttachmentsPanel({
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold text-slate-800">{item.fileName}</span>
                 <span className="mt-0.5 block text-xs text-slate-500">
-                  {formatSize(item.sizeBytes)} · {new Date(item.createdAt).toLocaleString("ko-KR")}
+                  {formatSize(item.sizeBytes)} · {formatDateTime(item.createdAt)}
                   {item.status === "PENDING" ? " · 업로드 미완료" : ""}
                 </span>
               </span>

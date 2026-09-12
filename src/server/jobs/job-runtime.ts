@@ -79,10 +79,15 @@ export async function reclaimExpiredLeases(prisma: PrismaClient, now = new Date(
 export async function claimNextJob(
   prisma: PrismaClient,
   workerId: string,
-  options: { now?: Date; defaultLeaseSeconds?: number } = {},
+  options: { now?: Date; defaultLeaseSeconds?: number; types?: readonly string[] } = {},
 ): Promise<ClaimedJob | null> {
   const now = options.now ?? new Date();
   const leaseExpiresAt = new Date(now.getTime() + (options.defaultLeaseSeconds ?? 60) * 1000);
+  // 종류를 제한한 worker(`WORKER_JOB_TYPES`)는 그 종류만 잡는다. 비우면 전부.
+  const typeFilter =
+    options.types && options.types.length > 0
+      ? Prisma.sql`AND "type" = ANY(${[...options.types]}::text[])`
+      : Prisma.empty;
   const rows = await prisma.$queryRaw<ClaimRow[]>`
     UPDATE "JobQueue"
     SET "status" = 'RUNNING',
@@ -93,7 +98,7 @@ export async function claimNextJob(
         "updatedAt" = ${now}
     WHERE "id" = (
       SELECT "id" FROM "JobQueue"
-      WHERE "status" = 'QUEUED' AND "availableAt" <= ${now}
+      WHERE "status" = 'QUEUED' AND "availableAt" <= ${now} ${typeFilter}
       ORDER BY "priority" ASC, "availableAt" ASC, "id" ASC
       FOR UPDATE SKIP LOCKED
       LIMIT 1

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
+import { formatDateTime } from "@/domain/format-date";
 import { QueryBar, QueryField } from "@/components/ui/query-bar";
 import type { CuttingPlanDto, CuttingRevisionDto } from "@/server/cutting/cutting-plan-service";
 
@@ -208,7 +209,7 @@ export function CuttingPlanListPanel({ initial }: { initial: { items: CuttingPla
                   {plan.currentRevision?.unplacedQuantity ?? "-"}
                 </td>
                 <td className="px-4 py-2 text-slate-500">
-                  {new Date(plan.updatedAt).toLocaleString("ko-KR")}
+                  {formatDateTime(plan.updatedAt)}
                 </td>
               </tr>
             ))}

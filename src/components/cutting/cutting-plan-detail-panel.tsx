@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { formatDateTime } from "@/domain/format-date";
 import type { CuttingAnnotations } from "@/domain/cutting/annotations";
 import type { CuttingInput, CuttingResult } from "@/domain/cutting/schema";
 import { isLandscape, screenViewBox, toScreenRect } from "@/domain/cutting/screen-transform";
@@ -487,7 +488,7 @@ export function CuttingPlanDetailPanel({
                 </td>
                 <td className="px-4 py-2 text-right">{item.pins.length}</td>
                 <td className="px-4 py-2 text-slate-500">
-                  {item.createdByName} · {new Date(item.createdAt).toLocaleString("ko-KR")}
+                  {item.createdByName} · {formatDateTime(item.createdAt)}
                 </td>
               </tr>
             ))}

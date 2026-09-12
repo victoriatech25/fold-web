@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { formatDateTime } from "@/domain/format-date";
 import { OrderRequestError, orderRequest } from "@/components/orders/order-api";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type { OrderCalculationStateDto } from "@/server/orders/order-calculation-service";
@@ -90,7 +91,7 @@ export function OrderCalculationPanel({
               <tbody className="divide-y">{snapshot.items.map((item) => <tr key={item.id}><td className="p-3"><b>작업 {item.lineNumber}</b><p className="max-w-48 truncate text-xs text-slate-500">{item.name} · 수량 {item.quantity}</p></td><td className="p-3 text-right font-mono">{item.metrics.areaEachM2}㎡</td><td className="p-3 text-right font-mono">{item.metrics.bendOperationsEach}회</td><td className="p-3 text-right font-mono">{item.metrics.vCutLengthEachM}m</td><td className="p-3 text-right">{amount(item.materialAmountKrw)}</td><td className="p-3 text-right">{amount((BigInt(item.bendAmountKrw) + BigInt(item.vCutAmountKrw) + BigInt(item.surchargeAmountKrw)).toString())}</td><td className="p-3 text-right font-bold">{amount(item.supplyAmountKrw)}</td><td className="p-3 text-xs"><b>{scopeLabel[item.pricingResult.trace.foldRate.scopeType]}</b><br /><span className="text-slate-500">개정 {item.pricingResult.trace.foldRate.revisionId.slice(0, 8)}…</span></td></tr>)}</tbody>
             </table>
           </div>
-          <p className="mt-3 text-xs text-slate-500">계산 버전 {snapshot.snapshotNumber} · {new Date(snapshot.createdAt).toLocaleString("ko-KR")} · 입력 {snapshot.inputChecksumSha256.slice(0, 12)}… · 결과 {snapshot.resultChecksumSha256.slice(0, 12)}…</p>
+          <p className="mt-3 text-xs text-slate-500">계산 버전 {snapshot.snapshotNumber} · {formatDateTime(snapshot.createdAt)} · 입력 {snapshot.inputChecksumSha256.slice(0, 12)}… · 결과 {snapshot.resultChecksumSha256.slice(0, 12)}…</p>
         </>
       )}
     </section>

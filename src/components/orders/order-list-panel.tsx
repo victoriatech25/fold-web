@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { formatDateTime } from "@/domain/format-date";
 import { orderRequest } from "@/components/orders/order-api";
 import { orderStatusLabels } from "@/components/orders/order-status-panel";
 import { CommonDialog } from "@/components/ui/common-popup";
@@ -328,7 +329,7 @@ export function OrderListPanel({
                       <StatusBadge status={order.status} />
                     </td>
                     <td className="px-4 py-2.5 text-xs text-slate-500">
-                      {new Date(order.updatedAt).toLocaleString("ko-KR")}
+                      {formatDateTime(order.updatedAt)}
                     </td>
                   </tr>
                 ))

@@ -24,10 +24,13 @@ RUN version="$(node -p "require('./package.json').devDependencies.prisma")" \
 
 FROM node:22-alpine AS runner
 WORKDIR /app
+# 시간대를 한국으로 고정한다(2026-09-08 점검 H2). 화면 포맷은 Asia/Seoul 을 명시하지만
+# 로그·헬스체크·큐 시각까지 같은 기준이어야 한다. Node 는 ICU 에 tz 를 내장해 tzdata 가 없어도 된다.
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0 \
-    PORT=3000
+    PORT=3000 \
+    TZ=Asia/Seoul
 
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs

@@ -18,6 +18,9 @@ export default async function globalSetup() {
       DATABASE_URL: databaseUrl,
       WORKER_ID: "e2e-worker",
       WORKER_IDLE_POLL_MS: "500",
+      // 작업 큐 화면 E2E 가 `대기 중` 인 dxf.export 작업을 취소해 본다. 그 작업을 먼저
+      // 집어 가지 않도록 재단 종류만 잡는다.
+      WORKER_JOB_TYPES: "cutting.optimize,cutting.dxf",
     },
     stdio: ["ignore", log, log],
     shell: process.platform === "win32",

@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import { type FormEvent, useMemo, useState, useTransition } from "react";
 
+import { formatDateTime, fromDateTimeLocalInput, toDateTimeLocalInput } from "@/domain/format-date";
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
 import { TabPanel, Tabs } from "@/components/ui/tabs";
 import type {
@@ -47,17 +48,9 @@ const statusColor = {
 const field = (data: FormData, name: string) =>
   String(data.get(name) ?? "").trim();
 const decimalPattern = "[0-9]+([.][0-9]{1,6})?";
-const dateText = (value: string | null) =>
-  value
-    ? new Intl.DateTimeFormat("ko-KR", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(new Date(value))
-    : "미정";
-const localDateTime = (date = new Date()) => {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-};
+const dateText = (value: string | null) => (value ? formatDateTime(value) : "미정");
+// 효력 시각 입력은 브라우저 시간대가 아니라 KST 로 읽고 쓴다.
+const localDateTime = (date = new Date()) => toDateTimeLocalInput(date);
 
 function valuesFromForm(data: FormData): MaterialRuleFields {
   return {
@@ -418,7 +411,7 @@ function ReviewDialog({
             new FormData(event.currentTarget),
             "effectiveFrom",
           );
-          onSubmit(new Date(value).toISOString());
+          onSubmit(fromDateTimeLocalInput(value));
         }}
       >
         <label className="text-sm font-bold text-slate-700">

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime } from "@/domain/format-date";
 import { QueryBar, QueryField } from "@/components/ui/query-bar";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -48,9 +49,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "요청을 처리하지 못했습니다.";
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-}
+const formatDate = formatDateTime;
 
 function DocumentPreview({ document }: { document: ServerFoldDocument }) {
   const segments = document.blocks.flatMap((block) => block.segments);

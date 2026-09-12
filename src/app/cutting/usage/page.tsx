@@ -1,3 +1,4 @@
+import { formatDate } from "@/domain/format-date";
 import { SheetUsagePanel } from "@/components/cutting/sheet-usage-panel";
 import { requirePermissionPage } from "@/server/auth/auth-dal";
 import { getPrisma } from "@/server/db/prisma";
@@ -9,14 +10,7 @@ export const dynamic = "force-dynamic";
  * 오늘이 며칠인지는 KST 로 센다. `toISOString()` 을 쓰면 한국 새벽에 어제 날짜가 잡힌다.
  * 실적 조회 API 도 같은 기준으로 경계를 자른다.
  */
-function seoulDateInput(value: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(value);
-}
+const seoulDateInput = formatDate;
 
 /** 하루의 시작·끝을 KST 로 만든다. */
 function seoulDayBoundary(dateInput: string, endOfDay: boolean): Date {

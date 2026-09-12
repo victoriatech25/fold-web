@@ -35,9 +35,13 @@ function errorMessage(error: unknown): string {
  * 큐에서 작업 하나를 잡아 끝까지 처리한다. 처리할 작업이 없으면 `null`을 준다.
  * worker 반복문과 통합 테스트가 같은 경로를 쓴다.
  */
-export async function processNextJob(prisma: PrismaClient, workerId: string): Promise<ProcessedJob | null> {
+export async function processNextJob(
+  prisma: PrismaClient,
+  workerId: string,
+  options: { types?: readonly string[] } = {},
+): Promise<ProcessedJob | null> {
   await reclaimExpiredLeases(prisma);
-  const claimed = await claimNextJob(prisma, workerId);
+  const claimed = await claimNextJob(prisma, workerId, { types: options.types });
   if (!claimed) return null;
 
   const startedAt = Date.now();
