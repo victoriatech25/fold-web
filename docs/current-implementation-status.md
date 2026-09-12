@@ -103,7 +103,7 @@ MFC 코드, 화면과 계산 결과는 비교 근거로 사용하지만 1:1 복�
 | 수주 목록·이력 | P2-A11 완료 | 기간·거래처·담당자·복수 상태 검색, cursor 목록, 수주 단위 안전 이력, 생산 요청 진입 구현 |
 | 작업 queue·worker | P2-B01 검수 대기 | `SKIP LOCKED` 작업 선택, lease 좀비 회수, 멱등 등록, 지수 backoff, 취소·다시 실행, 작업 큐 화면 구현·자동 검증 완료 |
 | 출력 | DXF 구현, STEP·PDF 미구현 | 제작 DXF 직접 다운로드 가능; PDF·파일 object storage는 P2-B 범위 |
-| 자동 검증 | 양호 | 단위 319건, PostgreSQL 통합 72건, Playwright 28개 시나리오와 lint/typecheck/build 통과 |
+| 자동 검증 | 양호 | 단위 405건, PostgreSQL 통합 109건(일반 83 + 큐·재단 26), Playwright 38개 시나리오와 lint/typecheck/build 통과 (2026-09-12) |
 | 배포 | 구현됨 | Docker Hub 태그 이미지와 self-hosted runner 사용 |
 
 ## 2. 시스템 구성
@@ -515,17 +515,17 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 | `src/server/platform/platform-repository.ts` | 내부 플랫폼 repository 경계 |
 | `src/server/http/api-response.ts` | 표준 오류 envelope와 request ID |
 
-`src/stores/canvas-store.ts`는 초기 MobX/Konva 예제의 사각형 상태로 보이며 현재 애플리케이션에서 import되지 않는다. 제거하거나 별도 샘플로 분리할 수 있는 잔여 코드다.
+~~`src/stores/canvas-store.ts`는 초기 MobX/Konva 예제의 사각형 상태로 보이며 현재 애플리케이션에서 import되지 않는다.~~ 2026-09-12 삭제했다(점검 L3).
 
 ## 8. 자동 검증 결과
 
-2026-08-17 P2-A11 승인 기준으로 아래 명령을 로컬에서 직접 실행했다.
+2026-09-12 `P2-B11` 구현 기준으로 아래 명령을 로컬에서 직접 실행했다. (2026-08-17 기록은 단위 319 · 통합 72 · E2E 25 였다.)
 
 | 명령 | 결과 |
 |---|---|
-| `npm test` | 성공: 단위 테스트 319건 통과; DB 통합 테스트는 기본 실행에서 제외 |
-| `npm run test:integration` | 성공: test DB reset·18개 migration·seed 후 PostgreSQL 통합 테스트 72건 통과 |
-| `npm run test:e2e` | 성공: 가격 적용·개정·공통 팝업을 포함한 Playwright Chromium 25개 시나리오 통과 |
+| `npm test` | 성공: 단위 테스트 405건 통과, 109건 skip(DB 통합 테스트는 기본 실행에서 제외) |
+| `npm run test:integration` | 성공: test DB reset·25개 migration·seed 후 PostgreSQL 통합 테스트 109건 통과 (일반 묶음 83 + 작업 큐·재단 묶음 26) |
+| `npm run test:e2e` | 성공: Playwright Chromium 38개 시나리오 통과. E2E 동안 재단 전용 worker 가 함께 뜬다(`e2e/global-setup.ts`) |
 | `npm run lint` | 성공: ESLint 오류 없음 |
 | `npm run typecheck` | 성공: TypeScript 오류 없음 |
 | `npm run build` | 성공: DB 환경변수 없이 Prisma generate·Next.js production build·TypeScript 검사 통과 |
@@ -579,7 +579,7 @@ Docker 이미지 빌드·게시와 운영 배포는 `v*` 태그에서만 실행�
 
 - 루트 `README.md`는 create-next-app 기본 문서 상태라 프로젝트 목적과 실행·배포 방법을 충분히 설명하지 않는다.
 - `docs/threejs-model-plan.md`와 `docs/editor-test-plan.md`에는 계획 또는 기대 동작이 섞여 있다. 실제 구현 판단에는 이 문서와 코드를 우선해야 한다.
-- 사용되지 않는 `canvas-store.ts`가 남아 있다.
+- ~~사용되지 않는 `canvas-store.ts`가 남아 있다.~~ 2026-09-12 삭제.
 
 ## 10. 권장 다음 작업
 

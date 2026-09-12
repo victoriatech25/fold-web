@@ -29,6 +29,7 @@
 | `APP_ORIGIN` | app | 실제 공개 도메인. `https://`, 운영에서는 HTTPS 필수 |
 | `AUTH_RATE_LIMIT_SECRET` | app | 32자 이상 임의 문자열 |
 | `MIGRATION_DATABASE_URL` | migrate | 선택. DDL 권한이 있는 계정(`fold_web_migrator` 등). 비워 두면 `DATABASE_URL` 로 마이그레이션을 실행한다 |
+| `AUTH_TRUST_PROXY` | app | 선택, 기본 `false`. **운영은 `true` 로 둔다.** 그래야 IP 기준 로그인 제한(`AUTH_SOURCE_FAILURE_LIMIT`)이 동작한다(점검 M2). 단, 리버스 프록시가 `X-Forwarded-For` 를 클라이언트 IP 로 **덮어써야** 한다 — nginx 라면 `proxy_set_header X-Forwarded-For $remote_addr;`. 이어 붙이는 설정(`$proxy_add_x_forwarded_for`)이면 첫 값이 위조될 수 있다 |
 
 `STORAGE_*`는 아직 필수가 아니다. 4절에 적은 대로 운영 저장소 적용은 `P2-C08`에서 한다.
 
@@ -78,6 +79,7 @@ worker 전용 환경변수는 다음과 같다. DB 접속 정보는 `app`과 같
 | `WORKER_MAINTENANCE_INTERVAL_MS` | `60000` | lease 회수와 종료 작업 정리 주기 |
 | `WORKER_JOB_RETENTION_DAYS` | `90` | 끝난 작업을 큐 테이블에서 지우기까지의 기간 |
 | `WORKER_ID` | 호스트명 | 로그와 lease 소유자 표시에 쓴다 |
+| `WORKER_MAX_CONSECUTIVE_ERRORS` | `10` | 반복문 오류(주로 DB 접속 실패)가 이만큼 잇따르면 종료 코드 1 로 내려간다. compose 의 `restart` 가 다시 띄운다. 영원히 `Up` 인 채 멈춰 있는 것을 막는다(점검 M3). `0` 이면 끄지 않는다 |
 | `WORKER_JOB_TYPES` | 비움(전부) | 이 worker 가 잡을 작업 종류를 쉼표로 제한한다. 예: `cutting.optimize,cutting.dxf`. 재단 전용 worker 를 따로 띄우거나, E2E 처럼 특정 작업을 건드리지 말아야 할 때 쓴다 |
 
 worker를 여러 개 띄워도 된다. `FOR UPDATE SKIP LOCKED`로 작업을 잡으므로 같은 작업을 두 번 처리하지 않는다.
@@ -90,7 +92,7 @@ npm run worker
 
 `server-only`가 일반 Node 실행에서 예외를 던지므로 이 스크립트는 `--conditions=react-server`를 붙인다. 번들(`worker.mjs`)은 빌드 시점에 같은 조건으로 만들어져 별도 플래그가 필요 없다.
 
-배포 스크립트는 `docker compose pull`과 `up -d`로 두 서비스를 함께 교체한다. 상태 확인은 `app` 컨테이너의 `/api/health`로 하며, worker는 헬스체크 대상이 아니다. worker가 뜨지 않아도 웹 기능은 계속 동작하고 작업만 큐에 쌓인다.
+배포 스크립트는 `docker compose pull`과 `up -d`로 두 서비스를 함께 교체한다. 상태 확인은 `app` 컨테이너의 `/api/health`로 하며, worker는 헬스체크 대상이 아니다. worker가 뜨지 않아도 웹 기능은 계속 동작하고 작업만 큐에 쌓인다. worker 가 DB 에 계속 닿지 못하면 `WORKER_MAX_CONSECUTIVE_ERRORS` 뒤 스스로 내려가 `docker ps` 에 `Restarting` 으로 보인다.
 운영 리버스 프록시의 upstream은 `http://127.0.0.1:10000`으로 설정한다.
 
 ### DB 마이그레이션
