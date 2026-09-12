@@ -9,7 +9,8 @@
 - non-root `nextjs` 사용자로 실행
 - 컨테이너 내부 애플리케이션 포트 `3000`
 - 서버 호스트 기본 포트 `127.0.0.1:10000`
-- `/api/health` 상태 확인
+- `/api/health` 상태 확인 (DB 접속·마이그레이션 적용 여부 포함)
+- 같은 이미지로 배포 전 `prisma migrate deploy`를 실행하는 `migrate` 서비스
 - 운영 서버와 동일한 `linux/amd64` 이미지 검증
 - 같은 이미지를 쓰는 `app`·`worker` 두 서비스의 Docker Compose 구성
 
@@ -23,6 +24,7 @@
 | `DATABASE_URL` | app, worker | PostgreSQL 이 이 서버 자신에 떠 있다면 호스트를 `127.0.0.1` 이 아니라 **`host.docker.internal`** 로 써야 한다. 컨테이너 안의 `127.0.0.1`은 컨테이너 자신이다 |
 | `APP_ORIGIN` | app | 실제 공개 도메인. `https://`, 운영에서는 HTTPS 필수 |
 | `AUTH_RATE_LIMIT_SECRET` | app | 32자 이상 임의 문자열 |
+| `MIGRATION_DATABASE_URL` | migrate | 선택. DDL 권한이 있는 계정(`fold_web_migrator` 등). 비워 두면 `DATABASE_URL` 로 마이그레이션을 실행한다 |
 
 `STORAGE_*`는 아직 필수가 아니다. 4절에 적은 대로 운영 저장소 적용은 `P2-C08`에서 한다.
 
@@ -85,6 +87,43 @@ npm run worker
 
 배포 스크립트는 `docker compose pull`과 `up -d`로 두 서비스를 함께 교체한다. 상태 확인은 `app` 컨테이너의 `/api/health`로 하며, worker는 헬스체크 대상이 아니다. worker가 뜨지 않아도 웹 기능은 계속 동작하고 작업만 큐에 쌓인다.
 운영 리버스 프록시의 upstream은 `http://127.0.0.1:10000`으로 설정한다.
+
+### DB 마이그레이션
+
+`deploy.sh`는 컨테이너를 교체하기 **전에** 새 이미지로 `prisma migrate deploy`를 실행한다. 2026-09-06 첫 배포까지는 이 단계가 없어 사람이 손으로 적용했다(2026-09-08 점검 H1).
+
+```bash
+docker compose pull
+docker compose --profile migrate run --rm --no-deps migrate   # 여기서 실패하면 컨테이너를 바꾸지 않는다
+docker compose up -d --no-build --remove-orphans
+```
+
+- `migrate` 서비스는 `app`과 같은 이미지를 쓴다. 이미지 안 `/opt/fold-migrate`에 Prisma CLI·`prisma/migrations`·전용 `prisma.config.ts`(`deploy/prisma.config.ts`)가 들어 있다. standalone 출력에는 CLI가 없어서 따로 넣었다
+- `profiles: ["migrate"]`라 `docker compose up`에는 포함되지 않는다
+- 접속 계정은 `MIGRATION_DATABASE_URL`이 있으면 그것, 없으면 `DATABASE_URL`이다. `DATABASE_URL`의 계정에 DDL 권한이 없는 서버라면 `.env`에 `MIGRATION_DATABASE_URL`을 넣어야 한다
+- 마이그레이션이 실패하면 `deploy.sh`는 `APP_IMAGE`만 이전 값으로 되돌리고 끝난다. 기존 컨테이너는 건드리지 않는다. 실패한 마이그레이션은 `_prisma_migrations`에 미완료로 남으므로 원인을 고친 뒤 `prisma migrate resolve`로 정리하고 다시 배포한다
+- 마이그레이션은 컨테이너 교체보다 먼저 적용되므로, **새 스키마 위에서 이전 코드가 잠깐 돌고, 롤백되면 계속 돈다.** 컬럼 삭제·이름 변경처럼 이전 코드를 깨뜨리는 변경은 한 배포에 넣지 않고, 먼저 코드가 그 컬럼을 안 쓰게 배포한 다음 지운다
+
+수동으로 적용해야 할 때도 같은 명령을 쓴다.
+
+```bash
+cd /home/kyhoon/fold-web
+docker compose --profile migrate run --rm --no-deps migrate
+```
+
+### `/api/health`
+
+헬스체크는 DB를 실제로 확인한다. 이전에는 무조건 `ok`를 돌려줘서 `DATABASE_URL`이 빠진 컨테이너도 정상으로 판정됐다(2026-09-08 점검 H4).
+
+- `SELECT 1`로 접속을 확인한다
+- 이미지에 들어 있는 `prisma/migrations` 목록(`PRISMA_MIGRATIONS_DIR`)과 `_prisma_migrations`를 대조한다. 적용되지 않았거나 실패한 마이그레이션이 하나라도 있으면 실패다
+- 둘 다 맞으면 `200`, 아니면 `503`이다. Docker `HEALTHCHECK`와 `deploy.sh`의 `healthy` 대기가 이 코드를 본다
+
+```json
+{"status":"ok","checks":{"database":{"status":"ok"},"migrations":{"status":"ok","expected":23,"applied":23,"pending":0,"failed":0}}}
+```
+
+응답에는 건수만 싣고 마이그레이션 이름은 컨테이너 로그(`[health] pending migrations: …`)에 남긴다. 헬스 경로는 리버스 프록시를 거쳐 밖에서도 열리기 때문이다. `DATABASE_URL`의 계정은 `_prisma_migrations`에 `SELECT` 권한이 있어야 한다.
 
 ### 파일 저장소 서비스
 
@@ -184,7 +223,8 @@ Docker Hub 이미지를 서버에서 가져와 컨테이너를 교체한다.
 
 ## 5단계: 상태 검사와 롤백
 
-- 새 컨테이너의 `/api/health` 확인
+- 컨테이너 교체 전 `prisma migrate deploy` 실행, 실패 시 교체 중단
+- 새 컨테이너의 `/api/health` 확인 (DB 접속·마이그레이션 적용 여부)
 - 실패 시 직전 이미지 태그로 복원
 - 최근 성공 이미지와 배포 기록 유지
 - 운영 배포 및 의도적인 실패 롤백 시험

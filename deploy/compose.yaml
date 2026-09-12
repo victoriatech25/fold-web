@@ -22,6 +22,24 @@ services:
       - no-new-privileges:true
     stop_grace_period: 20s
 
+  # 배포 절차가 컨테이너를 바꾸기 전에 한 번 실행한다(`deploy.sh`).
+  # `up` 에는 포함되지 않도록 profile 로 분리한다.
+  migrate:
+    image: ${APP_IMAGE:?APP_IMAGE is required}
+    profiles: ["migrate"]
+    restart: "no"
+    working_dir: /opt/fold-migrate
+    command: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      # DDL 권한이 있는 계정. 비워 두면 DATABASE_URL 로 실행한다.
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    security_opt:
+      - no-new-privileges:true
+
   # web과 같은 이미지를 쓰고 진입점만 다르다(`D2-B01-B`).
   worker:
     image: ${APP_IMAGE:?APP_IMAGE is required}

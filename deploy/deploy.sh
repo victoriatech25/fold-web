@@ -49,6 +49,14 @@ rollback() {
 trap rollback ERR
 
 docker compose pull
+
+# 컨테이너를 바꾸기 전에 새 이미지로 마이그레이션을 먼저 적용한다. 실패하면
+# 기존 컨테이너는 그대로 두고 APP_IMAGE 만 되돌린다. 마이그레이션이 빠진 채
+# 새 코드가 올라가면 없는 컬럼을 읽다 터지는데, 헬스체크가 DB 를 안 보던
+# 시절에는 그것마저 잡히지 않았다(2026-09-08 점검 H1·H4).
+echo "Applying database migrations with ${image}."
+docker compose --profile migrate run --rm --no-deps migrate
+
 docker compose up -d --no-build --remove-orphans
 
 container_id="$(docker compose ps -q app)"
