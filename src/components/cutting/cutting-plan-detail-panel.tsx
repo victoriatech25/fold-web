@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { CuttingInput, CuttingResult } from "@/domain/cutting/schema";
+import { isLandscape, screenViewBox, toScreenRect } from "@/domain/cutting/screen-transform";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type { CuttingPlanDetailDto, CuttingPlanDto } from "@/server/cutting/cutting-plan-service";
 import { cuttingRequest, planStatusLabels, planStatusStyles, revisionStatusLabels } from "./cutting-plan-list-panel";
@@ -28,27 +29,14 @@ function SheetFigure({
   const sheet = input.sheets.find((item) => item.sheetItemId === sheetResult.sheetItemId);
   if (!sheet) return null;
 
-  const width = Number(sheet.widthMm);
-  const length = Number(sheet.lengthMm);
   const partById = new Map(input.parts.map((part) => [part.id, part]));
 
-  // 긴 쪽이 가로로 놓이게 그린다.
-  const landscape = length > width;
+  // 긴 쪽이 가로로, 배치 원점이 좌상단에 오게 그린다(`D2-B05-L`). 편집기와 같은 변환이다.
+  const landscape = isLandscape(sheet);
+  const viewBox = screenViewBox(sheet);
 
-  /**
-   * 재단 좌표(왼쪽 아래 원점, y는 위쪽)를 화면 좌표로 옮긴다.
-   * 어느 쪽이든 배치 원점이 화면 좌상단에 오고 긴 쪽이 가로로 놓인다.
-   *
-   * - 세로가 긴 원판: 시계 방향으로 90도 눕힌다.
-   * - 가로가 긴 원판: 그대로 두고 y를 위에서 아래로 읽는다.
-   *
-   * 좌표를 새로 계산하지 않고 보는 방향만 바꾼다. solver 결과는 그대로다.
-   */
   function toScreen(xMm: string, yMm: string, boxWidth: number, boxLength: number) {
-    const x = Number(xMm);
-    const y = Number(yMm);
-    if (landscape) return { x: y, y: x, width: boxLength, height: boxWidth };
-    return { x, y, width: boxWidth, height: boxLength };
+    return toScreenRect({ x: Number(xMm), y: Number(yMm), width: boxWidth, height: boxLength }, landscape);
   }
 
   return (
@@ -65,7 +53,7 @@ function SheetFigure({
         aria-label={`원판 ${sheetIndex + 1} 배치`}
         className={`w-full border border-slate-300 bg-slate-50 ${landscape ? "max-w-2xl" : "max-w-md"}`}
         role="img"
-        viewBox={landscape ? `0 0 ${length} ${width}` : `0 0 ${width} ${length}`}
+        viewBox={`0 0 ${viewBox.width} ${viewBox.height}`}
       >
         {sheetResult.remnants.map((remnant, index) => {
           const box = toScreen(
@@ -349,6 +337,15 @@ export function CuttingPlanDetailPanel({
           >
             {Object.keys(pins).length > 0 ? "고정하고 다시 계산" : "다시 계산"}
           </button>
+          {plan.result ? (
+            <Link
+              className="rounded border border-teal-700 px-3 py-1.5 text-xs font-bold text-teal-800"
+              data-testid="cutting-edit-link"
+              href={`/cutting/${plan.id}/edit`}
+            >
+              배치 편집
+            </Link>
+          ) : null}
           {canApprove ? (
             <button
               className="rounded border border-teal-700 px-3 py-1.5 text-xs font-bold text-teal-800 disabled:opacity-50"
@@ -408,6 +405,7 @@ export function CuttingPlanDetailPanel({
               <th className="px-4 py-2">상태</th>
               <th className="px-4 py-2 text-right">원판 수</th>
               <th className="px-4 py-2 text-right">수율</th>
+              <th className="px-4 py-2">출처</th>
               <th className="px-4 py-2 text-right">고정</th>
               <th className="px-4 py-2">실행</th>
             </tr>
@@ -420,6 +418,14 @@ export function CuttingPlanDetailPanel({
                 <td className="px-4 py-2 text-right">{item.sheetCount ?? "-"}</td>
                 <td className="px-4 py-2 text-right">
                   {item.yieldPercent ? `${item.yieldPercent}%` : "-"}
+                </td>
+                <td className="px-4 py-2">
+                  {item.source === "MANUAL_EDIT" ? "편집" : "계산"}
+                  {item.warnings.length > 0 ? (
+                    <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-900">
+                      경고 {item.warnings.length}
+                    </span>
+                  ) : null}
                 </td>
                 <td className="px-4 py-2 text-right">{item.pins.length}</td>
                 <td className="px-4 py-2 text-slate-500">

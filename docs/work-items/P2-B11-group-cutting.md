@@ -203,7 +203,11 @@ annotations 검사(전부 거부):
 
 좌표 — 편집기는 화면 좌표(긴 쪽 가로, 좌상단 원점)로 그리고 저장 직전에 계약 좌표(왼쪽 아래 원점)로 되돌린다. 변환은 `SheetFigure` 의 `toScreen` 을 역함수와 함께 `src/domain/cutting/screen-transform.ts` 로 꺼내 공유한다. 숫자는 계약대로 문자열 십진수, 편집 중에는 `bigint` 단위(`units.ts`)로 다뤄 오차를 없앤다.
 
-그리기 — 기존 SVG 를 그대로 키운다. 부품 수백 개까지는 SVG 로 충분하고, 절곡 편집기의 Konva 를 끌어오면 두 편집기의 상호작용이 갈라진다. 드래그는 `pointerdown/move/up` 과 `setPointerCapture`.
+그리기 — 기존 SVG 를 그대로 키운다. 부품 수백 개까지는 SVG 로 충분하고, 절곡 편집기의 Konva 를 끌어오면 두 편집기의 상호작용이 갈라진다. 드래그는 배치에서 `pointerdown` 으로 들고 `window` 의 `pointermove/up` 으로 놓는다 — 원판 SVG 가 여러 개라 요소 밖으로 나가도 추적해야 한다.
+
+편집 중 지정은 저장 형식(`sheetIndex`·`partId#n`)이 아니라 **편집기 키**로 든다(`editor-state.ts`). 배치를 하나 빼거나 원판을 지우면 뒤 번호가 밀려 저장 키가 다른 배치를 가리키게 되기 때문이다. `toSaveAnnotations` 가 저장 직전에 한 번 변환한다.
+
+E2E 는 worker 가 있어야 재단 결과가 나오므로 `e2e/global-setup.ts` 가 테스트 DB 를 보는 worker 를 함께 띄운다. `P2-B10` 생산 E2E 도 이 기반을 쓴다.
 
 ### 4.7 DXF 생성
 
@@ -263,7 +267,7 @@ annotations 검사(전부 거부):
 | 순서 | 내용 | 산출 |
 |---|---|---|
 | B11-1 | migration(4.2), `annotations.ts`, `validateManualEdit`, `manual-revisions`·`validate` API, DTO 확장 — **2026-09-12 완료** | 단위 7건·통합 3건 |
-| B11-2 | 편집기 — 부품 이동·미배치 투입·회전·새 원판·빈 원판 삭제·실행취소·검증 표시·저장 | E2E |
+| B11-2 | 편집기 — 부품 이동·미배치 투입·회전·새 원판·빈 원판 삭제·실행취소·검증 표시·저장 — **2026-09-12 완료** | 단위 6건·E2E 1건 |
 | B11-3 | 편집기 — 레이저 그룹·가로선·필름 | E2E |
 | B11-4 | DXF — writer 확장, `cutting-dxf-service`, `cutting.dxf` 작업, 순번, zip, 파일 목록 API·화면 | 통합 테스트 + MFC 대조 |
 | B11-5 | 검수 가이드, 상태 문서 갱신, 사용자 검수 | — |
@@ -381,3 +385,4 @@ MFC 에서 `Prog1` 라이선스에만 열려 있어 부가 기능일 가능성�
 | 2026-09-12 | **정의 정정(`E`).** 사용자가 그룹재단을 "재단 배치 편집기 + 원판별 DXF" 로 확인. 레이저 그룹은 부속. `F`(절곡선 포함)·`G`(guillotine 경고)·`H`(처음부터 같이) 결정. `D2-B05-J` (다) 재개방. 문서 전면 재작성 | 사용자·Claude |
 | 2026-09-12 | 상세 설계(4절). 데이터 모델·annotations 스키마·검증 규칙·API·편집기 상호작용·DXF 생성·순서. 실제 DXF 로 닫을 질문은 4.11 | Claude |
 | 2026-09-12 | B11-1 구현. `CuttingPlanRevision` 에 `source`·`baseRevisionId`·`annotations`·`warnings`, `annotations.ts`·`manual-edit.ts`, `createManualRevision`·`validateManualRevision`, API 둘, 감사 `cutting.revision_edited`. 설계와 달라진 것: 미배치는 서버가 세고 편집 개정은 잔재를 보고하지 않는다 | Claude |
+| 2026-09-12 | B11-2 구현. `editor-state.ts`(순수 상태·스냅·판정·저장 변환), `screen-transform.ts`, `/cutting/[planId]/edit` 편집기(이동·원판 간 이동·미배치 투입·회전·원판 추가/삭제·실행취소·디바운스 검증·저장), 상세 화면 `배치 편집` 진입과 개정 출처 열. E2E 에 worker 를 띄우는 global setup 추가 | Claude |
