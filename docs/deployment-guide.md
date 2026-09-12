@@ -102,6 +102,7 @@ docker compose up -d --no-build --remove-orphans
 - `profiles: ["migrate"]`라 `docker compose up`에는 포함되지 않는다
 - 접속 계정은 `MIGRATION_DATABASE_URL`이 있으면 그것, 없으면 `DATABASE_URL`이다. `DATABASE_URL`의 계정에 DDL 권한이 없는 서버라면 `.env`에 `MIGRATION_DATABASE_URL`을 넣어야 한다
 - 마이그레이션이 실패하면 `deploy.sh`는 `APP_IMAGE`만 이전 값으로 되돌리고 끝난다. 기존 컨테이너는 건드리지 않는다. 실패한 마이그레이션은 `_prisma_migrations`에 미완료로 남으므로 원인을 고친 뒤 `prisma migrate resolve`로 정리하고 다시 배포한다
+- **새 테이블이 생기는 마이그레이션 뒤에는 앱 계정 권한을 줘야 한다.** `DATABASE_URL` 계정이 테이블 소유자가 아닌 서버(로컬처럼 `fold_web_app`/`fold_web_migrator` 로 나뉜 구성)에서는 `prisma migrate deploy` 만으로는 앱이 새 테이블을 읽지 못한다. 예: `20260912120000_cutting_dxf_files` 의 `CuttingDxfSequence` 는 `GRANT SELECT, INSERT, UPDATE, DELETE ON "CuttingDxfSequence" TO fold_web_app;` 이 필요하다. 자동화는 `P2-B11` 뒤 별도 작업
 - 마이그레이션은 컨테이너 교체보다 먼저 적용되므로, **새 스키마 위에서 이전 코드가 잠깐 돌고, 롤백되면 계속 돈다.** 컬럼 삭제·이름 변경처럼 이전 코드를 깨뜨리는 변경은 한 배포에 넣지 않고, 먼저 코드가 그 컬럼을 안 쓰게 배포한 다음 지운다
 
 수동으로 적용해야 할 때도 같은 명령을 쓴다.

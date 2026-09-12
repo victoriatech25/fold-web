@@ -218,6 +218,18 @@ type AuditPayloadByAction = {
   "cutting.revision_created": {
     metadata: { revisionNumber: number; pinnedPartCount: number; jobId: string };
   };
+  // 재단 개정의 원판 DXF 생성(`P2-B11`).
+  "cutting.dxf_exported": {
+    metadata: {
+      revisionNumber: number;
+      dateKey: string;
+      sequence: number;
+      sheetFileCount: number;
+      laserGroupFileCount: number;
+      zipAssetId: string;
+      contentRetained: boolean;
+    };
+  };
   // 편집기에서 저장한 개정(`P2-B11`). 배치 원문은 남기지 않고 건수만 남긴다.
   "cutting.revision_edited": {
     metadata: {

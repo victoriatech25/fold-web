@@ -5,7 +5,11 @@ import type { AuthenticatedContext } from "@/server/auth/auth-types";
 import { disconnectPrisma, getPrisma } from "@/server/db/prisma";
 import { prepareFoldRevisionDocument } from "@/server/fold-document/revision-contract";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { enqueueJob } from "@/server/jobs/job-service";
 import { processNextJob } from "@/server/jobs/job-worker";
+import { readStorageRuntimeConfig } from "@/server/config/storage-env";
+import { ensureBucket } from "@/server/storage/s3-file-storage";
+import { listCuttingRevisionDxf } from "./cutting-dxf-service";
 import { addOrderFoldItem } from "@/server/orders/order-fold-service";
 import { createOrder } from "@/server/orders/order-service";
 import { createOrderCalculationSnapshot } from "@/server/orders/order-calculation-service";
@@ -338,6 +342,50 @@ integration.sequential("cutting plan integration", () => {
     const after = await getCuttingPlan(prisma, context, planId);
     expect(after.lockVersion).toBe(before.lockVersion);
     expect(after.revisions).toHaveLength(3);
+  });
+
+  it("편집 개정의 원판 DXF 를 큐로 만들고 파일 목록으로 읽는다", async () => {
+    await ensureBucket(readStorageRuntimeConfig());
+    const before = await getCuttingPlan(prisma, context, planId);
+    const revisionId = before.currentRevision!.id;
+
+    const { job } = await enqueueJob(prisma, context, {
+      type: "cutting.dxf",
+      payload: { cuttingPlanId: planId, cuttingPlanRevisionId: revisionId },
+      idempotencyKey: `cutting-dxf-${revisionId}`,
+      requestId: "cutting-dxf",
+    });
+    const processed = await processUntil(job.id);
+    expect(processed.outcome).toBe("SUCCEEDED");
+
+    const files = await listCuttingRevisionDxf(prisma, context, { planId, revisionId });
+    // 원판 2장 + zip. 레이저 그룹은 없다.
+    expect(files.map((file) => file.kind)).toEqual(["SHEET", "SHEET", "ZIP"]);
+    expect(files.every((file) => file.status === "READY")).toBe(true);
+    expect(files[0].fileName).toMatch(/^\d{6}-\d{2}-A\.dxf$/);
+    // 둘째 원판은 편집에서 필름을 켰으므로 F 접두가 붙는다.
+    expect(files[1].fileName).toMatch(/^F\d{6}-\d{2}-B\.dxf$/);
+    expect(files[2].fileName).toMatch(/\.zip$/);
+
+    const stored = await prisma.fileAsset.findUniqueOrThrow({
+      where: { id: files[0].assetId },
+      select: { metadata: true, mediaType: true },
+    });
+    expect(stored.mediaType).toBe("application/dxf");
+    expect((stored.metadata as { layers: string[] }).layers).toEqual(
+      expect.arrayContaining(["-L-", "-X-"]),
+    );
+
+    // 같은 개정을 다시 걸면 만들지 않고 있는 파일을 돌려준다.
+    const again = await enqueueJob(prisma, context, {
+      type: "cutting.dxf",
+      payload: { cuttingPlanId: planId, cuttingPlanRevisionId: revisionId },
+      idempotencyKey: `cutting-dxf-${revisionId}-again`,
+      requestId: "cutting-dxf-again",
+    });
+    const reprocessed = await processUntil(again.job.id);
+    expect(reprocessed.outcome).toBe("SUCCEEDED");
+    expect(await listCuttingRevisionDxf(prisma, context, { planId, revisionId })).toHaveLength(3);
   });
 
   it("잠금 번호가 다르면 편집을 저장하지 않는다", async () => {

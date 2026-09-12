@@ -125,4 +125,13 @@ test("재단 배치를 편집기에서 옮겨 저장하면 편집 개정이 쌓�
   await expect(page).toHaveURL(planHref!);
   await expect(page.getByRole("cell", { name: "편집", exact: true })).toHaveCount(2);
   await expect(page.getByText("원판 2", { exact: true })).toBeVisible();
+
+  // 원판 DXF: 큐 작업을 걸면 worker 가 만들고 목록에 원판 2장 + zip 이 나타난다(B11-4).
+  await page.getByTestId("cutting-dxf-generate").click();
+  const dxfFiles = page.getByTestId("cutting-dxf-files").locator("li");
+  await expect(dxfFiles).toHaveCount(3, { timeout: 60_000 });
+  await expect(dxfFiles.nth(0)).toContainText(/\d{6}-\d{2}-A\.dxf/);
+  await expect(dxfFiles.nth(1)).toContainText(/\d{6}-\d{2}-B\.dxf/);
+  await expect(dxfFiles.nth(2)).toContainText(".zip");
+  await expect(dxfFiles.nth(0).getByRole("button", { name: "내려받기" })).toBeVisible();
 });

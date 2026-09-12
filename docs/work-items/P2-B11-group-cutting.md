@@ -241,6 +241,8 @@ E2E 는 worker 가 있어야 재단 결과가 나오므로 `e2e/global-setup.ts`
 
 `{색상}` — MFC 는 원판 기준정보의 색상 문자열이다. 웹 `MaterialVariant` 에는 색상이 없으므로 **변형 `code`** 를 넣는다. 실제 파일 대조 후 바꿀 수 있다(4.11).
 
+**구현(2026-09-12)** — `src/domain/cutting/sheet-dxf.ts`(순수 entity 조립)·`src/server/cutting/cutting-dxf-service.ts`(파일 생성·보관)·`src/server/dxf/zip-writer.ts`(store 방식 zip, 의존성 없음)·`cutting.dxf` 작업. 저장 키는 개정·파일명·내용을 섞은 해시라 같은 내용의 파일이 다른 개정에서 나와도 자리를 빼앗지 않는다. 순번은 `CuttingDxfSequence` 를 `INSERT … ON CONFLICT DO UPDATE … RETURNING` 으로 한 문장에서 뽑는다.
+
 **dxf-writer 확장** — 지금 writer 는 `ManufacturingLayer` 고정 6종이다. 임의 레이어 이름·색을 받는 `createDxfDocumentFromLayers(entities: { layer: string; color: number; … }[])` 를 추가하고 기존 함수는 그 위의 얇은 껍데기로 바꾼다. 출력 포맷(R2000, LINE/ARC)은 그대로다.
 
 ### 4.8 승인·사용량·감사
@@ -269,7 +271,7 @@ E2E 는 worker 가 있어야 재단 결과가 나오므로 `e2e/global-setup.ts`
 | B11-1 | migration(4.2), `annotations.ts`, `validateManualEdit`, `manual-revisions`·`validate` API, DTO 확장 — **2026-09-12 완료** | 단위 7건·통합 3건 |
 | B11-2 | 편집기 — 부품 이동·미배치 투입·회전·새 원판·빈 원판 삭제·실행취소·검증 표시·저장 — **2026-09-12 완료** | 단위 6건·E2E 1건 |
 | B11-3 | 편집기 — 레이저 그룹·가로선·필름 — **2026-09-12 완료** | 단위 3건·E2E(같은 흐름) |
-| B11-4 | DXF — writer 확장, `cutting-dxf-service`, `cutting.dxf` 작업, 순번, zip, 파일 목록 API·화면, 레이저 그룹 안쪽 선 제외·그룹 파일·필름 반영 | 통합 테스트 + MFC 대조 |
+| B11-4 | DXF — writer 확장, `cutting-dxf-service`, `cutting.dxf` 작업, 순번, zip, 파일 목록 API·화면, 레이저 그룹 안쪽 선 제외·그룹 파일·필름 반영 — **2026-09-12 구현 완료(가정 위). MFC 대조는 미완** | 단위 6건·통합 1건·E2E(같은 흐름) |
 | B11-5 | 검수 가이드, 상태 문서 갱신, 사용자 검수 | — |
 
 ### 4.11 열린 질문 — 실제 DXF 파일을 받은 뒤 정한다
@@ -282,6 +284,10 @@ E2E 는 worker 가 있어야 재단 결과가 나오므로 `e2e/global-setup.ts`
 | 필름 파일명 | `F` 접두 | `F` 위치와 그룹 파일에도 붙는지 |
 | 원판 외곽에 trim 포함 여부 | 전체 원판 | 외곽 사각형 크기 |
 | 중복선 제거 | 항상 제거(옵션 0) | 현장이 옵션 1·2 를 쓰는지 |
+| 레이저 그룹 안쪽 선의 범위 | 그룹 사각형 **안쪽**(경계 제외) 선만 `- -`. 경계는 기계가 자른다 | MFC `IsLineInsideRect` 가 경계를 포함하는지 |
+| A-cut 레이어 | `-V1-{A깊이×100}` | MFC 가 `-V1-` 을 무엇에 쓰는지 |
+| `{색상}` 의 하이픈 | 재질 변형 `code` 그대로(`AL-1T` → `-b-1.00-AL-1T`) | MFC 는 `/` 만 지운다. 장비가 하이픈을 구분자로 읽으면 code 의 하이픈을 지워야 한다 |
+| 그룹 파일 내용 | 첫 부품의 전개도 DXF(고정 레이어 `CUT`·`V_CUT`…) | MFC `ExportPiece` 의 레이어 이름이 원판 파일 규칙(`-V-…`)을 따르는지 |
 
 ### 4.12 넣지 않는 것
 
@@ -387,3 +393,4 @@ MFC 에서 `Prog1` 라이선스에만 열려 있어 부가 기능일 가능성�
 | 2026-09-12 | B11-1 구현. `CuttingPlanRevision` 에 `source`·`baseRevisionId`·`annotations`·`warnings`, `annotations.ts`·`manual-edit.ts`, `createManualRevision`·`validateManualRevision`, API 둘, 감사 `cutting.revision_edited`. 설계와 달라진 것: 미배치는 서버가 세고 편집 개정은 잔재를 보고하지 않는다 | Claude |
 | 2026-09-12 | B11-2 구현. `editor-state.ts`(순수 상태·스냅·판정·저장 변환), `screen-transform.ts`, `/cutting/[planId]/edit` 편집기(이동·원판 간 이동·미배치 투입·회전·원판 추가/삭제·실행취소·디바운스 검증·저장), 상세 화면 `배치 편집` 진입과 개정 출처 열. E2E 에 worker 를 띄우는 global setup 추가 | Claude |
 | 2026-09-12 | B11-3 구현. 편집기에 도구 모드(부품 이동·레이저 그룹·절단선), 사각형 선택으로 묶기·누르면 풀기, 클릭으로 절단선 두기·지우기, 원판 필름 토글. 즉시 판정은 서버 규칙과 같은 `laserGroupIssue`·`cutLineIssue`. 서버 위반에 `placementKey` 를 실어 문제인 장만 표시. 상세 화면에 그룹·절단선·필름 표시 | Claude |
+| 2026-09-12 | B11-4 구현. DXF writer 임의 레이어 확장, 원판 DXF 조립(`sheet-dxf.ts`: MFC 레이어·중복선 병합·그룹 안쪽 `- -`·절곡선 축 변환·필름), zip writer, `cutting.dxf` 큐 작업과 `FileAsset` 보관(`cuttingPlanRevisionId`), 순번 표, POST/GET API, 상세 화면 DXF 패널. 4.11 에 가정 넷 추가 | Claude |

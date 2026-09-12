@@ -235,6 +235,7 @@ export const auditActionCatalog = {
   "job.retried": { category: "SYSTEM", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "JobQueue", label: "작업 다시 실행" },
   "cutting.plan_created": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "CuttingPlan", label: "재단 작업 생성" },
   "cutting.revision_created": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "CuttingPlan", label: "재단 개정 실행" },
+  "cutting.dxf_exported": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "CuttingPlan", label: "재단 DXF 생성" },
   "cutting.revision_edited": { category: "DATA_CHANGE", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "CuttingPlan", label: "재단 배치 편집 저장" },
   "cutting.approved": { category: "APPROVAL", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "CuttingPlan", label: "재단 결과 승인" },
   "cutting.approval_cancelled": { category: "APPROVAL", defaultOutcome: "SUCCESS", defaultSource: "WEB", entityType: "CuttingPlan", label: "재단 승인 취소" },

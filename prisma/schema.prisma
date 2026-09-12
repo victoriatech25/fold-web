@@ -231,6 +231,7 @@ model Organization {
   legacyMappings             LegacyMapping[]
   jobs                       JobQueue[]
   cuttingPlans               CuttingPlan[]
+  cuttingDxfSequences        CuttingDxfSequence[]
   cuttingPlanRevisions       CuttingPlanRevision[]
   sheetUsageRecords          SheetUsageRecord[]
 
@@ -1119,17 +1120,34 @@ model FileAsset {
   checksumSha256 String          @db.Char(64)
   metadata       Json?           @db.JsonB
   uploadedById   String?         @db.Uuid
+  // 재단 개정의 원판 DXF·zip(`P2-B11`). 개정 단위로 파일 목록을 읽는다.
+  cuttingPlanRevisionId String?  @db.Uuid
   deletedAt      DateTime?       @db.Timestamptz(6)
   createdAt      DateTime        @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime        @updatedAt @db.Timestamptz(6)
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   uploadedBy     User?           @relation("FileAssetUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
   salesOrder     SalesOrder?     @relation(fields: [salesOrderId], references: [id], onDelete: Restrict)
+  cuttingPlanRevision CuttingPlanRevision? @relation(fields: [cuttingPlanRevisionId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, salesOrderId, status])
   @@index([organizationId, kind, status])
   @@index([organizationId, checksumSha256])
   @@index([uploadedById])
+  @@index([cuttingPlanRevisionId])
+}
+
+/**
+ * 재단 DXF 파일명의 당일 순번(`P2-B11` 4.7). MFC 는 PC 레지스트리로 세던 것을
+ * 조직·날짜(Asia/Seoul `yymmdd`) 단위로 서버에서 센다.
+ */
+model CuttingDxfSequence {
+  organizationId String       @db.Uuid
+  dateKey        String       @db.Char(6)
+  next           Int          @default(1)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@id([organizationId, dateKey])
 }
 
 model JobQueue {
@@ -1301,6 +1319,7 @@ model CuttingPlanRevision {
   currentOfPlan         CuttingPlan?              @relation("CuttingPlanCurrentRevision")
   approvedOfPlan        CuttingPlan?              @relation("CuttingPlanApprovedRevision")
   sheetUsageRecords     SheetUsageRecord[]
+  dxfFiles              FileAsset[]
 
   @@unique([cuttingPlanId, revisionNumber], map: "CuttingPlanRevision_plan_revision_key")
   @@index([organizationId, cuttingPlanId, revisionNumber], map: "CuttingPlanRevision_plan_number_idx")

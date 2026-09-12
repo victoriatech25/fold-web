@@ -44,10 +44,11 @@ export function defineJob<TPayload>(definition: JobDefinition<TPayload>) {
 // import 순서나 tree-shaking에 따라 worker가 종류를 모르는 채로 뜰 수 있다.
 // 새 작업 종류는 이 목록에 직접 추가한다.
 import { cuttingOptimizeJob } from "./handlers/cutting-optimize-job";
+import { cuttingDxfJob } from "./handlers/cutting-dxf-job";
 import { dxfExportJob } from "./handlers/dxf-export-job";
 import { storageCleanupJob } from "./handlers/storage-cleanup-job";
 
-const catalog = [cuttingOptimizeJob, dxfExportJob, storageCleanupJob] as const;
+const catalog = [cuttingOptimizeJob, cuttingDxfJob, dxfExportJob, storageCleanupJob] as const;
 
 type AnyJobDefinition = JobDefinition<never>;
 

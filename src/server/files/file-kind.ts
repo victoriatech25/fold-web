@@ -30,8 +30,9 @@ export const fileKindPolicies: Record<FileAssetKind, FileKindPolicy> = {
     label: "제작 DXF",
     uploadPermission: "output.print",
     downloadPermission: "output.print",
-    mediaTypes: ["application/dxf", "image/vnd.dxf"],
-    extensions: ["dxf"],
+    // 재단 원판 DXF 묶음 zip 도 같은 종류로 다룬다(`P2-B11`).
+    mediaTypes: ["application/dxf", "image/vnd.dxf", "application/zip"],
+    extensions: ["dxf", "zip"],
     maxBytes: 20 * megabyte,
     userUploadable: false,
     regenerable: true,

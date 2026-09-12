@@ -8,6 +8,7 @@ import type { CuttingInput, CuttingResult } from "@/domain/cutting/schema";
 import { isLandscape, screenViewBox, toScreenRect } from "@/domain/cutting/screen-transform";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type { CuttingPlanDetailDto, CuttingPlanDto } from "@/server/cutting/cutting-plan-service";
+import { CuttingDxfPanel } from "./cutting-dxf-panel";
 import { cuttingRequest, planStatusLabels, planStatusStyles, revisionStatusLabels } from "./cutting-plan-list-panel";
 
 /** 원판 하나를 화면 폭에 맞춰 그린다. 긴 쪽을 가로로, 배치 원점을 좌상단으로 놓는다. */
@@ -439,6 +440,16 @@ export function CuttingPlanDetailPanel({
             />
           ))}
         </div>
+      ) : null}
+
+      {revision?.status === "SUCCEEDED" ? (
+        <CuttingDxfPanel
+          canGenerate={canOptimize}
+          key={revision.id}
+          planId={plan.id}
+          revisionId={revision.id}
+          revisionNumber={revision.revisionNumber}
+        />
       ) : null}
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
