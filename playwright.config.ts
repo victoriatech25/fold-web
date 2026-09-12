@@ -28,7 +28,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1 --port 3100",
+    // `npm run dev` 는 8000 을 고정하므로 next 를 직접 부른다. 포트 인자가 겹치지 않게.
+    command: "npm exec -- next dev --hostname 127.0.0.1 --port 3100",
     url: `${baseURL}/api/health`,
     // Never attach the suite to an unrelated local app that happens to own
     // the test port and expose a health endpoint.

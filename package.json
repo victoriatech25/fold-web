@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "PORT=8000 next dev",
+    "dev": "next dev --port 8000",
     "build": "prisma generate && next build && node scripts/build-worker.mjs",
     "start": "next start",
     "worker": "node --conditions=react-server --import tsx src/worker/main.ts",
@@ -11,7 +11,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:storage": "RUN_STORAGE_INTEGRATION=1 vitest run src/server/storage",
+    "test:storage": "node scripts/run-storage-tests.mjs",
     "test:integration": "node scripts/run-integration-tests.mjs",
     "test:e2e": "node scripts/prepare-e2e.mjs && playwright test",
     "auth:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",

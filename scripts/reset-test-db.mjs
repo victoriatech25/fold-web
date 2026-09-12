@@ -31,6 +31,8 @@ function runPrisma(arguments_) {
       ...environment,
     },
     stdio: "inherit",
+    // Windows 에서는 `npm` 이 `npm.cmd` 라 shell 없이는 ENOENT 다(2026-09-08 점검 M1).
+    shell: process.platform === "win32",
   });
 
   if (result.error) {
