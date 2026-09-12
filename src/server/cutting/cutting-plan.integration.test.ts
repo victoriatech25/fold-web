@@ -11,12 +11,15 @@ import { createOrder } from "@/server/orders/order-service";
 import { createOrderCalculationSnapshot } from "@/server/orders/order-calculation-service";
 import { transitionOrder } from "@/server/orders/order-transition-service";
 import { CuttingError } from "./cutting-error";
+import { emptyAnnotations } from "@/domain/cutting/annotations";
 import {
   approveCuttingPlan,
   cancelCuttingApproval,
   createCuttingPlansForOrder,
+  createManualRevision,
   getCuttingPlan,
   rerunCuttingPlan,
+  validateManualRevision,
 } from "./cutting-plan-service";
 import { listSheetUsageForOrder, summarizeSheetUsageByPeriod } from "./sheet-usage-service";
 
@@ -258,6 +261,97 @@ integration.sequential("cutting plan integration", () => {
     expect(after.result?.sheets[1].placements.every((placement) => placement.partId === partId)).toBe(true);
     // 이전 개정은 그대로 남는다(`D2-B05-H`).
     expect(after.revisions.map((item) => item.revisionNumber)).toEqual([2, 1]);
+  });
+
+  it("편집한 배치를 저장하면 편집 개정이 쌓이고 지정이 남는다", async () => {
+    const before = await getCuttingPlan(prisma, context, planId);
+    const result = before.result!;
+    const baseRevisionId = before.currentRevision!.id;
+
+    // 배치는 solver 결과 그대로 두고 둘째 원판에 필름만 켠다. 뒤의 승인·실적 테스트가
+    // 이 개정을 승인하므로 원판 수를 바꾸지 않는다.
+    const sheets = result.sheets.map((sheet) => ({ sheetItemId: sheet.sheetItemId, placements: sheet.placements }));
+    const annotations = {
+      ...emptyAnnotations(),
+      sheets: [{ sheetIndex: 1, film: true }],
+    };
+
+    const saved = await createManualRevision(prisma, context, {
+      planId,
+      baseRevisionId,
+      sheets,
+      annotations,
+      expectedLockVersion: before.lockVersion,
+      requestId: "cutting-manual-save",
+    });
+    expect(saved.revision).toMatchObject({
+      revisionNumber: 3,
+      status: "SUCCEEDED",
+      source: "MANUAL_EDIT",
+      baseRevisionId,
+      sheetCount: 2,
+      unplacedQuantity: 0,
+    });
+    expect(saved.warnings).toEqual([]);
+    expect(saved.plan.lockVersion).toBe(before.lockVersion + 1);
+    expect(saved.plan.status).toBe("CALCULATED");
+
+    const after = await getCuttingPlan(prisma, context, planId);
+    expect(after.currentRevision?.id).toBe(saved.revision.id);
+    expect(after.result?.engineVersion).toBe("manual-edit-v1");
+    expect(after.result?.sheets).toHaveLength(2);
+    expect(after.annotations?.sheets).toEqual([{ sheetIndex: 1, film: true }]);
+    expect(after.revisions.map((item) => [item.revisionNumber, item.source])).toEqual([
+      [3, "MANUAL_EDIT"],
+      [2, "SOLVER"],
+      [1, "SOLVER"],
+    ]);
+  });
+
+  it("겹치는 배치는 저장하지 않고 위반을 돌려준다", async () => {
+    const before = await getCuttingPlan(prisma, context, planId);
+    const first = before.result!.sheets[0].placements[0];
+    const sheets = [
+      { sheetItemId: before.result!.sheets[0].sheetItemId, placements: [first, { ...first }] },
+    ];
+
+    const checked = await validateManualRevision(prisma, context, {
+      planId,
+      baseRevisionId: before.currentRevision!.id,
+      sheets,
+      annotations: emptyAnnotations(),
+    });
+    expect(checked.violations.map((item) => item.code)).toContain("OVERLAP");
+    expect(checked.result.summary.unplacedParts.length).toBeGreaterThan(0);
+
+    await expect(
+      createManualRevision(prisma, context, {
+        planId,
+        baseRevisionId: before.currentRevision!.id,
+        sheets,
+        annotations: emptyAnnotations(),
+        expectedLockVersion: before.lockVersion,
+        requestId: "cutting-manual-reject",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+
+    const after = await getCuttingPlan(prisma, context, planId);
+    expect(after.lockVersion).toBe(before.lockVersion);
+    expect(after.revisions).toHaveLength(3);
+  });
+
+  it("잠금 번호가 다르면 편집을 저장하지 않는다", async () => {
+    const before = await getCuttingPlan(prisma, context, planId);
+    await expect(
+      createManualRevision(prisma, context, {
+        planId,
+        baseRevisionId: before.currentRevision!.id,
+        sheets: before.result!.sheets.map((sheet) => ({ sheetItemId: sheet.sheetItemId, placements: sheet.placements })),
+        annotations: emptyAnnotations(),
+        expectedLockVersion: before.lockVersion + 7,
+        requestId: "cutting-manual-stale",
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("승인하면 잠기고 다시 돌릴 수 없다", async () => {

@@ -138,7 +138,7 @@ cuttingAnnotations = {
 | 검사 | 편집 개정 | solver·고정 재실행 |
 |---|---|---|
 | `OVERLAP`·`OUT_OF_USABLE_AREA`·`UNKNOWN_PART`·`UNKNOWN_SHEET`·`ROTATION_NOT_ALLOWED`·`GRAIN_CONFLICT`·`SHEET_LIMIT_EXCEEDED`·`CONTRACT_VERSION_MISMATCH` | **거부** | 거부 |
-| `QUANTITY_MISMATCH` | **거부** — 단, 미배치를 허용한다. 배치 수 + `unplacedParts` 수량 = 입력 수량이면 통과 | 거부 |
+| `QUANTITY_MISMATCH` | **거부** — 부품을 수량보다 많이 놓았을 때. 미배치는 허용하며 서버가 `입력 수량 − 배치 수` 로 센다 | 거부 |
 | `NOT_GUILLOTINE`·`KERF_NOT_KEPT` | **경고** — `warnings` 에 남기고 저장 (`D2-B11-G`) | 거부(`D2-B05-F`) |
 | `REMNANT_*`·`AREA_MISMATCH` | 서버가 잔재·요약을 **다시 계산해 채우므로** 검사 대상이 아니다 | 거부 |
 
@@ -153,7 +153,7 @@ annotations 검사(전부 거부):
 | `CUT_LINE_OUT_OF_SHEET` | 원판 사용 영역(trim 안) 밖의 y |
 | `ANNOTATION_UNKNOWN_SHEET`·`ANNOTATION_UNKNOWN_PLACEMENT` | 가리키는 원판·배치가 결과에 없다 |
 
-잔재·요약은 서버가 채운다. 편집기는 `placements` 와 `unplacedParts` 만 보낸다. 잔재 계산은 `P2-B06` 의 규칙(남은 조각은 손실)을 그대로 쓰고, 계산 함수는 solver 쪽 것을 꺼내 공유한다.
+요약·미배치는 서버가 채운다(`buildManualEditResult`). 편집기는 원판별 `placements` 만 보낸다. **편집 개정은 잔재 사각형을 보고하지 않는다** — 자유 배치에서 잔재 사각형을 구하는 것은 별개 문제이고, `P2-B06` 은 남은 조각을 손실로 세므로 면적 차만 있으면 된다. 레이저 그룹의 `boundsMm` 도 서버가 배치에서 다시 계산해 덮어쓴다.
 
 ### 4.5 API
 
@@ -161,8 +161,8 @@ annotations 검사(전부 거부):
 
 | 메서드·경로 | 요청 | 응답 | 규칙 |
 |---|---|---|---|
-| `POST /api/v1/cutting-plans/{planId}/manual-revisions` | `{ expectedLockVersion, baseRevisionId, sheets: [{ sheetItemId, placements[] }], unplacedParts[], annotations }` | `201` 개정 DTO + `warnings[]` | 4.4 검증. 거부면 `400 INVALID_REQUEST` 에 `details.violations[]`. 승인된 작업이면 `409`. 새 개정이 `currentRevision` 이 되고 `lockVersion` +1. 감사 `cutting.revision_edited` |
-| `POST /api/v1/cutting-plans/{planId}/manual-revisions/validate` | 위와 같음(`expectedLockVersion` 없음) | `200 { violations[], warnings[] }` | 저장 없이 검증만. 편집기가 이동할 때마다 부른다(디바운스) |
+| `POST /api/v1/cutting-plans/{planId}/manual-revisions` | `{ expectedLockVersion, baseRevisionId, sheets: [{ sheetItemId, placements[] }], annotations }` | `201 { plan, revision, warnings[] }` | 4.4 검증. 거부면 `400 INVALID_REQUEST` 에 `details.violations[]`. 승인된 작업이면 `409`. 새 개정이 `currentRevision` 이 되고 `lockVersion` +1. 감사 `cutting.revision_edited` |
+| `POST /api/v1/cutting-plans/{planId}/manual-revisions/validate` | 위와 같음(`expectedLockVersion` 없음) | `200 { violations[], warnings[], summary, annotations }` | 저장 없이 검증만. 편집기가 이동할 때마다 부른다(디바운스) |
 | `POST /api/v1/cutting-plans/{planId}/revisions/{revisionId}/dxf` | `{}` | `202 { jobId }` | `cutting.dxf` 작업을 큐에 넣는다. `SUCCEEDED` 개정만. idempotency `cutting-dxf-{revisionId}-{annotationsChecksum}` — 같은 개정·같은 지정이면 다시 만들지 않는다 |
 | `GET /api/v1/cutting-plans/{planId}/revisions/{revisionId}/dxf` | — | `200 { files: [{ sheetIndex, fileName, assetId, kind: "SHEET" \| "LASER_GROUP" }], zipAssetId }` | 만들어진 파일 목록. 내려받기는 기존 `GET /files/{fileId}/downloads` |
 | `GET /api/v1/cutting-plans/{planId}` | (기존) | DTO 에 `revisions[].source`·`baseRevisionId`·`warnings`, `annotations` 추가 | — |
@@ -262,7 +262,7 @@ annotations 검사(전부 거부):
 
 | 순서 | 내용 | 산출 |
 |---|---|---|
-| B11-1 | migration(4.2), `annotations.ts`, `validateManualEdit`, `manual-revisions`·`validate` API, DTO 확장 | 통합 테스트 |
+| B11-1 | migration(4.2), `annotations.ts`, `validateManualEdit`, `manual-revisions`·`validate` API, DTO 확장 — **2026-09-12 완료** | 단위 7건·통합 3건 |
 | B11-2 | 편집기 — 부품 이동·미배치 투입·회전·새 원판·빈 원판 삭제·실행취소·검증 표시·저장 | E2E |
 | B11-3 | 편집기 — 레이저 그룹·가로선·필름 | E2E |
 | B11-4 | DXF — writer 확장, `cutting-dxf-service`, `cutting.dxf` 작업, 순번, zip, 파일 목록 API·화면 | 통합 테스트 + MFC 대조 |
@@ -380,3 +380,4 @@ MFC 에서 `Prog1` 라이선스에만 열려 있어 부가 기능일 가능성�
 | 2026-09-12 | `D2-B11-A~D` 사용자 결정. 주력(A), MFC DXF 규칙(B), 개정에 붙여 잠금(C), 출력 묶음보다 먼저(D). `READY` | 사용자·Claude |
 | 2026-09-12 | **정의 정정(`E`).** 사용자가 그룹재단을 "재단 배치 편집기 + 원판별 DXF" 로 확인. 레이저 그룹은 부속. `F`(절곡선 포함)·`G`(guillotine 경고)·`H`(처음부터 같이) 결정. `D2-B05-J` (다) 재개방. 문서 전면 재작성 | 사용자·Claude |
 | 2026-09-12 | 상세 설계(4절). 데이터 모델·annotations 스키마·검증 규칙·API·편집기 상호작용·DXF 생성·순서. 실제 DXF 로 닫을 질문은 4.11 | Claude |
+| 2026-09-12 | B11-1 구현. `CuttingPlanRevision` 에 `source`·`baseRevisionId`·`annotations`·`warnings`, `annotations.ts`·`manual-edit.ts`, `createManualRevision`·`validateManualRevision`, API 둘, 감사 `cutting.revision_edited`. 설계와 달라진 것: 미배치는 서버가 세고 편집 개정은 잔재를 보고하지 않는다 | Claude |

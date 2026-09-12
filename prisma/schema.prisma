@@ -144,6 +144,12 @@ enum CuttingPlanRevisionStatus {
   FAILED
 }
 
+/// 개정을 누가 만들었나(`P2-B11`). `MANUAL_EDIT` 는 편집기에서 저장한 것으로 큐를 타지 않는다.
+enum CuttingRevisionSource {
+  SOLVER
+  MANUAL_EDIT
+}
+
 /// 원판 사용 기록의 유효 여부(`D2-B06-F`). 승인을 취소해도 지우지 않고 무효로 둔다.
 enum SheetUsageStatus {
   ACTIVE
@@ -1259,6 +1265,9 @@ model CuttingPlan {
 /**
  * 재단 실행 한 번. 다시 돌리면 덮어쓰지 않고 개정이 쌓인다(`D2-B05-H`).
  * `pins` 는 사용자가 손으로 지시한 고정 배치다(`D2-B05-J`).
+ * 편집기에서 저장한 개정은 `source = MANUAL_EDIT` 이고(`P2-B11`), 출발점 개정을
+ * `baseRevisionId` 로, 레이저 그룹·가로선·필름 지정을 `annotations` 로,
+ * 저장을 허용한 경고(guillotine·kerf)를 `warnings` 로 남긴다(`D2-B11-C`·`D2-B11-G`).
  */
 model CuttingPlanRevision {
   id                    String                    @id @default(uuid()) @db.Uuid
@@ -1266,8 +1275,12 @@ model CuttingPlanRevision {
   cuttingPlanId         String                    @db.Uuid
   revisionNumber        Int
   status                CuttingPlanRevisionStatus @default(QUEUED)
+  source                CuttingRevisionSource     @default(SOLVER)
+  baseRevisionId        String?                   @db.Uuid
   jobId                 String?                   @db.Uuid
   pins                  Json                      @db.JsonB
+  annotations           Json?                     @db.JsonB
+  warnings              Json?                     @db.JsonB
   engineVersion         String?                   @db.VarChar(50)
   result                Json?                     @db.JsonB
   sheetCount            Int?
@@ -1282,6 +1295,8 @@ model CuttingPlanRevision {
   organization          Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   cuttingPlan           CuttingPlan               @relation("CuttingPlanRevisions", fields: [cuttingPlanId], references: [id], onDelete: Cascade)
   job                   JobQueue?                 @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  baseRevision          CuttingPlanRevision?      @relation("CuttingPlanRevisionBase", fields: [baseRevisionId], references: [id], onDelete: SetNull)
+  derivedRevisions      CuttingPlanRevision[]     @relation("CuttingPlanRevisionBase")
   createdByMembership   OrganizationMembership    @relation("CuttingPlanRevisionCreator", fields: [createdByMembershipId], references: [id], onDelete: Restrict)
   currentOfPlan         CuttingPlan?              @relation("CuttingPlanCurrentRevision")
   approvedOfPlan        CuttingPlan?              @relation("CuttingPlanApprovedRevision")
@@ -1290,6 +1305,7 @@ model CuttingPlanRevision {
   @@unique([cuttingPlanId, revisionNumber], map: "CuttingPlanRevision_plan_revision_key")
   @@index([organizationId, cuttingPlanId, revisionNumber], map: "CuttingPlanRevision_plan_number_idx")
   @@index([jobId])
+  @@index([baseRevisionId])
 }
 
 /**

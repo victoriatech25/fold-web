@@ -218,6 +218,18 @@ type AuditPayloadByAction = {
   "cutting.revision_created": {
     metadata: { revisionNumber: number; pinnedPartCount: number; jobId: string };
   };
+  // 편집기에서 저장한 개정(`P2-B11`). 배치 원문은 남기지 않고 건수만 남긴다.
+  "cutting.revision_edited": {
+    metadata: {
+      revisionNumber: number;
+      baseRevisionId: string;
+      sheetCount: number;
+      unplacedQuantity: number;
+      warningCount: number;
+      laserGroupCount: number;
+      horizontalCutLineCount: number;
+    };
+  };
   "cutting.approved": {
     before: { status: string; lockVersion: number };
     after: { status: string; lockVersion: number };

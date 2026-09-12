@@ -1,5 +1,12 @@
 import "server-only";
 
+import { cuttingAnnotationsSchema, type CuttingAnnotations } from "@/domain/cutting/annotations";
+import {
+  buildManualEditResult,
+  validateManualEdit,
+  type ManualEditSheet,
+  type ManualEditViolation,
+} from "@/domain/cutting/manual-edit";
 import type { CuttingInput, CuttingResult } from "@/domain/cutting/schema";
 import { cuttingInputSchema, cuttingResultSchema } from "@/domain/cutting/schema";
 import { writeAuditEvent } from "@/server/audit/audit-writer";
@@ -27,8 +34,11 @@ const revisionSelect = {
   id: true,
   revisionNumber: true,
   status: true,
+  source: true,
+  baseRevisionId: true,
   jobId: true,
   pins: true,
+  warnings: true,
   engineVersion: true,
   sheetCount: true,
   usedAreaM2: true,
@@ -70,8 +80,11 @@ function toRevisionDto(row: RevisionRow) {
     id: row.id,
     revisionNumber: row.revisionNumber,
     status: row.status,
+    source: row.source,
+    baseRevisionId: row.baseRevisionId,
     jobId: row.jobId,
     pins: row.pins as unknown as CuttingPin[],
+    warnings: (row.warnings as unknown as ManualEditViolation[] | null) ?? [],
     engineVersion: row.engineVersion,
     sheetCount: row.sheetCount,
     usedAreaM2: row.usedAreaM2?.toString() ?? null,
@@ -339,6 +352,8 @@ export async function listCuttingPlans(
 export type CuttingPlanDetailDto = CuttingPlanDto & {
   input: CuttingInput;
   result: CuttingResult | null;
+  /** 현재 개정의 지정(`P2-B11`). solver 개정은 `null`. */
+  annotations: CuttingAnnotations | null;
   revisions: CuttingRevisionDto[];
 };
 
@@ -355,20 +370,176 @@ export async function getCuttingPlan(
   if (!row) throw new CuttingError("NOT_FOUND", "재단 작업을 찾을 수 없습니다.");
 
   let result: CuttingResult | null = null;
+  let annotations: CuttingAnnotations | null = null;
   if (row.currentRevision?.status === "SUCCEEDED") {
     const stored = await prisma.cuttingPlanRevision.findUniqueOrThrow({
       where: { id: row.currentRevision.id },
-      select: { result: true },
+      select: { result: true, annotations: true },
     });
     const parsed = cuttingResultSchema.safeParse(stored.result);
     result = parsed.success ? parsed.data : null;
+    const parsedAnnotations = cuttingAnnotationsSchema.safeParse(stored.annotations);
+    annotations = parsedAnnotations.success ? parsedAnnotations.data : null;
   }
 
   return {
     ...toPlanDto(row),
     input: readPlanInput(row.id, row.input),
     result,
+    annotations,
     revisions: row.revisions.map(toRevisionDto),
+  };
+}
+
+export type ManualRevisionInput = {
+  planId: string;
+  baseRevisionId: string;
+  sheets: ManualEditSheet[];
+  annotations: CuttingAnnotations;
+};
+
+export type ManualRevisionValidation = {
+  violations: ManualEditViolation[];
+  warnings: ManualEditViolation[];
+  result: CuttingResult;
+  annotations: CuttingAnnotations;
+};
+
+/**
+ * 편집기가 보낸 배치를 저장 없이 검증한다(`P2-B11` 4.4·4.5). 편집기가 이동할 때마다
+ * 부르므로 결과·지정을 조립해 돌려주고, 저장은 `createManualRevision` 이 같은 함수를 쓴다.
+ */
+export async function validateManualRevision(
+  prisma: PrismaClient,
+  context: AuthenticatedContext,
+  input: ManualRevisionInput,
+): Promise<ManualRevisionValidation> {
+  requirePermission(context, "cutting.optimize");
+  const plan = await loadPlan(prisma, context.organizationId, input.planId);
+  const stored = await prisma.cuttingPlan.findUniqueOrThrow({
+    where: { id: plan.id },
+    select: { input: true },
+  });
+  const base = await prisma.cuttingPlanRevision.findFirst({
+    where: { id: input.baseRevisionId, cuttingPlanId: plan.id, organizationId: context.organizationId },
+    select: { id: true, status: true },
+  });
+  if (!base) throw new CuttingError("NOT_FOUND", "편집의 출발점이 된 재단 개정을 찾을 수 없습니다.");
+  if (base.status !== "SUCCEEDED") {
+    throw new CuttingError("CONFLICT", "성공한 재단 결과만 편집할 수 있습니다.");
+  }
+
+  const cuttingInput = readPlanInput(plan.id, stored.input);
+  const result = buildManualEditResult(cuttingInput, input.sheets);
+  const outcome = validateManualEdit(cuttingInput, result, input.annotations);
+  return {
+    violations: outcome.violations,
+    warnings: outcome.warnings,
+    result,
+    annotations: outcome.normalizedAnnotations,
+  };
+}
+
+/**
+ * 편집한 배치를 새 개정으로 저장한다(`D2-B05-H`·`D2-B11-C`). 큐를 타지 않고 곧바로
+ * `SUCCEEDED` 다. 거부 항목이 있으면 저장하지 않고 위반 목록을 돌려준다.
+ * 경고(guillotine·kerf)는 개정에 남겨 승인자가 다시 본다(`D2-B11-G`).
+ */
+export async function createManualRevision(
+  prisma: PrismaClient,
+  context: AuthenticatedContext,
+  input: ManualRevisionInput & { expectedLockVersion: number; requestId: string },
+): Promise<{ plan: CuttingPlanDto; revision: CuttingRevisionDto; warnings: ManualEditViolation[] }> {
+  requirePermission(context, "cutting.optimize");
+  const plan = await loadPlan(prisma, context.organizationId, input.planId);
+  if (plan.status === "APPROVED") {
+    throw new CuttingError("CONFLICT", "승인된 재단 작업은 편집할 수 없습니다. 먼저 승인을 취소해 주세요.");
+  }
+  if (plan.lockVersion !== input.expectedLockVersion) {
+    throw new CuttingError("CONFLICT", "재단 작업이 다른 화면에서 변경되었습니다.");
+  }
+
+  const validation = await validateManualRevision(prisma, context, input);
+  if (validation.violations.length > 0) {
+    throw new CuttingError("INVALID_REQUEST", "저장할 수 없는 배치입니다. 표시된 항목을 고쳐 주세요.", {
+      violations: validation.violations,
+      warnings: validation.warnings,
+    });
+  }
+
+  const unplacedQuantity = validation.result.summary.unplacedParts.reduce(
+    (total, part) => total + part.quantity,
+    0,
+  );
+
+  const created = await prisma.$transaction(async (tx) => {
+    const fresh = await tx.cuttingPlan.findFirstOrThrow({
+      where: { id: plan.id, organizationId: context.organizationId },
+      select: { nextRevisionNumber: true },
+    });
+    const revision = await tx.cuttingPlanRevision.create({
+      data: {
+        organizationId: context.organizationId,
+        cuttingPlanId: plan.id,
+        revisionNumber: fresh.nextRevisionNumber,
+        status: "SUCCEEDED",
+        source: "MANUAL_EDIT",
+        baseRevisionId: input.baseRevisionId,
+        pins: [] as unknown as Prisma.InputJsonValue,
+        annotations: validation.annotations as unknown as Prisma.InputJsonValue,
+        warnings: validation.warnings as unknown as Prisma.InputJsonValue,
+        engineVersion: validation.result.engineVersion,
+        result: validation.result as unknown as Prisma.InputJsonValue,
+        sheetCount: validation.result.summary.sheetCount,
+        usedAreaM2: validation.result.summary.usedAreaM2,
+        totalAreaM2: validation.result.summary.totalAreaM2,
+        yieldPercent: validation.result.summary.yieldPercent,
+        unplacedQuantity,
+        createdByMembershipId: context.membershipId,
+      },
+      select: revisionSelect,
+    });
+    // 잠금 확인과 개정 번호 증가를 한 번에 한다. 그 사이에 다른 화면이 바꿨으면 되돌린다.
+    const claimed = await tx.cuttingPlan.updateMany({
+      where: {
+        id: plan.id,
+        organizationId: context.organizationId,
+        lockVersion: input.expectedLockVersion,
+        status: { not: "APPROVED" },
+      },
+      data: {
+        nextRevisionNumber: { increment: 1 },
+        lockVersion: { increment: 1 },
+        currentRevisionId: revision.id,
+        status: "CALCULATED",
+      },
+    });
+    if (claimed.count !== 1) {
+      throw new CuttingError("CONFLICT", "재단 작업이 다른 화면에서 변경되었습니다.");
+    }
+    await writeAuditEvent(tx, {
+      organizationId: context.organizationId,
+      actorUserId: context.userId,
+      action: "cutting.revision_edited",
+      entityId: plan.id,
+      requestId: input.requestId,
+      metadata: {
+        revisionNumber: revision.revisionNumber,
+        baseRevisionId: input.baseRevisionId,
+        sheetCount: validation.result.summary.sheetCount,
+        unplacedQuantity,
+        warningCount: validation.warnings.length,
+        laserGroupCount: validation.annotations.laserGroups.length,
+        horizontalCutLineCount: validation.annotations.horizontalCutLines.length,
+      },
+    });
+    return revision;
+  });
+
+  return {
+    plan: toPlanDto(await loadPlan(prisma, context.organizationId, plan.id)),
+    revision: toRevisionDto(created),
+    warnings: validation.warnings,
   };
 }
 
