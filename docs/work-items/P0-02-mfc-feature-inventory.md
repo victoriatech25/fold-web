@@ -68,7 +68,8 @@ MFC 참조 루트:
 | `F-12` | 주문·승인 | 신규, 열기, 복사, 삭제, 저장, 주문 목록 | 작업 상태·이력 | `Work03Dlg`, `SellOrderDlg` | 명시적 상태 전이·승인·감사 | `P2-A10`, `P2-A11` |
 | `F-13` | 전개·DXF | 전개 보기, 확장 옵션, 작업 DXF 생성 | 전개 geometry·DXF | `Work03Dlg`, `HiExportDxf`, `Mydxf` | 제작 geometry와 파일 작업 분리 | `P1-14`, `P1-16` |
 | `F-14` | 3D 검토 | MFC 핵심 기능보다 웹에서 강화된 검토 기능 | 검토용 geometry | 현재 `fold_web` `src/domain/3d`, `model-3d` | 웹 개선 기능으로 유지·검증 | `P1-15` |
-| `F-15` | 재단 | 원판·부품, 배치, 그룹 재단, 수동 보정, 잔재·수율 | `sellplaninfo`, `sellrawuse`, 배치 결과 | `CuttingDlg`, `CuttingOrgDlg`, `HiCuttingSolver` | worker 작업·수동 승인·이력 | `P2-B03`~`P2-B06` |
+| `F-15` | 재단 | 원판·부품, 배치, 수동 보정, 잔재·수율 | `sellplaninfo`, `sellrawuse`, 배치 결과 | `CuttingDlg`, `CuttingOrgDlg`, `HiCuttingSolver` | worker 작업·수동 승인·이력 | `P2-B03`~`P2-B06` |
+| `F-15a` | 그룹재단 | 재단 결과 위에 레이저 그룹·가로 절단선·필름을 지정하고 원판별 장비용 DXF 를 낸다. **수주를 묶는 기능이 아니다**(2026-09-12 소스 확인). `Prog1` 라이선스에만 열림 | 없음(화면 세션에만 존재) | `CuttingGroupDlg`, `CutGroupEditDlg`, `RazorCutManager`, `HiExportDxf` | 재단 개정 annotations·DXF 출력 | [`P2-B11`](./P2-B11-group-cutting.md) |
 | `F-16` | 출력·라벨 | 작업표, 절곡도, 재단 배치·요약, 견적, 라벨 | PDF·인쇄물 | `ZPrintingDlg`, `PrintFold*`, `CutPrint`, `HiDrawingReport` | 서버 PDF·버전 템플릿·브라우저 미리보기 | `P2-B07`, `P2-B08` |
 | `F-17` | 기계 연동 | NC 설정·파일·전송·채널·장비 응답 | 전송 상태 | `NCCmmDlg`, `NCCmmSettingDlg`, `HiDrawingNCManager` | P1 placeholder, P3 Agent·adapter | `P1-04`, `P3-A01`~`P3-A08` |
 | `F-18` | DB 백업·업데이트 | DB 백업, 시스템 정보, 프로그램 업데이트 | 백업·버전 | `MainDlg`, `SysInfoDlg`, `DBbackup` | 운영 backup·restore와 배포 pipeline로 대체 | `P2-C08`~`P2-C11` |
@@ -159,3 +160,4 @@ flowchart LR
 |---|---|---|
 | 2026-07-18 | MFC 정적 코드·resource 기반 기능 인벤토리 초안 작성 | 구현·조사 담당 |
 | 2026-07-18 | 대략적인 핵심 흐름 승인, MFC 실행·UI 비계승과 웹 독자 구조 원칙 반영 후 완료 | 구현·조사 담당 |
+| 2026-09-12 | `F-15` 에서 그룹재단을 `F-15a` 로 분리. MFC 소스 확인 결과 그룹재단은 수주 묶음이 아니라 레이저 그룹 지정 + 장비용 DXF 다 | Claude |
