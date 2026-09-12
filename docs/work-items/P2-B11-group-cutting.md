@@ -268,8 +268,8 @@ E2E 는 worker 가 있어야 재단 결과가 나오므로 `e2e/global-setup.ts`
 |---|---|---|
 | B11-1 | migration(4.2), `annotations.ts`, `validateManualEdit`, `manual-revisions`·`validate` API, DTO 확장 — **2026-09-12 완료** | 단위 7건·통합 3건 |
 | B11-2 | 편집기 — 부품 이동·미배치 투입·회전·새 원판·빈 원판 삭제·실행취소·검증 표시·저장 — **2026-09-12 완료** | 단위 6건·E2E 1건 |
-| B11-3 | 편집기 — 레이저 그룹·가로선·필름 | E2E |
-| B11-4 | DXF — writer 확장, `cutting-dxf-service`, `cutting.dxf` 작업, 순번, zip, 파일 목록 API·화면 | 통합 테스트 + MFC 대조 |
+| B11-3 | 편집기 — 레이저 그룹·가로선·필름 — **2026-09-12 완료** | 단위 3건·E2E(같은 흐름) |
+| B11-4 | DXF — writer 확장, `cutting-dxf-service`, `cutting.dxf` 작업, 순번, zip, 파일 목록 API·화면, 레이저 그룹 안쪽 선 제외·그룹 파일·필름 반영 | 통합 테스트 + MFC 대조 |
 | B11-5 | 검수 가이드, 상태 문서 갱신, 사용자 검수 | — |
 
 ### 4.11 열린 질문 — 실제 DXF 파일을 받은 뒤 정한다
@@ -386,3 +386,4 @@ MFC 에서 `Prog1` 라이선스에만 열려 있어 부가 기능일 가능성�
 | 2026-09-12 | 상세 설계(4절). 데이터 모델·annotations 스키마·검증 규칙·API·편집기 상호작용·DXF 생성·순서. 실제 DXF 로 닫을 질문은 4.11 | Claude |
 | 2026-09-12 | B11-1 구현. `CuttingPlanRevision` 에 `source`·`baseRevisionId`·`annotations`·`warnings`, `annotations.ts`·`manual-edit.ts`, `createManualRevision`·`validateManualRevision`, API 둘, 감사 `cutting.revision_edited`. 설계와 달라진 것: 미배치는 서버가 세고 편집 개정은 잔재를 보고하지 않는다 | Claude |
 | 2026-09-12 | B11-2 구현. `editor-state.ts`(순수 상태·스냅·판정·저장 변환), `screen-transform.ts`, `/cutting/[planId]/edit` 편집기(이동·원판 간 이동·미배치 투입·회전·원판 추가/삭제·실행취소·디바운스 검증·저장), 상세 화면 `배치 편집` 진입과 개정 출처 열. E2E 에 worker 를 띄우는 global setup 추가 | Claude |
+| 2026-09-12 | B11-3 구현. 편집기에 도구 모드(부품 이동·레이저 그룹·절단선), 사각형 선택으로 묶기·누르면 풀기, 클릭으로 절단선 두기·지우기, 원판 필름 토글. 즉시 판정은 서버 규칙과 같은 `laserGroupIssue`·`cutLineIssue`. 서버 위반에 `placementKey` 를 실어 문제인 장만 표시. 상세 화면에 그룹·절단선·필름 표시 | Claude |
