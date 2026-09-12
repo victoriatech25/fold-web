@@ -161,3 +161,53 @@ describe("editor state", () => {
     expect(placementIssue({ x: 700, y: 0, width: 400, height: 500 }, [neighbour], usable)).toBe("OUT_OF_USABLE_AREA");
   });
 });
+
+describe("editor annotations", () => {
+  const partById = new Map(input.parts.map((part) => [part.id, part]));
+
+  it("격자로 놓인 같은 부품만 묶고, 섞이거나 이미 묶인 것은 거부한다", async () => {
+    const { addLaserGroup, laserGroupIssue, removeLaserGroup } = await import("@/domain/cutting/editor-state");
+    let state = createEditorState(result, null);
+    const [a0, a1, b0] = state.sheets[0].placements;
+
+    expect(laserGroupIssue(state, 0, [a0.key, a1.key], partById)).toBeNull();
+    expect(laserGroupIssue(state, 0, [a0.key, b0.key], partById)).toBe("MIXED_PART");
+    expect(laserGroupIssue(state, 0, [], partById)).toBe("EMPTY");
+
+    state = addLaserGroup(state, 0, [a0.key, a1.key]);
+    expect(state.annotations.laserGroups).toHaveLength(1);
+    expect(laserGroupIssue(state, 0, [a1.key], partById)).toBe("OVERLAP");
+    expect(toSaveAnnotations(state).laserGroups[0].placementKeys).toEqual(["A#0", "A#1"]);
+
+    state = removeLaserGroup(state, state.annotations.laserGroups[0].id);
+    expect(state.annotations.laserGroups).toEqual([]);
+  });
+
+  it("L자로 놓인 배치는 격자가 아니라 거부한다", async () => {
+    const { laserGroupIssue } = await import("@/domain/cutting/editor-state");
+    let state = createEditorState(result, null);
+    state = insertPlacement(state, input, "A", { sheetIndex: 0, xMm: 0, yMm: 1000, rotated: false });
+    const [a0, a1, , a2] = state.sheets[0].placements;
+    expect(laserGroupIssue(state, 0, [a0.key, a1.key, a2.key], partById)).toBe("NOT_RECTANGLE");
+  });
+
+  it("절단선은 부품 사이에만 두고 필름은 원판 단위로 켠다", async () => {
+    const { addCutLine, cutLineIssue, removeCutLine, toggleFilm } = await import("@/domain/cutting/editor-state");
+    let state = createEditorState(result, null);
+    const spec = input.sheets[0];
+    expect(cutLineIssue(state, 0, 250, spec, partById)).toBe("CROSSES_PART");
+    expect(cutLineIssue(state, 0, 2500, spec, partById)).toBe("OUT_OF_SHEET");
+    expect(cutLineIssue(state, 0, 1500, spec, partById)).toBeNull();
+
+    state = addCutLine(state, 0, 1500);
+    state = toggleFilm(state, 0);
+    const saved = toSaveAnnotations(state);
+    expect(saved.horizontalCutLines).toEqual([{ id: state.annotations.horizontalCutLines[0].id, sheetIndex: 0, yMm: "1500" }]);
+    expect(saved.sheets).toEqual([{ sheetIndex: 0, film: true }]);
+
+    state = removeCutLine(state, state.annotations.horizontalCutLines[0].id);
+    state = toggleFilm(state, 0);
+    expect(toSaveAnnotations(state)).toMatchObject({ horizontalCutLines: [], sheets: [{ sheetIndex: 0, film: false }] });
+    expect(undo(undo(state)).annotations.filmSheetKeys).toHaveLength(1);
+  });
+});

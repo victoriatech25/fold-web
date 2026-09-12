@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { CuttingAnnotations } from "@/domain/cutting/annotations";
 import type { CuttingInput, CuttingResult } from "@/domain/cutting/schema";
 import { isLandscape, screenViewBox, toScreenRect } from "@/domain/cutting/screen-transform";
 import { useCommonPopup } from "@/components/ui/common-popup";
@@ -13,6 +14,7 @@ import { cuttingRequest, planStatusLabels, planStatusStyles, revisionStatusLabel
 function SheetFigure({
   input,
   result,
+  annotations,
   sheetIndex,
   pinnedPartIds,
   onTogglePin,
@@ -20,6 +22,7 @@ function SheetFigure({
 }: {
   input: CuttingInput;
   result: CuttingResult;
+  annotations: CuttingAnnotations | null;
   sheetIndex: number;
   pinnedPartIds: Set<string>;
   onTogglePin: (partId: string, sheetIndex: number) => void;
@@ -39,11 +42,21 @@ function SheetFigure({
     return toScreenRect({ x: Number(xMm), y: Number(yMm), width: boxWidth, height: boxLength }, landscape);
   }
 
+  // 편집 개정의 지정(`P2-B11`). 레이저 그룹은 사각형, 절단선은 폭을 가로지르는 선, 필름은 머리글 표시.
+  const laserGroups = annotations?.laserGroups.filter((group) => group.sheetIndex === sheetIndex) ?? [];
+  const cutLines = annotations?.horizontalCutLines.filter((line) => line.sheetIndex === sheetIndex) ?? [];
+  const film = annotations?.sheets.some((item) => item.sheetIndex === sheetIndex && item.film) ?? false;
+  const usableX = Number(sheet.trimLeftMm);
+  const usableWidth = Number(sheet.widthMm) - usableX - Number(sheet.trimRightMm);
+
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex flex-wrap items-baseline gap-2">
         <h3 className="text-sm font-black">원판 {sheetIndex + 1}</h3>
         <span className="text-xs text-slate-500">{sheet.label}</span>
+        {film ? <span className="rounded bg-sky-100 px-1.5 text-[11px] font-bold text-sky-900">필름</span> : null}
+        {laserGroups.length > 0 ? <span className="text-xs text-indigo-700">레이저 그룹 {laserGroups.length}</span> : null}
+        {cutLines.length > 0 ? <span className="text-xs text-rose-700">절단선 {cutLines.length}</span> : null}
         <span className="ml-auto text-xs text-slate-500">
           사용 면적 {sheetResult.usedAreaM2}㎡ · 부품 {sheetResult.placements.length}개
         </span>
@@ -104,6 +117,39 @@ function SheetFigure({
                 {part.label}
               </text>
             </g>
+          );
+        })}
+        {laserGroups.map((group) => {
+          const box = toScreen(group.boundsMm.xMm, group.boundsMm.yMm, Number(group.boundsMm.widthMm), Number(group.boundsMm.lengthMm));
+          return (
+            <rect
+              data-testid={`plan-laser-group-${group.id}`}
+              fill="rgba(99,102,241,0.12)"
+              height={box.height}
+              key={group.id}
+              stroke="#4f46e5"
+              strokeDasharray="24 12"
+              strokeWidth={8}
+              width={box.width}
+              x={box.x}
+              y={box.y}
+            />
+          );
+        })}
+        {cutLines.map((line) => {
+          const box = toScreenRect({ x: usableX, y: Number(line.yMm), width: usableWidth, height: 0 }, landscape);
+          return (
+            <line
+              data-testid={`plan-cut-line-${line.id}`}
+              key={line.id}
+              stroke="#e11d48"
+              strokeDasharray="30 15"
+              strokeWidth={6}
+              x1={box.x}
+              x2={box.x + box.width}
+              y1={box.y}
+              y2={box.y + box.height}
+            />
           );
         })}
       </svg>
@@ -382,6 +428,7 @@ export function CuttingPlanDetailPanel({
         <div className="grid gap-3 lg:grid-cols-2">
           {plan.result.sheets.map((_, index) => (
             <SheetFigure
+              annotations={plan.annotations}
               editable={editable}
               input={plan.input}
               key={index}

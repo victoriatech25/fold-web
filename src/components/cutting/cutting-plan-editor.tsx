@@ -5,20 +5,29 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import {
+  addCutLine,
+  addLaserGroup,
   addSheet,
   canRotate,
   createEditorState,
+  cutLineIssue,
   deleteSheet,
   insertPlacement,
+  laserGroupBounds,
+  laserGroupIssue,
   movePlacement,
   partSize,
   placementIssue,
   placementRect,
   redo,
+  removeCutLine,
+  removeLaserGroup,
   removePlacement,
+  savedKeyByPlacement,
   snapPosition,
   toSaveAnnotations,
   toSaveSheets,
+  toggleFilm,
   undo,
   unplacedCounts,
   usableRect,
@@ -27,7 +36,7 @@ import {
 } from "@/domain/cutting/editor-state";
 import type { ManualEditViolation } from "@/domain/cutting/manual-edit";
 import type { CuttingPart, CuttingSheet, CuttingSummary } from "@/domain/cutting/schema";
-import { fromScreenRect, isLandscape, screenViewBox, toScreenRect } from "@/domain/cutting/screen-transform";
+import { fromScreenPoint, fromScreenRect, isLandscape, screenViewBox, toScreenRect } from "@/domain/cutting/screen-transform";
 import { useCommonPopup } from "@/components/ui/common-popup";
 import type { CuttingPlanDetailDto } from "@/server/cutting/cutting-plan-service";
 import { cuttingRequest } from "./cutting-plan-list-panel";
@@ -54,6 +63,24 @@ type Carry = {
   grabY: number;
   /** 놓을 자리. 원판 위에 있을 때만. */
   ghost: { sheetIndex: number; rect: RectMm; issue: ReturnType<typeof placementIssue> } | null;
+};
+
+/** 도구 모드. 이동은 배치를 끌고, 그룹은 사각형으로 골라 묶고, 절단선은 클릭한 자리에 선을 둔다. */
+type EditorMode = "move" | "group" | "line";
+
+/** 그룹 모드의 사각형 선택. 화면 좌표(mm). */
+type Band = { sheetIndex: number; x0: number; y0: number; x1: number; y1: number };
+
+const modeLabels: Record<EditorMode, string> = { move: "부품 이동", group: "레이저 그룹", line: "절단선" };
+const groupIssueMessages: Record<string, string> = {
+  MIXED_PART: "레이저 그룹은 같은 부품을 같은 방향으로 놓은 것만 묶을 수 있습니다.",
+  NOT_RECTANGLE: "레이저 그룹은 행×열 격자로 놓인 부품만 묶을 수 있고, 사각형 안에 다른 부품이 없어야 합니다.",
+  OVERLAP: "이미 다른 레이저 그룹에 속한 부품이 있습니다.",
+  EMPTY: "묶을 부품을 사각형으로 골라 주세요.",
+};
+const lineIssueMessages: Record<string, string> = {
+  OUT_OF_SHEET: "절단선은 원판 사용 영역 안에만 둘 수 있습니다.",
+  CROSSES_PART: "절단선이 부품을 가로지릅니다. 부품 사이나 빈 곳에 두세요.",
 };
 
 type Validation = {
@@ -95,6 +122,9 @@ export function CuttingPlanEditor({ plan }: { plan: CuttingPlanDetailDto }) {
   const [state, setState] = useState<EditorState>(() => createEditorState(plan.result!, plan.annotations));
   const [carry, setCarry] = useState<Carry | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [mode, setMode] = useState<EditorMode>("move");
+  const [band, setBand] = useState<Band | null>(null);
+  const [notice, setNotice] = useState("");
   const [validated, setValidated] = useState<ValidationFor | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -104,6 +134,10 @@ export function CuttingPlanEditor({ plan }: { plan: CuttingPlanDetailDto }) {
   useEffect(() => {
     carryRef.current = carry;
   }, [carry]);
+  const bandRef = useRef<Band | null>(null);
+  useEffect(() => {
+    bandRef.current = band;
+  }, [band]);
 
   const partById = useMemo(() => new Map(input.parts.map((part) => [part.id, part])), [input.parts]);
   const sheetSpecById = useMemo(() => new Map(input.sheets.map((sheet) => [sheet.sheetItemId, sheet])), [input.sheets]);
@@ -220,6 +254,57 @@ export function CuttingPlanEditor({ plan }: { plan: CuttingPlanDetailDto }) {
     };
   }, [carry, input, partById, proposeAt, sheetSpecById, state.sheets]);
 
+  // 그룹 모드의 사각형 선택. 놓는 순간 겹치는 배치를 모아 묶는다.
+  useEffect(() => {
+    if (!band) return;
+    function onMove(event: PointerEvent) {
+      const current = bandRef.current;
+      const svg = current ? svgRefs.current.get(current.sheetIndex) : undefined;
+      if (!current || !svg) return;
+      const point = svgPoint(svg, event.clientX, event.clientY);
+      if (point) setBand({ ...current, x1: point.x, y1: point.y });
+    }
+    function onUp() {
+      const current = bandRef.current;
+      setBand(null);
+      if (!current) return;
+      const sheet = state.sheets[current.sheetIndex];
+      const spec = sheet ? sheetSpecById.get(sheet.sheetItemId) : undefined;
+      if (!sheet || !spec) return;
+      const landscape = isLandscape(spec);
+      const selection = {
+        x: Math.min(current.x0, current.x1),
+        y: Math.min(current.y0, current.y1),
+        width: Math.abs(current.x1 - current.x0),
+        height: Math.abs(current.y1 - current.y0),
+      };
+      const keys = sheet.placements
+        .filter((placement) => {
+          const box = toScreenRect(placementRect(partById.get(placement.partId)!, placement), landscape);
+          return (
+            box.x < selection.x + selection.width &&
+            selection.x < box.x + box.width &&
+            box.y < selection.y + selection.height &&
+            selection.y < box.y + box.height
+          );
+        })
+        .map((placement) => placement.key);
+      const issue = laserGroupIssue(state, current.sheetIndex, keys, partById);
+      if (issue) {
+        setNotice(groupIssueMessages[issue]);
+        return;
+      }
+      setNotice("");
+      setState((previous) => addLaserGroup(previous, current.sheetIndex, keys));
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [band, partById, sheetSpecById, state]);
+
   // 선택한 배치의 키보드 조작: R 회전, Delete 미배치로.
   useEffect(() => {
     if (!selectedKey || carry) return;
@@ -249,8 +334,48 @@ export function CuttingPlanEditor({ plan }: { plan: CuttingPlanDetailDto }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [carry, partById, selectedKey, sheetSpecById]);
 
+  function startBand(event: ReactPointerEvent<SVGElement>, sheetIndex: number) {
+    const svg = svgRefs.current.get(sheetIndex);
+    const point = svg ? svgPoint(svg, event.clientX, event.clientY) : null;
+    if (!point) return;
+    event.preventDefault();
+    setBand({ sheetIndex, x0: point.x, y0: point.y, x1: point.x, y1: point.y });
+  }
+
+  /** 절단선 모드에서 원판을 클릭하면 그 자리(길이 방향 위치)에 선을 둔다. */
+  function placeLine(event: ReactPointerEvent<SVGElement>, sheetIndex: number) {
+    const svg = svgRefs.current.get(sheetIndex);
+    const sheet = state.sheets[sheetIndex];
+    const spec = sheet ? sheetSpecById.get(sheet.sheetItemId) : undefined;
+    const point = svg ? svgPoint(svg, event.clientX, event.clientY) : null;
+    if (!point || !spec) return;
+    const yMm = fromScreenPoint(point, isLandscape(spec)).y;
+    const issue = cutLineIssue(state, sheetIndex, yMm, spec, partById);
+    if (issue) {
+      setNotice(lineIssueMessages[issue]);
+      return;
+    }
+    setNotice("");
+    setState((previous) => addCutLine(previous, sheetIndex, yMm));
+  }
+
+  function onSheetPointerDown(event: ReactPointerEvent<SVGSVGElement>, sheetIndex: number) {
+    if (event.button !== 0) return;
+    setSelectedKey(null);
+    if (mode === "group") startBand(event, sheetIndex);
+    if (mode === "line") placeLine(event, sheetIndex);
+  }
+
   function startMove(event: ReactPointerEvent<SVGGElement>, sheetIndex: number, key: string) {
     if (event.button !== 0) return;
+    if (mode === "group") {
+      startBand(event, sheetIndex);
+      return;
+    }
+    if (mode === "line") {
+      placeLine(event, sheetIndex);
+      return;
+    }
     const svg = svgRefs.current.get(sheetIndex);
     const sheet = state.sheets[sheetIndex];
     const placement = sheet?.placements.find((item) => item.key === key);
@@ -331,6 +456,17 @@ export function CuttingPlanEditor({ plan }: { plan: CuttingPlanDetailDto }) {
     }
     return map;
   }, [violations, warnings]);
+  // 서버 위반의 `partId#n` 을 편집기 배치 키로 되돌린다. 같은 부품 여러 장 중 문제인 장만 표시한다.
+  const flaggedKeys = useMemo(() => {
+    const editorKeyBySaved = new Map<string, string>();
+    for (const [editorKey, savedKey] of savedKeyByPlacement(state)) editorKeyBySaved.set(savedKey, editorKey);
+    const keys = new Set<string>();
+    for (const item of [...violations, ...warnings]) {
+      const key = item.placementKey ? editorKeyBySaved.get(item.placementKey) : undefined;
+      if (key) keys.add(key);
+    }
+    return keys;
+  }, [state, violations, warnings]);
 
   return (
     <div className="space-y-3" data-testid="cutting-editor">
@@ -347,6 +483,24 @@ export function CuttingPlanEditor({ plan }: { plan: CuttingPlanDetailDto }) {
       </div>
 
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm">
+        <span className="flex overflow-hidden rounded border border-slate-300" role="group" aria-label="도구">
+          {(Object.keys(modeLabels) as EditorMode[]).map((item) => (
+            <button
+              aria-pressed={mode === item}
+              className={`px-2 py-1 font-bold ${mode === item ? "bg-teal-700 text-white" : "bg-white text-slate-700"}`}
+              data-testid={`editor-mode-${item}`}
+              key={item}
+              onClick={() => {
+                setMode(item);
+                setNotice("");
+              }}
+              type="button"
+            >
+              {modeLabels[item]}
+            </button>
+          ))}
+        </span>
+        <span className="mx-1 h-4 w-px bg-slate-200" />
         <label className="flex items-center gap-1">
           <span className="text-slate-500">새 원판</span>
           <select
@@ -424,6 +578,11 @@ export function CuttingPlanEditor({ plan }: { plan: CuttingPlanDetailDto }) {
       {error ? (
         <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-800">{error}</p>
       ) : null}
+      {notice ? (
+        <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900" data-testid="editor-notice">
+          {notice}
+        </p>
+      ) : null}
 
       <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
         <div className="space-y-3">
@@ -432,12 +591,19 @@ export function CuttingPlanEditor({ plan }: { plan: CuttingPlanDetailDto }) {
             if (!spec) return null;
             return (
               <EditorSheetFigure
+                annotations={state.annotations}
+                band={band?.sheetIndex === sheetIndex ? band : null}
                 carry={carry}
+                flaggedKeys={flaggedKeys}
                 issues={violationsBySheet.get(sheetIndex) ?? []}
                 key={sheet.key}
+                mode={mode}
                 onDelete={() => setState((previous) => deleteSheet(previous, sheetIndex))}
-                onSelect={setSelectedKey}
+                onPointerDownSheet={onSheetPointerDown}
+                onRemoveGroup={(groupId) => setState((previous) => removeLaserGroup(previous, groupId))}
+                onRemoveLine={(lineId) => setState((previous) => removeCutLine(previous, lineId))}
                 onStartMove={startMove}
+                onToggleFilm={() => setState((previous) => toggleFilm(previous, sheetIndex))}
                 partById={partById}
                 deletable={sheet.placements.length === 0 && state.sheets.length > 1}
                 refCallback={(element) => {
@@ -532,11 +698,18 @@ function EditorSheetFigure({
   spec,
   partById,
   carry,
+  band,
+  mode,
+  annotations,
   selectedKey,
   issues,
+  flaggedKeys,
   deletable,
   onStartMove,
-  onSelect,
+  onPointerDownSheet,
+  onRemoveGroup,
+  onRemoveLine,
+  onToggleFilm,
   onDelete,
   refCallback,
 }: {
@@ -545,11 +718,18 @@ function EditorSheetFigure({
   spec: CuttingSheet;
   partById: Map<string, CuttingPart>;
   carry: Carry | null;
+  band: Band | null;
+  mode: EditorMode;
+  annotations: EditorState["annotations"];
   selectedKey: string | null;
   issues: ManualEditViolation[];
+  flaggedKeys: Set<string>;
   deletable: boolean;
   onStartMove: (event: ReactPointerEvent<SVGGElement>, sheetIndex: number, key: string) => void;
-  onSelect: (key: string | null) => void;
+  onPointerDownSheet: (event: ReactPointerEvent<SVGSVGElement>, sheetIndex: number) => void;
+  onRemoveGroup: (groupId: string) => void;
+  onRemoveLine: (lineId: string) => void;
+  onToggleFilm: () => void;
   onDelete: () => void;
   refCallback: (element: SVGSVGElement | null) => void;
 }) {
@@ -557,7 +737,10 @@ function EditorSheetFigure({
   const viewBox = screenViewBox(spec);
   const usable = toScreenRect(usableRect(spec), landscape);
   const ghost = carry?.ghost?.sheetIndex === sheetIndex ? carry.ghost : null;
-  const issuePartIds = new Set(issues.map((issue) => issue.partId).filter((id): id is string => !!id));
+  const film = annotations.filmSheetKeys.includes(sheet.key);
+  const groups = annotations.laserGroups.filter((group) => group.sheetKey === sheet.key);
+  const lines = annotations.horizontalCutLines.filter((line) => line.sheetKey === sheet.key);
+  const usableContract = usableRect(spec);
   const errorCount = issues.filter((issue) => !["NOT_GUILLOTINE", "KERF_NOT_KEPT"].includes(issue.code)).length;
   const fontSize = Math.max(24, Math.min(viewBox.width, viewBox.height) / 30);
 
@@ -571,8 +754,14 @@ function EditorSheetFigure({
         {issues.length - errorCount > 0 ? (
           <span className="font-bold text-amber-800">경고 {issues.length - errorCount}건</span>
         ) : null}
+        {groups.length > 0 ? <span className="text-indigo-700">레이저 그룹 {groups.length}</span> : null}
+        {lines.length > 0 ? <span className="text-rose-700">절단선 {lines.length}</span> : null}
+        <label className="ml-auto flex items-center gap-1">
+          <input checked={film} data-testid={`editor-film-${sheetIndex}`} onChange={onToggleFilm} type="checkbox" />
+          필름
+        </label>
         {deletable ? (
-          <button className="ml-auto text-red-700 underline" onClick={onDelete} type="button">
+          <button className="text-red-700 underline" onClick={onDelete} type="button">
             빈 원판 삭제
           </button>
         ) : null}
@@ -581,8 +770,8 @@ function EditorSheetFigure({
         aria-label={`원판 ${sheetIndex + 1} 편집`}
         className={`w-full touch-none select-none border border-slate-300 bg-slate-50 ${landscape ? "max-w-3xl" : "max-w-md"} ${
           ghost ? (ghost.issue ? "ring-2 ring-red-400" : "ring-2 ring-teal-400") : ""
-        }`}
-        onPointerDown={() => onSelect(null)}
+        } ${mode === "line" ? "cursor-crosshair" : mode === "group" ? "cursor-cell" : ""}`}
+        onPointerDown={(event) => onPointerDownSheet(event, sheetIndex)}
         ref={refCallback}
         role="img"
         viewBox={`0 0 ${viewBox.width} ${viewBox.height}`}
@@ -594,10 +783,10 @@ function EditorSheetFigure({
           const box = toScreenRect(placementRect(part, placement), landscape);
           const carrying = carry?.kind === "move" && carry.key === placement.key;
           const selected = selectedKey === placement.key;
-          const flagged = issuePartIds.has(placement.partId);
+          const flagged = flaggedKeys.has(placement.key);
           return (
             <g
-              className="cursor-grab"
+              className={mode === "move" ? "cursor-grab" : undefined}
               data-testid={`placement-${placement.key}`}
               key={placement.key}
               onPointerDown={(event) => {
@@ -629,6 +818,64 @@ function EditorSheetFigure({
             </g>
           );
         })}
+        {groups.map((group) => {
+          const members = sheet.placements.filter((placement) => group.placementKeys.includes(placement.key));
+          if (members.length === 0) return null;
+          const box = toScreenRect(laserGroupBounds(members, partById), landscape);
+          return (
+            <rect
+              className="cursor-pointer"
+              data-testid={`laser-group-${group.id}`}
+              fill="rgba(99,102,241,0.12)"
+              height={box.height}
+              key={group.id}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                onRemoveGroup(group.id);
+              }}
+              // 그룹 모드에서만 눌러 풀 수 있다. 다른 모드에서는 아래 부품이 이벤트를 받아야 한다.
+              pointerEvents={mode === "group" ? "auto" : "none"}
+              stroke="#4f46e5"
+              strokeDasharray="24 12"
+              strokeWidth={8}
+              width={box.width}
+              x={box.x}
+              y={box.y}
+            />
+          );
+        })}
+        {lines.map((line) => {
+          // 절단선은 길이 방향 위치 하나로 정해지고 폭 전체를 가로지른다.
+          const box = toScreenRect({ x: usableContract.x, y: line.yMm, width: usableContract.width, height: 0 }, landscape);
+          const end = { x: box.x + box.width, y: box.y + box.height };
+          return (
+            <g
+              className="cursor-pointer"
+              data-testid={`cut-line-${line.id}`}
+              key={line.id}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                onRemoveLine(line.id);
+              }}
+              pointerEvents={mode === "line" ? "auto" : "none"}
+            >
+              <line stroke="transparent" strokeWidth={30} x1={box.x} x2={end.x} y1={box.y} y2={end.y} />
+              <line stroke="#e11d48" strokeDasharray="30 15" strokeWidth={6} x1={box.x} x2={end.x} y1={box.y} y2={end.y} />
+            </g>
+          );
+        })}
+        {band ? (
+          <rect
+            fill="rgba(79,70,229,0.15)"
+            height={Math.abs(band.y1 - band.y0)}
+            pointerEvents="none"
+            stroke="#4f46e5"
+            strokeWidth={4}
+            width={Math.abs(band.x1 - band.x0)}
+            x={Math.min(band.x0, band.x1)}
+            y={Math.min(band.y0, band.y1)}
+          />
+        ) : null}
         {ghost
           ? (() => {
               const box = toScreenRect(ghost.rect, landscape);
@@ -649,7 +896,13 @@ function EditorSheetFigure({
             })()
           : null}
       </svg>
-      <p className="mt-1 text-[11px] text-slate-500">부품을 끌어 옮깁니다. 선택 후 R 회전, Delete 미배치로.</p>
+      <p className="mt-1 text-[11px] text-slate-500">
+        {mode === "move"
+          ? "부품을 끌어 옮깁니다. 선택 후 R 회전, Delete 미배치로."
+          : mode === "group"
+            ? "같은 부품이 격자로 놓인 곳을 사각형으로 골라 묶습니다. 그룹을 누르면 풉니다."
+            : "빈 곳을 누르면 절단선을 둡니다. 선을 누르면 지웁니다."}
+      </p>
     </div>
   );
 }

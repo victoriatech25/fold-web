@@ -286,21 +286,13 @@ export function removePlacement(state: EditorState, key: string): EditorState {
  */
 export function toSaveAnnotations(snapshot: EditorSnapshot): CuttingAnnotations {
   const sheetIndexByKey = new Map(snapshot.sheets.map((sheet, index) => [sheet.key, index]));
-  const savedKeyByPlacement = new Map<string, string>();
-  for (const sheet of snapshot.sheets) {
-    const ordinal = new Map<string, number>();
-    for (const placement of sheet.placements) {
-      const n = ordinal.get(placement.partId) ?? 0;
-      ordinal.set(placement.partId, n + 1);
-      savedKeyByPlacement.set(placement.key, `${placement.partId}#${n}`);
-    }
-  }
+  const savedKeys = savedKeyByPlacement(snapshot);
   const placeholder = { xMm: "0", yMm: "0", widthMm: "1", lengthMm: "1" };
   return {
     version: CUTTING_ANNOTATIONS_VERSION,
     laserGroups: snapshot.annotations.laserGroups.flatMap((group) => {
       const sheetIndex = sheetIndexByKey.get(group.sheetKey);
-      const keys = group.placementKeys.map((key) => savedKeyByPlacement.get(key)).filter((k): k is string => !!k);
+      const keys = group.placementKeys.map((key) => savedKeys.get(key)).filter((k): k is string => !!k);
       if (sheetIndex === undefined || keys.length === 0) return [];
       return [{ id: group.id, sheetIndex, placementKeys: keys, boundsMm: placeholder }];
     }),
@@ -379,4 +371,143 @@ export function toSaveSheets(sheets: EditorSheet[]) {
       rotated: placement.rotated,
     })),
   }));
+}
+
+// ---- 지정(레이저 그룹·절단선·필름) — `P2-B11` B11-3 ----
+
+export type LaserGroupIssue = "MIXED_PART" | "NOT_RECTANGLE" | "OVERLAP" | "EMPTY";
+
+/**
+ * 묶기 전에 즉시 판정한다. 서버 `validateAnnotations` 와 같은 규칙이다 — 같은 부품·같은
+ * 방향, 행×열 격자, 사각형 안에 다른 배치 없음, 다른 그룹과 겹치지 않음.
+ */
+export function laserGroupIssue(
+  state: EditorSnapshot,
+  sheetIndex: number,
+  placementKeys: string[],
+  partById: Map<string, CuttingPart>,
+): LaserGroupIssue | null {
+  const sheet = state.sheets[sheetIndex];
+  if (!sheet || placementKeys.length === 0) return "EMPTY";
+  const members = sheet.placements.filter((placement) => placementKeys.includes(placement.key));
+  if (members.length !== placementKeys.length) return "EMPTY";
+  const first = members[0];
+  if (members.some((m) => m.partId !== first.partId || m.rotated !== first.rotated)) return "MIXED_PART";
+  const taken = new Set(state.annotations.laserGroups.flatMap((group) => group.placementKeys));
+  if (members.some((m) => taken.has(m.key))) return "OVERLAP";
+
+  const xs = new Set(members.map((m) => m.xMm));
+  const ys = new Set(members.map((m) => m.yMm));
+  if (xs.size * ys.size !== members.length) return "NOT_RECTANGLE";
+  const seen = new Set(members.map((m) => `${m.xMm}:${m.yMm}`));
+  for (const x of xs) for (const y of ys) if (!seen.has(`${x}:${y}`)) return "NOT_RECTANGLE";
+
+  const bounds = laserGroupBounds(members, partById);
+  const memberKeys = new Set(placementKeys);
+  const intruder = sheet.placements.some(
+    (placement) => !memberKeys.has(placement.key) && rectsOverlap(placementRect(partById.get(placement.partId)!, placement), bounds),
+  );
+  return intruder ? "NOT_RECTANGLE" : null;
+}
+
+export function laserGroupBounds(members: EditorPlacement[], partById: Map<string, CuttingPart>): RectMm {
+  const rects = members.map((member) => placementRect(partById.get(member.partId)!, member));
+  const minX = Math.min(...rects.map((r) => r.x));
+  const minY = Math.min(...rects.map((r) => r.y));
+  const maxX = Math.max(...rects.map((r) => r.x + r.width));
+  const maxY = Math.max(...rects.map((r) => r.y + r.height));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+export function addLaserGroup(state: EditorState, sheetIndex: number, placementKeys: string[]): EditorState {
+  const sheet = state.sheets[sheetIndex];
+  if (!sheet) return state;
+  return commit(state, {
+    sheets: state.sheets,
+    annotations: {
+      ...state.annotations,
+      laserGroups: [...state.annotations.laserGroups, { id: nextKey("group"), sheetKey: sheet.key, placementKeys }],
+    },
+  });
+}
+
+export function removeLaserGroup(state: EditorState, groupId: string): EditorState {
+  if (!state.annotations.laserGroups.some((group) => group.id === groupId)) return state;
+  return commit(state, {
+    sheets: state.sheets,
+    annotations: {
+      ...state.annotations,
+      laserGroups: state.annotations.laserGroups.filter((group) => group.id !== groupId),
+    },
+  });
+}
+
+/** 절단선이 놓일 수 있는지. 사용 영역 안이고 배치 내부를 지나지 않아야 한다. */
+export function cutLineIssue(
+  state: EditorSnapshot,
+  sheetIndex: number,
+  yMm: number,
+  spec: CuttingSheet,
+  partById: Map<string, CuttingPart>,
+): "OUT_OF_SHEET" | "CROSSES_PART" | null {
+  const usable = usableRect(spec);
+  if (yMm < usable.y - EPSILON || yMm > usable.y + usable.height + EPSILON) return "OUT_OF_SHEET";
+  const sheet = state.sheets[sheetIndex];
+  const crosses = sheet?.placements.some((placement) => {
+    const rect = placementRect(partById.get(placement.partId)!, placement);
+    return rect.y + EPSILON < yMm && yMm < rect.y + rect.height - EPSILON;
+  });
+  return crosses ? "CROSSES_PART" : null;
+}
+
+export function addCutLine(state: EditorState, sheetIndex: number, yMm: number): EditorState {
+  const sheet = state.sheets[sheetIndex];
+  if (!sheet) return state;
+  return commit(state, {
+    sheets: state.sheets,
+    annotations: {
+      ...state.annotations,
+      horizontalCutLines: [...state.annotations.horizontalCutLines, { id: nextKey("line"), sheetKey: sheet.key, yMm }],
+    },
+  });
+}
+
+export function removeCutLine(state: EditorState, lineId: string): EditorState {
+  if (!state.annotations.horizontalCutLines.some((line) => line.id === lineId)) return state;
+  return commit(state, {
+    sheets: state.sheets,
+    annotations: {
+      ...state.annotations,
+      horizontalCutLines: state.annotations.horizontalCutLines.filter((line) => line.id !== lineId),
+    },
+  });
+}
+
+export function toggleFilm(state: EditorState, sheetIndex: number): EditorState {
+  const sheet = state.sheets[sheetIndex];
+  if (!sheet) return state;
+  const on = state.annotations.filmSheetKeys.includes(sheet.key);
+  return commit(state, {
+    sheets: state.sheets,
+    annotations: {
+      ...state.annotations,
+      filmSheetKeys: on
+        ? state.annotations.filmSheetKeys.filter((key) => key !== sheet.key)
+        : [...state.annotations.filmSheetKeys, sheet.key],
+    },
+  });
+}
+
+/** 편집기 배치 키 → 저장 키(`partId#n`). 서버 위반이 가리키는 배치를 화면에서 찾을 때 쓴다. */
+export function savedKeyByPlacement(snapshot: EditorSnapshot): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const sheet of snapshot.sheets) {
+    const ordinal = new Map<string, number>();
+    for (const placement of sheet.placements) {
+      const n = ordinal.get(placement.partId) ?? 0;
+      ordinal.set(placement.partId, n + 1);
+      map.set(placement.key, `${placement.partId}#${n}`);
+    }
+  }
+  return map;
 }

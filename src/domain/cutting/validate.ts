@@ -29,6 +29,8 @@ export type CuttingViolation = {
   message: string;
   sheetIndex?: number;
   partId?: string;
+  /** 같은 부품이 여러 장일 때 어느 배치인지(`partId#n`, `annotations.ts` 규칙). 편집기가 표시에 쓴다. */
+  placementKey?: string;
 };
 
 const ZERO = BigInt(0);
@@ -143,9 +145,13 @@ export function validateCuttingResult(
 
     const usable = usableArea(sheet);
     const rects: Rect[] = [];
+    const ordinal = new Map<string, number>();
 
     for (const placement of sheetResult.placements) {
       const part = partsById.get(placement.partId);
+      const n = ordinal.get(placement.partId) ?? 0;
+      ordinal.set(placement.partId, n + 1);
+      const placementKey = `${placement.partId}#${n}`;
       if (!part) {
         add({
           code: "UNKNOWN_PART",
@@ -160,6 +166,7 @@ export function validateCuttingResult(
       if (placement.rotated && (!part.rotationAllowed || sheet.rotationPolicy === "FIXED")) {
         add({
           code: "ROTATION_NOT_ALLOWED",
+          placementKey,
           message: `${part.label}은 이 원판에서 회전 배치할 수 없습니다.`,
           sheetIndex: sheetResult.sheetIndex,
           partId: part.id,
@@ -170,6 +177,7 @@ export function validateCuttingResult(
       if (sheet.grainAxis !== "NONE" && grain !== "NONE" && grain !== sheet.grainAxis) {
         add({
           code: "GRAIN_CONFLICT",
+          placementKey,
           message: `${part.label}의 결 방향이 원판 결과 어긋납니다.`,
           sheetIndex: sheetResult.sheetIndex,
           partId: part.id,
@@ -182,6 +190,7 @@ export function validateCuttingResult(
       if (!insideX || !insideY) {
         add({
           code: "OUT_OF_USABLE_AREA",
+          placementKey,
           message: `${part.label}이 trim을 뺀 사용 영역을 벗어났습니다.`,
           sheetIndex: sheetResult.sheetIndex,
           partId: part.id,
@@ -192,6 +201,7 @@ export function validateCuttingResult(
         if (overlaps(rect, other)) {
           add({
             code: "OVERLAP",
+          placementKey,
             message: `${part.label}이 다른 부품과 겹칩니다.`,
             sheetIndex: sheetResult.sheetIndex,
             partId: part.id,
@@ -199,6 +209,7 @@ export function validateCuttingResult(
         } else if (!keepsKerf(rect, other, kerf)) {
           add({
             code: "KERF_NOT_KEPT",
+          placementKey,
             message: `${part.label}과 이웃 부품 사이에 칼날 두께가 확보되지 않았습니다.`,
             sheetIndex: sheetResult.sheetIndex,
             partId: part.id,
