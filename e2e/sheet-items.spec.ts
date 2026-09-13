@@ -19,7 +19,8 @@ async function closeAlert(page: import("@playwright/test").Page, message: string
 
 test("원판 품목을 계산·등록·기본 지정하고 도면 snapshot으로 선택한다", async ({ page }) => {
   await login(page);
-  await page.getByRole("link", { name: "재질·두께" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "기준정보" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "재질·두께" }).click();
   await page.getByRole("link", { name: "알루미늄", exact: true }).click();
   await page.getByRole("tab", { name: /두께 항목/ }).click();
   await page.getByRole("link", { name: "원판 품목" }).first().click();

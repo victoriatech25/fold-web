@@ -24,7 +24,7 @@ test("재단 배치를 편집기에서 옮겨 저장하면 편집 개정이 쌓�
   await login(page);
 
   // 수주 만들기 → 절곡 작업 → 계산 → 승인. orders.spec 과 같은 경로다.
-  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "수주 등록/조회" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "영업관리" }).click();
   await page.getByRole("button", { name: "새 수주" }).click();
   const createDialog = page.getByRole("dialog", { name: "새 수주" });
   await createDialog.getByLabel("새 수주 거래처").selectOption({ label: "SCREEN-PRICE · 화면검수 가격 거래처" });

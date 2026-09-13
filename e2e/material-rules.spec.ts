@@ -19,7 +19,8 @@ async function closeAlert(page: import("@playwright/test").Page, message: string
 
 test("계산 규칙을 복사·검토·게시하고 계산 영향을 비교한다", async ({ page }) => {
   await login(page);
-  await page.getByRole("link", { name: "재질·두께" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "기준정보" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "재질·두께" }).click();
   await page.getByRole("link", { name: "알루미늄", exact: true }).click();
   await page.getByRole("tab", { name: /두께 항목/ }).click();
   await page.getByRole("link", { name: "계산 기준" }).first().click();

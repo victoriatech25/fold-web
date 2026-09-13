@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CopyPlus, Pencil, Plus, Power, Star } from "lucide-react";
+import { CopyPlus, Pencil, Plus, Power, Star } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useRef, useState, useTransition } from "react";
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
@@ -12,6 +12,7 @@ import type {
   SheetItemWorkspaceDto,
 } from "@/server/sheet-items/sheet-item-types";
 import { materialRequest, MaterialRequestError } from "./material-api";
+import { BackLink } from "@/components/ui/back-link";
 
 type EditorState = { mode: "create" | "copy" | "edit"; item: SheetItemDto | null };
 const decimalPattern = "[0-9]+([.][0-9]{1,6})?";
@@ -148,7 +149,7 @@ export function SheetItemPanel({ initial, canWrite }: { initial: SheetItemWorksp
     });
   }
   return <div className="mx-auto w-full max-w-[1500px] space-y-5 p-4 sm:p-6">
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><Link className="inline-flex items-center gap-1 text-sm font-bold text-slate-600" href={`/materials/${workspace.material.id}`}><ArrowLeft size={16} /> 재질 상세</Link><h1 className="mt-2 text-2xl font-black">원판 품목</h1><p className="mt-1 text-sm text-slate-600">{workspace.material.name} · {workspace.variant.name} ({workspace.variant.thicknessMm}T)</p></div>{canWrite ? <button className="inline-flex items-center gap-2 rounded bg-teal-700 px-4 py-2 text-sm font-bold text-white" onClick={() => setEditor({ mode: "create", item: null })}><Plus size={16} /> 원판 등록</button> : null}</header>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><BackLink href={`/materials/${workspace.material.id}`}>재질 상세</BackLink><h1 className="mt-2 text-2xl font-black">원판 품목</h1><p className="mt-1 text-sm text-slate-600">{workspace.material.name} · {workspace.variant.name} ({workspace.variant.thicknessMm}T)</p></div>{canWrite ? <button className="inline-flex items-center gap-2 rounded bg-teal-700 px-4 py-2 text-sm font-bold text-white" onClick={() => setEditor({ mode: "create", item: null })}><Plus size={16} /> 원판 등록</button> : null}</header>
     <section className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-3"><span><b className="block text-xs text-slate-500">등록 품목</b>{workspace.items.length}개</span><span><b className="block text-xs text-slate-500">활성 품목</b>{workspace.activeCount}개</span><span><b className="block text-xs text-slate-500">중량 계산 밀도</b>{workspace.material.densityKgPerM3 ? `${workspace.material.densityKgPerM3}kg/㎥` : "미등록"}</span></section>
     {workspace.items.length === 0 ? <section className="rounded-xl border border-dashed bg-white p-10 text-center text-sm text-slate-600">등록된 원판이 없습니다. 첫 품목은 자동으로 기본 원판이 됩니다.</section> : <section className="grid gap-4 xl:grid-cols-2">{workspace.items.map((item) => <article key={item.id} className={`rounded-xl border bg-white p-4 shadow-sm ${!item.active ? "opacity-65" : item.isDefault ? "border-teal-300" : "border-slate-200"}`}>
       <div className="flex flex-wrap items-start justify-between gap-3"><div><span className="flex flex-wrap items-center gap-2"><h2 className="font-black">{item.name}</h2>{item.isDefault && item.active ? <span className="rounded bg-teal-100 px-2 py-0.5 text-[11px] font-bold text-teal-800">기본</span> : null}{!item.active ? <span className="rounded bg-slate-200 px-2 py-0.5 text-[11px] font-bold">비활성</span> : null}</span><p className="mt-1 font-mono text-xs text-slate-500">{item.code}</p></div><b className="text-lg">{item.widthMm} × {item.lengthMm}mm</b></div>

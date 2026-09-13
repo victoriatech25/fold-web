@@ -1,9 +1,12 @@
 import {
   BadgeDollarSign,
+  Briefcase,
   Building,
   Building2,
   ClipboardList,
   ContactRound,
+  Database,
+  DraftingCompass,
   Factory,
   FileSpreadsheet,
   LayoutDashboard,
@@ -14,6 +17,7 @@ import {
   PenTool,
   Printer,
   ScrollText,
+  Settings,
   ShieldCheck,
   Truck,
   Users,
@@ -36,6 +40,8 @@ export type NavigationItem = {
 export type NavigationModule = {
   id: string;
   label: string;
+  /** 업무 홈 좌측 메뉴에서 모듈을 한 줄로 보여줄 때 쓰는 아이콘. */
+  icon: typeof LayoutDashboard;
   /** 모듈 자체가 한 화면인 경우의 경로. 하위 메뉴가 있으면 첫 화면으로 대신 이동한다. */
   href?: string;
   items: NavigationItem[];
@@ -46,10 +52,11 @@ export type NavigationModule = {
  * 화면을 추가할 때 이 배열만 고치면 두 자리에 동시에 반영된다.
  */
 const modules: NavigationModule[] = [
-  { id: "home", label: "업무 홈", href: "/", items: [] },
+  { id: "home", label: "업무 홈", icon: LayoutDashboard, href: "/", items: [] },
   {
     id: "sales",
     label: "영업관리",
+    icon: Briefcase,
     items: [
       { href: "/orders", icon: ClipboardList, label: "수주 등록/조회", permission: "order.read" },
       { icon: FileSpreadsheet, label: "견적 관리", planned: true },
@@ -59,6 +66,7 @@ const modules: NavigationModule[] = [
   {
     id: "design",
     label: "설계·도면",
+    icon: DraftingCompass,
     items: [
       { href: "/fold-editor", icon: PenTool, label: "도면 설계" },
       { href: "/fold-library", icon: Library, label: "템플릿" },
@@ -67,6 +75,7 @@ const modules: NavigationModule[] = [
   {
     id: "production",
     label: "생산·출력",
+    icon: Factory,
     items: [
       { href: "/jobs", icon: ListChecks, label: "작업 큐" },
       { href: "/cutting", icon: Factory, label: "생산·절단", permission: "cutting.optimize" },
@@ -77,6 +86,7 @@ const modules: NavigationModule[] = [
   {
     id: "master",
     label: "기준정보",
+    icon: Database,
     items: [
       { href: "/customers", icon: ContactRound, label: "거래처·현장", permission: "customer.read" },
       { href: "/materials", icon: Layers3, label: "재질·두께", permission: "material.read" },
@@ -87,6 +97,7 @@ const modules: NavigationModule[] = [
   {
     id: "system",
     label: "시스템",
+    icon: Settings,
     items: [
       { href: "/admin/users", icon: Users, label: "조직 관리", permission: "admin.manage" },
       { href: "/admin/departments", icon: Network, label: "부서", permission: "admin.manage" },

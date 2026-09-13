@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
   Calculator,
   CheckCircle2,
   Clock3,
@@ -13,7 +12,6 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
-import Link from "next/link";
 import { type FormEvent, useMemo, useState, useTransition } from "react";
 
 import { formatDateTime, fromDateTimeLocalInput, toDateTimeLocalInput } from "@/domain/format-date";
@@ -28,6 +26,7 @@ import type {
 } from "@/server/material-rules/material-rule-types";
 
 import { materialRequest, MaterialRequestError } from "./material-api";
+import { BackLink } from "@/components/ui/back-link";
 
 const statusLabel = {
   DRAFT: "초안",
@@ -659,13 +658,7 @@ export function MaterialRulePanel({
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link
-            href={`/materials/${workspace.material.id}`}
-            className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            재질 상세
-          </Link>
+          <BackLink href={`/materials/${workspace.material.id}`}>재질 상세</BackLink>
           <h1 className="mt-2 text-xl font-black">
             {workspace.variant.name} 계산 기준
           </h1>

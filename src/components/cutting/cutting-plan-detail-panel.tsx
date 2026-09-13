@@ -11,6 +11,7 @@ import { useCommonPopup } from "@/components/ui/common-popup";
 import type { CuttingPlanDetailDto, CuttingPlanDto } from "@/server/cutting/cutting-plan-service";
 import { CuttingDxfPanel } from "./cutting-dxf-panel";
 import { cuttingRequest, planStatusLabels, planStatusStyles, revisionStatusLabels } from "./cutting-plan-list-panel";
+import { BackLink } from "@/components/ui/back-link";
 
 /** 원판 하나를 화면 폭에 맞춰 그린다. 긴 쪽을 가로로, 배치 원점을 좌상단으로 놓는다. */
 function SheetFigure({
@@ -317,9 +318,7 @@ export function CuttingPlanDetailPanel({
         <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${planStatusStyles[plan.status]}`}>
           {planStatusLabels[plan.status]}
         </span>
-        <Link className="ml-auto text-xs text-teal-800 underline" href="/cutting">
-          목록으로
-        </Link>
+        <BackLink className="ml-auto" href="/cutting">재단 목록</BackLink>
       </div>
 
       <dl className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs shadow-sm sm:grid-cols-4">

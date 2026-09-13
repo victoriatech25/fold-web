@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
   Building2,
   Mail,
   MapPin,
@@ -11,7 +10,6 @@ import {
   Star,
   UserRound,
 } from "lucide-react";
-import Link from "next/link";
 import { FormEvent, useState, useTransition } from "react";
 
 import {
@@ -26,6 +24,7 @@ import type {
   CustomerDetailDto,
   CustomerSiteDto,
 } from "@/server/customers/customer-types";
+import { BackLink } from "@/components/ui/back-link";
 
 const typeLabels: Record<CustomerType, string> = {
   SALES: "매출처",
@@ -360,7 +359,7 @@ export function CustomerDetailPanel({
   return (
     <div className="space-y-5">
       <div>
-        <Link className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-teal-700" href="/customers"><ArrowLeft className="h-3.5 w-3.5" />거래처 목록</Link>
+        <BackLink href="/customers">거래처 목록</BackLink>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-black tracking-tight">{customer.name}</h1>
           <span className="rounded bg-slate-200 px-2 py-1 text-xs font-bold text-slate-700">{customer.code}</span>

@@ -42,7 +42,7 @@ test("작업을 등록하고 목록에서 확인·취소한다", async ({ page }
   expect(repeated.status).toBe(200);
   expect(repeated.body.data.id).toBe(created.id);
 
-  await page.getByRole("link", { name: "작업 큐" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "생산·출력" }).click();
   await expect(page).toHaveURL("/jobs");
   await expect(page.getByRole("heading", { name: "작업 큐" })).toBeVisible();
 

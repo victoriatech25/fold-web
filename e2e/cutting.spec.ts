@@ -14,7 +14,8 @@ async function login(page: import("@playwright/test").Page) {
 test("생산·절단 화면을 열고 승인 전 수주는 재단을 거부한다", async ({ page }) => {
   await login(page);
 
-  await page.getByRole("link", { name: "생산·절단" }).first().click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "생산·출력" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "생산·절단" }).click();
   await expect(page).toHaveURL("/cutting");
   await expect(page.getByRole("heading", { name: "생산·절단" })).toBeVisible();
 
@@ -44,7 +45,8 @@ test("생산·절단 화면을 열고 승인 전 수주는 재단을 거부한�
 test("원판 사용 실적 화면을 연다", async ({ page }) => {
   await login(page);
 
-  await page.getByRole("link", { name: "원판 사용 실적" }).first().click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "생산·출력" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "원판 사용 실적" }).click();
   await expect(page).toHaveURL("/cutting/usage");
   await expect(page.getByRole("heading", { name: "원판 사용 실적" })).toBeVisible();
   // 승인된 재단이 없는 계정이라 빈 상태가 보인다. 빈 화면도 읽혀야 한다.

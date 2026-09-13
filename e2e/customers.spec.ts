@@ -22,7 +22,8 @@ async function closeSuccessPopup(
 
 test("거래처와 담당자·고객 현장의 기본 수명주기를 관리한다", async ({ page }) => {
   await login(page);
-  await page.getByRole("link", { name: "거래처·현장" }).click();
+  // 업무 홈의 좌측 메뉴는 모듈만 보인다. 기준정보 모듈의 첫 화면이 거래처·현장이다.
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "기준정보" }).click();
   await expect(page).toHaveURL(/\/customers$/);
   await expect(page.getByRole("heading", { name: "거래처·고객 현장" })).toBeVisible();
 

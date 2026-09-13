@@ -19,7 +19,8 @@ async function closeAlert(page: import("@playwright/test").Page, message: string
 
 test("가격 적용 순서를 계산하고 가격표 초안 수명주기를 공통 팝업으로 처리한다", async ({ page }) => {
   await login(page);
-  await page.getByRole("link", { name: "가격 관리" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "기준정보" }).click();
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "가격 관리" }).click();
   await expect(page).toHaveURL(/\/pricing$/);
   await expect(page.getByRole("heading", { name: "가격 관리", level: 1 })).toBeVisible();
   await expect(page.getByText("활성 가격등급").locator("..")).toContainText("2개");

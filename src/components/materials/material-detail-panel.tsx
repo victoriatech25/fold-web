@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeft, CircleAlert, Layers3, Pencil, Plus, Settings2 } from "lucide-react";
+import { CircleAlert, Layers3, Pencil, Plus, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useState, useTransition } from "react";
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
@@ -9,6 +9,7 @@ import type {
   MaterialVariantDto,
 } from "@/server/materials/material-types";
 import { materialRequest, MaterialRequestError } from "./material-api";
+import { BackLink } from "@/components/ui/back-link";
 
 const field = (data: FormData, name: string) =>
   String(data.get(name) ?? "").trim();
@@ -250,13 +251,7 @@ export function MaterialDetailPanel({
   return (
     <div className="space-y-5">
       <div>
-        <Link
-          href="/materials"
-          className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          재질 목록
-        </Link>
+        <BackLink href="/materials">재질 목록</BackLink>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-black">{material.name}</h1>
           <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-bold">

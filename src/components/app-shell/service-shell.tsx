@@ -86,7 +86,11 @@ function MenuRow({
   );
 }
 
-/** 데스크톱 좌측 메뉴. 현재 모듈의 화면만 보여 목록을 짧게 유지한다. */
+/**
+ * 데스크톱 좌측 메뉴. 현재 모듈의 화면만 보여 목록을 짧게 유지한다.
+ * 업무 홈처럼 어느 모듈에도 속하지 않은 화면에서는 모듈을 한 줄씩만 보이고,
+ * 상세 화면 목록은 모듈에 들어간 뒤(상단 탭 또는 여기서 클릭) 보여 준다.
+ */
 function ModuleMenu({
   activeModule,
   modules,
@@ -102,7 +106,7 @@ function ModuleMenu({
   return (
     <nav aria-label="주요 메뉴" className="flex min-h-0 flex-1 flex-col gap-1">
       <p className="px-3 pb-1 text-[11px] font-bold tracking-[0.12em] text-slate-400">
-        {hasItems ? `${activeModule.label} 메뉴` : "업무 바로가기"}
+        {hasItems ? `${activeModule.label} 메뉴` : "업무 모듈"}
       </p>
       {hasItems
         ? activeModule.items.map((item) => (
@@ -110,14 +114,18 @@ function ModuleMenu({
           ))
         : modules
             .filter((module) => module.items.length > 0)
-            .map((module) => (
-              <div className="mt-2 first:mt-0" key={module.id}>
-                <p className="px-3 pb-1 text-[11px] font-bold text-slate-400">{module.label}</p>
-                {module.items.map((item) => (
-                  <MenuRow item={item} key={item.label} onNavigate={onNavigate} pathname={pathname} />
-                ))}
-              </div>
-            ))}
+            .map((module) => {
+              const href = moduleEntryHref(module);
+              if (!href) return null;
+              return (
+                <MenuRow
+                  item={{ href, icon: module.icon, label: module.label }}
+                  key={module.id}
+                  onNavigate={onNavigate}
+                  pathname={pathname}
+                />
+              );
+            })}
     </nav>
   );
 }

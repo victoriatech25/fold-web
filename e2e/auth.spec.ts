@@ -53,11 +53,8 @@ test("관리자 UI에서 조직 설정과 사용자 수명주기를 완료한다
 }) => {
   test.setTimeout(60_000);
   await loginAsAdministrator(page);
-  await expect(
-    page.getByRole("link", { name: "조직 관리" }),
-  ).toBeVisible();
-
-  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "조직 관리" }).click();
+  // 업무 홈의 좌측 메뉴는 모듈만 보인다. 시스템 모듈에 들어가면 첫 화면이 조직 관리다.
+  await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "시스템" }).click();
   await expect(page).toHaveURL(/\/admin\/users$/);
   await expect(
     page.getByRole("heading", { name: "사용자 관리" }),
