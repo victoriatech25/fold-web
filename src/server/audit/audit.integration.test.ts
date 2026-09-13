@@ -63,6 +63,7 @@ integration.sequential("audit event v2 integration", () => {
       organizationId,
       organizationCode: "AUDIT_INTEGRATION",
       organizationName: "감사 통합 테스트 조직",
+      platformAdmin: false,
       roleKeys: ["ADMINISTRATOR"],
       permissions: ["audit.read"],
       expiresAt: new Date("2099-01-01T00:00:00.000Z"),

@@ -16,6 +16,7 @@ const context: AuthenticatedContext = {
   organizationId: "33333333-3333-4333-8333-333333333333",
   organizationCode: "TEST",
   organizationName: "테스트 조직",
+  platformAdmin: false,
   roleKeys: ["ADMIN"],
   permissions: ["output.print"],
   expiresAt: new Date("2026-07-27T00:00:00.000Z"),

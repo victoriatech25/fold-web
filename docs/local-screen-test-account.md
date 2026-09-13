@@ -16,6 +16,7 @@
 | 표시 이름 | `로컬 화면 테스트 관리자` |
 | 조직 | `LOCAL_DEV` |
 | 역할 | `ADMINISTRATOR` |
+| 플랫폼 관리자 | `platformAdmin = true` — `시스템 > 회사 등록·관리` 가 보인다 |
 
 이 계정은 로컬 화면 기능을 반복 검수하기 위한 고정 테스트 계정이다. 실제 사용자·운영 데이터·운영 자격증명으로 사용하지 않는다. 비밀번호는 공개된 테스트 값이므로 외부 접근이 가능한 환경에서 절대 사용하지 않는다.
 
@@ -32,6 +33,7 @@ npm run auth:ensure-local-screen-test-account
 - 계정이 없으면 생성한다.
 - 계정을 `ACTIVE`로 복구한다.
 - `LOCAL_DEV` 조직 membership과 `ADMINISTRATOR` 역할을 보장한다.
+- 플랫폼 관리자 플래그(`platformAdmin`)를 켠다. 회사 등록·관리 화면 검수용이다.
 - 비밀번호를 `.env.local`의 고정 테스트 값으로 다시 설정한다.
 - 기존 session과 사용하지 않은 비밀번호 재설정 token을 폐기한다.
 - 생성 또는 비밀번호 복구 이력을 감사 로그에 남긴다.

@@ -8,5 +8,6 @@ export default async function AdminPage() {
   if (context.permissions.includes("admin.manage")) redirect("/admin/users");
   if (context.permissions.includes("master_data.read")) redirect("/admin/company");
   if (context.permissions.includes("audit.read")) redirect("/admin/audit-logs");
+  if (context.platformAdmin) redirect("/admin/organizations");
   notFound();
 }

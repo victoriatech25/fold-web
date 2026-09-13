@@ -12,7 +12,14 @@ export default async function AdminLayout({
   const canManageOrganization = auth.permissions.includes("admin.manage");
   const canReadMasterData = auth.permissions.includes("master_data.read");
   const canReadAudit = auth.permissions.includes("audit.read");
-  if (!canManageOrganization && !canReadMasterData && !canReadAudit) notFound();
+  if (
+    !canManageOrganization &&
+    !canReadMasterData &&
+    !canReadAudit &&
+    !auth.platformAdmin
+  ) {
+    notFound();
+  }
 
   return (
     <ServiceShell
@@ -22,6 +29,7 @@ export default async function AdminLayout({
       pageDescription="회사 기준정보와 사용자·권한·감사 이력을 관리합니다."
       pageTitle="시스템 관리"
       permissions={auth.permissions}
+      platformAdmin={auth.platformAdmin}
     >
       {children}
     </ServiceShell>

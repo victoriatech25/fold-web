@@ -25,6 +25,7 @@ export type PrincipalMembership = {
 export type LoginPrincipal = {
   userId: string;
   displayName: string;
+  platformAdmin: boolean;
   status: "INVITED" | "ACTIVE" | "SUSPENDED" | "DISABLED";
   passwordAlgorithm: string | null;
   passwordHash: string | null;
@@ -35,6 +36,7 @@ export type SessionPrincipal = {
   sessionId: string;
   userId: string;
   displayName: string;
+  platformAdmin: boolean;
   userStatus: "INVITED" | "ACTIVE" | "SUSPENDED" | "DISABLED";
   expiresAt: Date;
   lastSeenAt: Date | null;
@@ -100,6 +102,7 @@ export async function findLoginPrincipal(
       id: true,
       displayName: true,
       status: true,
+      platformAdmin: true,
       passwordCredential: {
         select: {
           algorithm: true,
@@ -149,6 +152,7 @@ export async function findLoginPrincipal(
   return {
     userId: user.id,
     displayName: user.displayName,
+    platformAdmin: user.platformAdmin,
     status: user.status,
     passwordAlgorithm: user.passwordCredential?.algorithm ?? null,
     passwordHash: user.passwordCredential?.passwordHash ?? null,
@@ -173,6 +177,7 @@ export async function findSessionPrincipal(
         select: {
           displayName: true,
           status: true,
+          platformAdmin: true,
           memberships: {
             where: {
               status: "ACTIVE",
@@ -219,6 +224,7 @@ export async function findSessionPrincipal(
     sessionId: session.id,
     userId: session.userId,
     displayName: session.user.displayName,
+    platformAdmin: session.user.platformAdmin,
     userStatus: session.user.status,
     expiresAt: session.expiresAt,
     lastSeenAt: session.lastSeenAt,

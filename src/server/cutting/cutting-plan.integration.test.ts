@@ -129,6 +129,7 @@ integration.sequential("cutting plan integration", () => {
       organizationId: organization.id,
       organizationCode: organization.code,
       organizationName: organization.name,
+      platformAdmin: false,
       roleKeys: ["CUT-OPERATOR"],
       permissions: [...grantedPermissions],
       expiresAt: new Date("2027-01-01T00:00:00Z"),

@@ -40,6 +40,7 @@ integration.sequential("sales order fold snapshot integration", () => {
       sessionId: crypto.randomUUID(), userId: user.id, displayName: user.displayName,
       membershipId: membership.id, departmentId: null, organizationId: organization.id,
       organizationCode: organization.code, organizationName: organization.name,
+      platformAdmin: false,
       roleKeys: ["SALES"], permissions: ["order.read", "order.edit", "order.calculate", "order.approve"], expiresAt: new Date("2027-01-01T00:00:00Z"),
     };
     const customer = await prisma.customer.create({ data: { organizationId: organization.id, code: "FOLD-CUSTOMER", name: "절곡 거래처", normalizedName: "절곡거래처", phone: "02-1000-2000", addressLine1: "서울시 테스트로 1" } });

@@ -111,6 +111,8 @@ async function main(): Promise<void> {
             normalizedEmail,
             displayName: input.LOCAL_SCREEN_TEST_DISPLAY_NAME,
             status: "ACTIVE",
+            // 로컬 검수 계정은 회사 등록 화면까지 확인해야 하므로 플랫폼 관리자로 둔다.
+            platformAdmin: true,
             passwordCredential: {
               create: {
                 algorithm: passwordHashAlgorithm,
@@ -148,6 +150,7 @@ async function main(): Promise<void> {
           email: input.LOCAL_SCREEN_TEST_EMAIL,
           displayName: input.LOCAL_SCREEN_TEST_DISPLAY_NAME,
           status: "ACTIVE",
+          platformAdmin: true,
           passwordCredential: {
             upsert: {
               create: {

@@ -98,6 +98,17 @@ type AuditPayloadByAction = {
       permissions: string[];
     };
   };
+  "platform.organization_created": {
+    after: { code: string; name: string; status: string };
+  };
+  "platform.organization_updated": {
+    before: { name: string; status: string };
+    after: { name: string; status: string };
+  };
+  "platform.organization_admin_invited": {
+    after: { organizationCode: string; status: string; roleKeys: string[] };
+    metadata: { expiresAt: string };
+  };
   "audit.events_viewed": {
     metadata: {
       activeFilters: string[];
@@ -108,7 +119,7 @@ type AuditPayloadByAction = {
   "audit.event_viewed": Record<never, never>;
   "authorization.permission_denied": {
     metadata: {
-      reason: "MISSING_PERMISSION" | "INVALID_MUTATION_ORIGIN";
+      reason: "MISSING_PERMISSION" | "MISSING_PLATFORM_ADMIN" | "INVALID_MUTATION_ORIGIN";
     };
   };
   "master_data.company_profile_updated": {

@@ -111,6 +111,27 @@ export const auditActionCatalog = {
     entityType: "Role",
     label: "사용자 정의 역할 변경",
   },
+  "platform.organization_created": {
+    category: "ADMINISTRATION",
+    defaultOutcome: "SUCCESS",
+    defaultSource: "WEB",
+    entityType: "Organization",
+    label: "조직(회사) 등록",
+  },
+  "platform.organization_updated": {
+    category: "ADMINISTRATION",
+    defaultOutcome: "SUCCESS",
+    defaultSource: "WEB",
+    entityType: "Organization",
+    label: "조직(회사) 변경",
+  },
+  "platform.organization_admin_invited": {
+    category: "ADMINISTRATION",
+    defaultOutcome: "SUCCESS",
+    defaultSource: "WEB",
+    entityType: "User",
+    label: "회사 관리자 발급",
+  },
   "audit.events_viewed": {
     category: "ADMINISTRATION",
     defaultOutcome: "SUCCESS",

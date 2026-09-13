@@ -51,6 +51,7 @@ integration.sequential("pricing integration", () => {
       organizationId: organization.id,
       organizationCode: organization.code,
       organizationName: organization.name,
+      platformAdmin: false,
       roleKeys: ["APPROVER"],
       permissions: ["pricing.read", "pricing.write", "pricing.approve", "material.read", "material.write"],
       expiresAt: new Date("2027-01-01T00:00:00Z"),

@@ -121,6 +121,7 @@ integration.sequential("fold template library integration", () => {
       organizationId,
       organizationCode: "FOLD_LIBRARY",
       organizationName: "템플릿 라이브러리 통합",
+      platformAdmin: false,
       roleKeys: ["APPROVER"],
       permissions: ["template.fold.read", "template.fold.edit", "template.fold.publish", "material.read"],
       expiresAt: new Date("2026-07-26T00:00:00.000Z"),

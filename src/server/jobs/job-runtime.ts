@@ -241,7 +241,7 @@ export async function resolveJobActor(
       id: true,
       departmentId: true,
       userId: true,
-      user: { select: { displayName: true } },
+      user: { select: { displayName: true, platformAdmin: true } },
       organization: { select: { id: true, code: true, name: true, status: true } },
       roles: {
         where: { role: { active: true } },
@@ -258,6 +258,7 @@ export async function resolveJobActor(
     sessionId: input.jobId,
     userId: membership.userId,
     displayName: membership.user.displayName,
+    platformAdmin: membership.user.platformAdmin,
     membershipId: membership.id,
     departmentId: membership.departmentId,
     organizationId: membership.organization.id,

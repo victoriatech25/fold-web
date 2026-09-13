@@ -20,6 +20,8 @@ const argumentsSchema = z.object({
   email: z.email().max(320),
   name: z.string().trim().min(1).max(100),
   organization: z.string().regex(/^[A-Z0-9_-]{2,50}$/),
+  // `--platform-admin true` 로 주면 조직 경계를 넘는 회사 등록·관리 화면이 열린다.
+  platformAdmin: z.enum(["true", "false"]).default("false"),
 });
 
 async function main(): Promise<void> {
@@ -27,6 +29,7 @@ async function main(): Promise<void> {
     "email",
     "name",
     "organization",
+    "platform-admin",
   ]);
   const input = argumentsSchema.parse({
     email: requireArgument(values, "email"),
@@ -35,6 +38,7 @@ async function main(): Promise<void> {
       values.get("organization") ??
       process.env.AUTH_DEFAULT_ORGANIZATION_CODE ??
       "LOCAL_DEV",
+    platformAdmin: values.get("platform-admin"),
   });
   const normalizedEmail = normalizeEmail(input.email);
   const password = await readPasswordFromStdin();
@@ -87,6 +91,7 @@ async function main(): Promise<void> {
           normalizedEmail,
           displayName: input.name,
           status: "ACTIVE",
+          platformAdmin: input.platformAdmin === "true",
           passwordCredential: {
             create: {
               algorithm: passwordHashAlgorithm,
@@ -121,7 +126,9 @@ async function main(): Promise<void> {
       });
       return user;
     });
-    process.stdout.write(`관리자 계정을 생성했습니다. userId=${result.id}\n`);
+    process.stdout.write(
+      `관리자 계정을 생성했습니다. userId=${result.id} platformAdmin=${input.platformAdmin}\n`,
+    );
   } finally {
     await prisma.$disconnect();
   }

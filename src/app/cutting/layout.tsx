@@ -13,6 +13,7 @@ export default async function CuttingLayout({ children }: Readonly<{ children: R
       pageTitle="생산·절단"
       pageDescription="승인된 수주의 재단 결과를 확인하고 승인합니다."
       permissions={auth.permissions}
+      platformAdmin={auth.platformAdmin}
     >
       {children}
     </ServiceShell>

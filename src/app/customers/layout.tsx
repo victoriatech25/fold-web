@@ -16,6 +16,7 @@ export default async function CustomersLayout({
       pageDescription="거래처 기본정보와 담당자·납품 현장을 관리합니다."
       pageTitle="거래처·현장"
       permissions={auth.permissions}
+      platformAdmin={auth.platformAdmin}
     >
       {children}
     </ServiceShell>

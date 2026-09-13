@@ -17,6 +17,7 @@ const context: AuthenticatedContext = {
   organizationId: "organization",
   organizationCode: "LOCAL_DEV",
   organizationName: "로컬 개발 조직",
+  platformAdmin: false,
   roleKeys: ["VIEWER"],
   permissions: ["customer.read"],
   expiresAt: new Date("2026-07-19T12:00:00.000Z"),

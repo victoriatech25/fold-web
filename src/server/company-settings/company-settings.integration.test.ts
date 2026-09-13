@@ -73,6 +73,7 @@ integration.sequential("company settings integration", () => {
       organizationId,
       organizationCode: "COMPANY_SETTINGS",
       organizationName: "회사 설정 통합",
+      platformAdmin: false,
       roleKeys: ["APPROVER"],
       permissions: ["master_data.read", "master_data.manage"],
       expiresAt: new Date("2026-07-27T00:00:00.000Z"),

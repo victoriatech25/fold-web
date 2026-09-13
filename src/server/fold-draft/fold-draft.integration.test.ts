@@ -163,6 +163,7 @@ integration.sequential("fold draft persistence integration", () => {
       organizationId,
       organizationCode: "FOLD_DRAFT",
       organizationName: "절곡 초안 통합 테스트",
+      platformAdmin: false,
       roleKeys: ["DESIGNER"],
       permissions: ["template.fold.read", "template.fold.edit", "material.read"],
       expiresAt: new Date("2026-07-26T00:00:00.000Z"),

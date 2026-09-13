@@ -111,6 +111,7 @@ export default async function Home() {
       pageDescription="오늘 필요한 업무를 빠르게 시작하고 최근 진행 상황을 확인합니다."
       pageTitle="업무 홈"
       permissions={auth.permissions}
+      platformAdmin={auth.platformAdmin}
     >
       <section className="overflow-hidden rounded-2xl bg-slate-950 px-5 py-6 text-white shadow-sm sm:px-7 sm:py-7">
         <div className="grid items-end gap-6 md:grid-cols-[1fr_auto]">

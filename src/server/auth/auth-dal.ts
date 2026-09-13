@@ -36,3 +36,10 @@ export async function requirePermissionPage(
   if (!hasPermission(context, permission)) notFound();
   return context;
 }
+
+/** 플랫폼 관리자 전용 화면. 조직 권한과 무관하게 `platformAdmin` 플래그만 본다. */
+export async function requirePlatformAdminPage(): Promise<AuthenticatedContext> {
+  const context = await requireAuthenticatedPage();
+  if (!context.platformAdmin) notFound();
+  return context;
+}

@@ -46,6 +46,7 @@ run(
     "src/server/platform/database-smoke.integration.test.ts",
     "src/server/auth/auth.integration.test.ts",
     "src/server/admin/admin.integration.test.ts",
+    "src/server/organizations/organization.integration.test.ts",
     "src/server/company-settings/company-settings.integration.test.ts",
     "src/server/customers/customer.integration.test.ts",
     "src/server/orders/order.integration.test.ts",

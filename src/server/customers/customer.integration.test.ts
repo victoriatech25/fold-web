@@ -70,6 +70,7 @@ integration.sequential("customer contacts and sites integration", () => {
       organizationId,
       organizationCode: organization.code,
       organizationName: organization.name,
+      platformAdmin: false,
       roleKeys: ["CUSTOMER_MANAGER"],
       permissions: ["customer.read", "customer.write"],
       expiresAt: new Date("2026-07-27T00:00:00.000Z"),

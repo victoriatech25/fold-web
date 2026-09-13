@@ -24,6 +24,8 @@ type ServiceShellProps = {
   pageDescription?: string;
   pageTitle: string;
   permissions: readonly PermissionKey[];
+  /** 플랫폼 관리자 전용 메뉴(회사 등록·관리)를 보일지. */
+  platformAdmin?: boolean;
   wide?: boolean;
 };
 
@@ -128,11 +130,12 @@ export function ServiceShell({
   pageDescription,
   pageTitle,
   permissions,
+  platformAdmin = false,
   wide = false,
 }: ServiceShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const modules = visibleModules(permissions);
+  const modules = visibleModules(permissions, platformAdmin);
   const activeModule = currentModule(pathname, modules);
 
   return (

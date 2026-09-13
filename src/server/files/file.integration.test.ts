@@ -65,6 +65,7 @@ integration.sequential("file upload integration", () => {
       organizationId: organization.id,
       organizationCode: organization.code,
       organizationName: organization.name,
+      platformAdmin: false,
       roleKeys: [role.key],
       permissions: permissions as AuthenticatedContext["permissions"],
       expiresAt: new Date("2027-01-01T00:00:00Z"),

@@ -1,5 +1,6 @@
 import {
   BadgeDollarSign,
+  Building,
   Building2,
   ClipboardList,
   ContactRound,
@@ -26,6 +27,8 @@ export type NavigationItem = {
   label: string;
   /** 화면을 여는 데 필요한 권한. 없으면 모든 사용자에게 보인다. */
   permission?: PermissionKey;
+  /** 플랫폼 관리자에게만 보이는 화면. 조직 권한과 무관하게 `platformAdmin` 플래그로만 연다. */
+  platformAdmin?: boolean;
   /** 후속 단계에서 제공할 기능. 링크 없이 `준비 중`으로만 표시한다. */
   planned?: boolean;
 };
@@ -89,6 +92,7 @@ const modules: NavigationModule[] = [
       { href: "/admin/departments", icon: Network, label: "부서", permission: "admin.manage" },
       { href: "/admin/roles", icon: ShieldCheck, label: "역할과 권한", permission: "admin.manage" },
       { href: "/admin/audit-logs", icon: ScrollText, label: "감사 로그", permission: "audit.read" },
+      { href: "/admin/organizations", icon: Building, label: "회사 등록·관리", platformAdmin: true },
     ],
   },
 ];
@@ -96,13 +100,17 @@ const modules: NavigationModule[] = [
 export const homeItem: NavigationItem = { href: "/", icon: LayoutDashboard, label: "홈" };
 
 /** 권한이 없는 화면은 메뉴에서 제거한다. 주소 직접 접근은 서버가 다시 검증한다. */
-export function visibleModules(permissions: readonly PermissionKey[]): NavigationModule[] {
+export function visibleModules(
+  permissions: readonly PermissionKey[],
+  platformAdmin = false,
+): NavigationModule[] {
   return modules
     .map((module) => ({
       ...module,
-      items: module.items.filter(
-        (item) => !item.permission || permissions.includes(item.permission),
-      ),
+      items: module.items.filter((item) => {
+        if (item.platformAdmin && !platformAdmin) return false;
+        return !item.permission || permissions.includes(item.permission);
+      }),
     }))
     .filter((module) => module.href !== undefined || module.items.length > 0);
 }

@@ -13,6 +13,7 @@ export default async function JobsLayout({ children }: Readonly<{ children: Reac
       pageTitle="작업 큐"
       pageDescription="서버에서 실행하는 작업의 진행과 실패를 확인합니다."
       permissions={auth.permissions}
+      platformAdmin={auth.platformAdmin}
     >
       {children}
     </ServiceShell>

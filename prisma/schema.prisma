@@ -285,6 +285,8 @@ model User {
   normalizedEmail                 String                   @unique @db.VarChar(320)
   displayName                     String                   @db.VarChar(100)
   status                          UserStatus               @default(INVITED)
+  /// 플랫폼 관리자. 조직(회사) 등록·상태 변경처럼 조직 경계를 넘는 작업은 이 플래그로만 연다.
+  platformAdmin                   Boolean                  @default(false)
   lastLoginAt                     DateTime?                @db.Timestamptz(6)
   createdAt                       DateTime                 @default(now()) @db.Timestamptz(6)
   updatedAt                       DateTime                 @updatedAt @db.Timestamptz(6)

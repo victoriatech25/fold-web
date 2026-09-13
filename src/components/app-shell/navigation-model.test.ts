@@ -49,3 +49,21 @@ describe("visibleModules", () => {
     expect(modules.map((module) => module.id)).toContain("home");
   });
 });
+
+describe("visibleModules 플랫폼 관리자", () => {
+  const hasOrganizations = (modules: ReturnType<typeof visibleModules>) =>
+    modules.some((module) => module.items.some((item) => item.href === "/admin/organizations"));
+
+  it("회사 등록·관리는 조직 권한이 다 있어도 플랫폼 관리자가 아니면 숨긴다", () => {
+    expect(hasOrganizations(visibleModules([...allPermissions]))).toBe(false);
+    expect(hasOrganizations(visibleModules([...allPermissions], false))).toBe(false);
+  });
+
+  it("플랫폼 관리자에게는 조직 권한이 없어도 보인다", () => {
+    const modules = visibleModules([], true);
+    expect(hasOrganizations(modules)).toBe(true);
+    expect(modules.find((module) => module.id === "system")?.items.map((item) => item.href)).toEqual([
+      "/admin/organizations",
+    ]);
+  });
+});

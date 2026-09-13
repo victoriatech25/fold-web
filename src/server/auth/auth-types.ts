@@ -4,6 +4,8 @@ export type AuthenticatedContext = {
   sessionId: string;
   userId: string;
   displayName: string;
+  /** 플랫폼 관리자 여부. 조직 권한(`permissions`)과 별개로 조직을 등록·관리할 수 있다. */
+  platformAdmin: boolean;
   membershipId: string;
   departmentId: string | null;
   organizationId: string;
@@ -17,6 +19,7 @@ export type AuthenticatedContext = {
 export type SessionUserDto = {
   userId: string;
   displayName: string;
+  platformAdmin: boolean;
   organization: {
     id: string;
     code: string;
@@ -32,6 +35,7 @@ export function toSessionUserDto(
   return {
     userId: context.userId,
     displayName: context.displayName,
+    platformAdmin: context.platformAdmin,
     organization: {
       id: context.organizationId,
       code: context.organizationCode,

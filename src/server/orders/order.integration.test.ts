@@ -52,6 +52,7 @@ integration.sequential("sales order header integration", () => {
       organizationId: organization.id,
       organizationCode: organization.code,
       organizationName: organization.name,
+      platformAdmin: false,
       roleKeys: ["SALES"],
       permissions: ["order.read", "order.edit"],
       expiresAt: new Date("2027-01-01T00:00:00Z"),

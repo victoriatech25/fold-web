@@ -68,6 +68,7 @@ integration.sequential("job queue integration", () => {
       organizationId: organization.id,
       organizationCode: organization.code,
       organizationName: organization.name,
+      platformAdmin: false,
       roleKeys: ["JOB-OPERATOR"],
       permissions: ["output.print", "cutting.optimize"],
       expiresAt: new Date("2027-01-01T00:00:00Z"),

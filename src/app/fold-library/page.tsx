@@ -13,6 +13,7 @@ export default async function FoldLibraryPage() {
       pageDescription="분류·검색·검토·게시·개정 이력을 관리합니다."
       pageTitle="절곡 템플릿 라이브러리"
       permissions={auth.permissions}
+      platformAdmin={auth.platformAdmin}
       wide
     >
       <FoldLibraryPanel
