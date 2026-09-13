@@ -6,6 +6,14 @@ export type MaterialRuleSummaryDto = {
   insideBendRadiusMm: string;
 };
 
+/** 진행 중(초안·검토) 개정. 두께 행에서 다음 단계를 안내하는 데 쓴다. */
+export type MaterialOpenRuleDto = {
+  id: string;
+  revisionNumber: number;
+  status: "DRAFT" | "REVIEW";
+  lockVersion: number;
+};
+
 export type MaterialVariantDto = {
   id: string;
   code: string;
@@ -17,6 +25,7 @@ export type MaterialVariantDto = {
   lockVersion: number;
   updatedAt: string;
   publishedRule: MaterialRuleSummaryDto | null;
+  openRule: MaterialOpenRuleDto | null;
 };
 
 export type MaterialSummaryDto = {

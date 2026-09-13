@@ -20,19 +20,31 @@ import type { MaterialDetailDto, MaterialFields, MaterialListDto, MaterialSummar
 type Database = PrismaClient | Prisma.TransactionClient;
 type Transaction = Prisma.TransactionClient;
 
-const currentRuleSelect = {
+const ruleSelect = {
   id: true,
   revisionNumber: true,
+  status: true,
   effectiveFrom: true,
   effectiveTo: true,
   insideBendRadiusMm: true,
+  lockVersion: true,
 } as const;
 
-function currentRuleWhere(now: Date): Prisma.MaterialRuleRevisionWhereInput {
+/**
+ * 두께 행에 필요한 개정만 읽는다 — 현재 적용 중인 게시본과 진행 중(초안·검토) 개정.
+ * 진행 중 개정은 두께 목록에서 "다음 단계" 버튼을 그리는 데 쓴다.
+ */
+function relevantRuleWhere(now: Date): Prisma.MaterialRuleRevisionWhereInput {
   return {
-    status: "PUBLISHED",
-    OR: [{ effectiveFrom: null }, { effectiveFrom: { lte: now } }],
-    AND: [{ OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] }],
+    deletedAt: null,
+    OR: [
+      { status: { in: ["DRAFT", "REVIEW"] } },
+      {
+        status: "PUBLISHED",
+        OR: [{ effectiveFrom: null }, { effectiveFrom: { lte: now } }],
+        AND: [{ OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] }],
+      },
+    ],
   };
 }
 
@@ -46,7 +58,7 @@ function detailSelect(now: Date) {
       select: {
         id: true, code: true, name: true, thicknessMm: true, defaultInsideRadiusMm: true,
         sortOrder: true, active: true, lockVersion: true, updatedAt: true,
-        ruleRevisions: { where: currentRuleWhere(now), orderBy: [{ revisionNumber: "desc" }], take: 1, select: currentRuleSelect },
+        ruleRevisions: { where: relevantRuleWhere(now), orderBy: [{ revisionNumber: "desc" }], select: ruleSelect },
       },
     },
   } as const satisfies Prisma.MaterialSelect;
@@ -54,13 +66,19 @@ function detailSelect(now: Date) {
 
 type DetailRow = Prisma.MaterialGetPayload<{ select: ReturnType<typeof detailSelect> }>;
 
+function publishedRuleOf(row: DetailRow["variants"][number]) {
+  return row.ruleRevisions.find((rule) => rule.status === "PUBLISHED") ?? null;
+}
+
 function toVariant(row: DetailRow["variants"][number]): MaterialVariantDto {
-  const rule = row.ruleRevisions[0];
+  const rule = publishedRuleOf(row);
+  const open = row.ruleRevisions.find((item) => item.status === "DRAFT" || item.status === "REVIEW") ?? null;
   return {
     id: row.id, code: row.code, name: row.name, thicknessMm: row.thicknessMm.toString(),
     defaultInsideRadiusMm: row.defaultInsideRadiusMm.toString(), sortOrder: row.sortOrder,
     active: row.active, lockVersion: row.lockVersion, updatedAt: row.updatedAt.toISOString(),
     publishedRule: rule ? { id: rule.id, revisionNumber: rule.revisionNumber, effectiveFrom: rule.effectiveFrom?.toISOString() ?? null, effectiveTo: rule.effectiveTo?.toISOString() ?? null, insideBendRadiusMm: rule.insideBendRadiusMm.toString() } : null,
+    openRule: open ? { id: open.id, revisionNumber: open.revisionNumber, status: open.status as "DRAFT" | "REVIEW", lockVersion: open.lockVersion } : null,
   };
 }
 
@@ -70,7 +88,7 @@ function toSummary(row: DetailRow): MaterialSummaryDto {
     id: row.id, code: row.code, name: row.name, densityKgPerM3: row.densityKgPerM3?.toString() ?? null,
     sortOrder: row.sortOrder, active: row.active, lockVersion: row.lockVersion,
     activeVariantCount: activeVariants.length,
-    calculationRequiredCount: activeVariants.filter((item) => item.ruleRevisions.length === 0).length,
+    calculationRequiredCount: activeVariants.filter((item) => publishedRuleOf(item) === null).length,
     updatedAt: row.updatedAt.toISOString(),
   };
 }

@@ -389,6 +389,8 @@ export async function transitionMaterialRule(
     expectedLockVersion: number;
     effectiveFrom?: string | null;
     reason?: string | null;
+    /** 검토 요청 때 초안에 변경 요약이 없으면 이 값으로 채운다. 재질 상세의 "다음 단계" 버튼이 쓴다. */
+    changeSummary?: string | null;
     requestId: string;
   },
 ) {
@@ -414,9 +416,11 @@ export async function transitionMaterialRule(
     let effectiveFrom = current.effectiveFrom;
     let effectiveTo = current.effectiveTo;
 
+    let changeSummary = current.changeSummary;
     if (input.action === "review") {
       if (current.status !== "DRAFT") throw new MaterialError("CONFLICT", "초안만 검토 요청할 수 있습니다.");
-      if (!current.changeSummary) throw new MaterialError("INVALID_REQUEST", "검토 요청 전에 변경 요약을 입력해 주세요.");
+      if (!changeSummary && input.changeSummary?.trim()) changeSummary = input.changeSummary.trim().slice(0, 500);
+      if (!changeSummary) throw new MaterialError("INVALID_REQUEST", "검토 요청 전에 변경 요약을 입력해 주세요.");
       effectiveFrom = parseEffectiveFrom(input.effectiveFrom);
       nextStatus = "REVIEW";
     } else if (input.action === "return") {
@@ -469,6 +473,7 @@ export async function transitionMaterialRule(
         ? { deletedAt: now, deletedByUserId: context.userId, lockVersion: { increment: 1 }, updatedByUserId: context.userId, statusChangedAt: now, statusChangedByUserId: context.userId }
         : {
             status: nextStatus,
+            changeSummary,
             effectiveFrom,
             effectiveTo,
             contentChecksumSha256: checksum,

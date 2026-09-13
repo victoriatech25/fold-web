@@ -5,7 +5,7 @@ import type { AuthenticatedContext } from "@/server/auth/auth-types";
 import { PermissionDeniedError } from "@/server/authorization/authorization";
 import { disconnectPrisma, getPrisma } from "@/server/db/prisma";
 import { listOrganizationFoldMaterialOptions } from "@/server/fold-draft/fold-draft-repository";
-import { createMaterial, createMaterialVariant } from "@/server/materials/material-service";
+import { createMaterial, createMaterialVariant, getMaterial } from "@/server/materials/material-service";
 
 import { createMaterialRule, getMaterialRuleWorkspace, previewMaterialRule, transitionMaterialRule, updateMaterialRule } from "./material-rule-service";
 import type { MaterialRuleFields } from "./material-rule-types";
@@ -87,5 +87,23 @@ integration.sequential("material calculation rule integration", () => {
     expect(workspace.revisions.find((item) => item.id === first.id)?.effectiveTo).toBeNull();
     expect(workspace.history.some((item) => item.action === "material.rule_retired" && item.reason === "예약 취소 검증")).toBe(true);
     await expect(getMaterialRuleWorkspace(prisma, { ...context, permissions: [] }, materialId, variantId)).rejects.toBeInstanceOf(PermissionDeniedError);
+  });
+  it("두께 행의 다음 단계 버튼: 변경 요약이 없는 초안도 검토 요청에 요약을 실어 보내면 진행되고, 재질 상세는 진행 중 개정을 보여 준다", async () => {
+    const variant = await createMaterialVariant(prisma, context, { materialId, code: "RULE-20", name: "규칙 2T", thicknessMm: "2", defaultInsideRadiusMm: "2", sortOrder: 1, requestId: "rule-variant-2" });
+    const draft = await createMaterialRule(prisma, context, { ...fields, changeSummary: null, materialId, variantId: variant.id, requestId: "rule-create-nosummary" });
+    let detail = await getMaterial(prisma, context, materialId);
+    expect(detail.variants.find((item) => item.id === variant.id)?.openRule).toMatchObject({ id: draft.id, status: "DRAFT" });
+
+    await expect(transitionMaterialRule(prisma, context, { materialId, variantId: variant.id, ruleId: draft.id, action: "review", expectedLockVersion: draft.lockVersion, effectiveFrom: new Date().toISOString(), requestId: "rule-review-nosummary" })).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+    const reviewed = await transitionMaterialRule(prisma, context, { materialId, variantId: variant.id, ruleId: draft.id, action: "review", expectedLockVersion: draft.lockVersion, effectiveFrom: new Date().toISOString(), changeSummary: "최초 계산 기준 등록", requestId: "rule-review-fill" });
+    expect(reviewed).toMatchObject({ status: "REVIEW", changeSummary: "최초 계산 기준 등록" });
+    detail = await getMaterial(prisma, context, materialId);
+    expect(detail.variants.find((item) => item.id === variant.id)?.openRule).toMatchObject({ id: draft.id, status: "REVIEW" });
+
+    await transitionMaterialRule(prisma, context, { materialId, variantId: variant.id, ruleId: draft.id, action: "publish", expectedLockVersion: reviewed!.lockVersion, requestId: "rule-publish-2" });
+    detail = await getMaterial(prisma, context, materialId);
+    const row = detail.variants.find((item) => item.id === variant.id)!;
+    expect(row.openRule).toBeNull();
+    expect(row.publishedRule?.id).toBe(draft.id);
   });
 });

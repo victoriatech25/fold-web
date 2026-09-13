@@ -13,6 +13,7 @@ const schema = z.object({
   expectedLockVersion: z.number().int().positive(),
   effectiveFrom: z.string().max(100).nullable().optional(),
   reason: z.string().max(500).nullable().optional(),
+  changeSummary: z.string().max(500).nullable().optional(),
 }).strict();
 
 export async function POST(request: Request, context: Context) {
