@@ -279,6 +279,13 @@ export const auditActionCatalog = {
     entityType: "Material",
     label: "재질 변경",
   },
+  "material.deleted": {
+    category: "DATA_CHANGE",
+    defaultOutcome: "SUCCESS",
+    defaultSource: "WEB",
+    entityType: "Material",
+    label: "재질 삭제",
+  },
   "material.variant_created": {
     category: "DATA_CHANGE",
     defaultOutcome: "SUCCESS",

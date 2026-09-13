@@ -237,3 +237,15 @@ PATCH  /api/v1/materials/:materialId/variants/:variantId
 - 로그인 설계 서비스에서 브라우저 재질 프리셋 저장·편집 UI를 제거하고 서버 발행 기준만 읽기 전용으로 표시한다.
 - MFC와 레거시 DB는 구조 판단의 참조 자료로만 사용했으며 소스·스키마를 그대로 이전하지 않았다.
 - 자동 검증 결과: 단위 299건, PostgreSQL 통합 44건, Chromium E2E 22건, typecheck·lint·production build·migration schema diff 모두 통과했다.
+
+## 부록. 재질 선택 삭제 (2026-09-13 추가)
+
+목록에서 재질을 체크해 `선택 삭제` 한다. `D2-A03-I` 대로 물리 삭제는 하지 않는다 — `deletedAt` 을 찍고 딸린 두께에도 함께 찍는다.
+
+- 권한 `material.write`. `POST /api/v1/materials/deletions` `{ materialIds }` (최대 100개). 되돌릴 수 없는 작업이라 `DELETE` 대신 명시적 하위 자원에 POST 한다
+- 한 트랜잭션이다. 하나라도 못 찾으면(다른 조직·이미 삭제) 전부 되돌린다
+- 삭제된 재질·두께는 목록(`비활성 포함` 이어도)·상세·설계 재질 선택·원판 품목·가격표 두께 선택에서 빠진다. 기존 모듈이 모두 `deletedAt: null` 로 거르고 있었다
+- 이미 저장된 도면·수주·재단은 스냅샷과 id 참조라 그대로 읽힌다
+- **코드·이름 고유 제약은 남는다.** 삭제한 재질의 코드는 다시 쓸 수 없다. 확인 팝업에 적어 둔다. 재사용이 필요해지면 그때 `deletedAt` 을 포함한 부분 고유 인덱스로 바꾼다
+- 감사 `material.deleted` (before: 재질 스냅샷, metadata: 두께 수)
+

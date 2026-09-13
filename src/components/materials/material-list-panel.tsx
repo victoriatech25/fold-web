@@ -1,5 +1,5 @@
 "use client";
-import { Layers3, Plus, Search } from "lucide-react";
+import { Layers3, Plus, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState, useTransition } from "react";
@@ -16,8 +16,39 @@ function CreateDialog({ open, onClose }: { open: boolean; onClose: () => void })
 }
 
 export function MaterialListPanel({ initial, canWrite }: { initial: MaterialListDto; canWrite: boolean }) {
+  const popup = useCommonPopup();
   const [result,setResult]=useState(initial); const [query,setQuery]=useState(""); const [inactive,setInactive]=useState(false); const [open,setOpen]=useState(false); const [error,setError]=useState(""); const [pending,startTransition]=useTransition();
-  function load(cursor?: string) { const params = new URLSearchParams({ limit:"25" }); if(query.trim()) params.set("q",query.trim()); if(inactive) params.set("includeInactive","true"); if(cursor) params.set("cursor",cursor); startTransition(async()=>{try{setError("");setResult(await materialRequest<MaterialListDto>(`/api/v1/materials?${params}`));}catch(e){setError(e instanceof Error?e.message:"목록을 불러오지 못했습니다.");}}); }
+  /** 선택 삭제 대상. 목록을 다시 불러오면 비운다 — 화면에 없는 항목을 지우지 않기 위해서다. */
+  const [selected, setSelected] = useState<string[]>([]);
+  const [notice, setNotice] = useState("");
+  function load(cursor?: string) { const params = new URLSearchParams({ limit:"25" }); if(query.trim()) params.set("q",query.trim()); if(inactive) params.set("includeInactive","true"); if(cursor) params.set("cursor",cursor); startTransition(async()=>{try{setError("");setSelected([]);setResult(await materialRequest<MaterialListDto>(`/api/v1/materials?${params}`));}catch(e){setError(e instanceof Error?e.message:"목록을 불러오지 못했습니다.");}}); }
+  const allSelected = result.items.length > 0 && result.items.every((item) => selected.includes(item.id));
+  function toggleAll() { setSelected(allSelected ? [] : result.items.map((item) => item.id)); }
+  function toggle(id: string) { setSelected((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id])); }
+  async function removeSelected() {
+    const targets = result.items.filter((item) => selected.includes(item.id));
+    if (targets.length === 0) return;
+    const variantCount = targets.reduce((sum, item) => sum + item.activeVariantCount, 0);
+    const names = targets.slice(0, 3).map((item) => item.name).join(", ") + (targets.length > 3 ? ` 외 ${targets.length - 3}개` : "");
+    const approved = await popup.confirm({
+      title: `재질 ${targets.length}개 삭제`,
+      message: `${names} 을(를) 삭제합니다. 딸린 두께 ${variantCount}개도 함께 사라지며, 설계·재질 목록에서 더 이상 선택할 수 없습니다. 이미 저장된 도면·수주는 영향을 받지 않습니다. 삭제한 재질의 코드는 다시 쓸 수 없습니다.`,
+      confirmText: "삭제",
+      variant: "danger",
+    });
+    if (!approved) return;
+    startTransition(async () => {
+      try {
+        setError("");
+        const { deletedCount } = await materialRequest<{ deletedCount: number }>("/api/v1/materials/deletions", { method: "POST", body: JSON.stringify({ materialIds: targets.map((item) => item.id) }) });
+        setNotice(`재질 ${deletedCount}개를 삭제했습니다.`);
+        setSelected([]);
+        setResult(await materialRequest<MaterialListDto>(`/api/v1/materials?${new URLSearchParams({ limit: "25", ...(query.trim() ? { q: query.trim() } : {}), ...(inactive ? { includeInactive: "true" } : {}) })}`));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "재질을 삭제하지 못했습니다.");
+      }
+    });
+  }
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -26,9 +57,19 @@ export function MaterialListPanel({ initial, canWrite }: { initial: MaterialList
           <p className="mt-0.5 text-xs text-slate-500">제품 계산에 사용할 재질과 두께별 발행 상태를 관리합니다.</p>
         </div>
         {canWrite ? (
-          <button className="inline-flex h-9 items-center gap-1.5 rounded bg-teal-700 px-4 text-xs font-bold text-white hover:bg-teal-800" onClick={() => setOpen(true)} type="button">
-            <Plus className="h-4 w-4" />새 재질
-          </button>
+          <div className="flex gap-2">
+            <button
+              className="inline-flex h-9 items-center gap-1.5 rounded border border-red-300 bg-white px-4 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-40"
+              disabled={pending || selected.length === 0}
+              onClick={() => void removeSelected()}
+              type="button"
+            >
+              <Trash2 className="h-4 w-4" />선택 삭제{selected.length > 0 ? ` (${selected.length})` : ""}
+            </button>
+            <button className="inline-flex h-9 items-center gap-1.5 rounded bg-teal-700 px-4 text-xs font-bold text-white hover:bg-teal-800" onClick={() => setOpen(true)} type="button">
+              <Plus className="h-4 w-4" />새 재질
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -52,6 +93,7 @@ export function MaterialListPanel({ initial, canWrite }: { initial: MaterialList
       </QueryBar>
 
       {error ? <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p> : null}
+      {notice ? <p className="rounded border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900" role="status">{notice}</p> : null}
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5">
@@ -68,6 +110,11 @@ export function MaterialListPanel({ initial, canWrite }: { initial: MaterialList
             <table className="w-full min-w-[760px] text-sm">
               <thead className="text-xs text-slate-500">
                 <tr className="border-b border-slate-200">
+                  {canWrite ? (
+                    <th className="w-10 px-4 py-2.5">
+                      <input aria-label="전체 선택" checked={allSelected} onChange={toggleAll} type="checkbox" />
+                    </th>
+                  ) : null}
                   <th className="px-4 py-2.5 text-left font-bold">재질명</th>
                   <th className="px-4 py-2.5 text-left font-bold">코드</th>
                   <th className="px-4 py-2.5 text-right font-bold">밀도(kg/m³)</th>
@@ -78,7 +125,12 @@ export function MaterialListPanel({ initial, canWrite }: { initial: MaterialList
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {result.items.map((item) => (
-                  <tr className="hover:bg-teal-50/60" key={item.id}>
+                  <tr className={selected.includes(item.id) ? "bg-red-50/60" : "hover:bg-teal-50/60"} key={item.id}>
+                    {canWrite ? (
+                      <td className="px-4 py-2.5">
+                        <input aria-label={`${item.name} 선택`} checked={selected.includes(item.id)} onChange={() => toggle(item.id)} type="checkbox" />
+                      </td>
+                    ) : null}
                     <td className="px-4 py-2.5">
                       <Link className="font-bold text-teal-800 underline-offset-2 hover:underline" href={`/materials/${item.id}`}>{item.name}</Link>
                     </td>

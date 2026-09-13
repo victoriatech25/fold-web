@@ -292,6 +292,7 @@ type AuditPayloadByAction = {
   };
   "material.created": { after: MaterialAuditSnapshot };
   "material.updated": { before: MaterialAuditSnapshot; after: MaterialAuditSnapshot };
+  "material.deleted": { before: MaterialAuditSnapshot; metadata: { variantCount: number } };
   "material.variant_created": { after: MaterialVariantAuditSnapshot };
   "material.variant_updated": { before: MaterialVariantAuditSnapshot; after: MaterialVariantAuditSnapshot };
   "material.rule_created": MaterialRuleCreateAuditPayload;

@@ -162,3 +162,33 @@ export async function updateMaterialVariant(prisma: PrismaClient, context: Authe
   requirePermission(context, "material.write"); const data = variantData(input);
   try { return await prisma.$transaction(async (tx) => { await lockMaterial(tx, context.organizationId, input.materialId); const select = detailSelect(new Date()).variants.select; const current = await tx.materialVariant.findFirst({ where: { id: input.variantId, materialId: input.materialId, organizationId: context.organizationId, deletedAt: null }, select }); if (!current) throw new MaterialError("NOT_FOUND", "두께 항목을 찾을 수 없습니다."); if (current.lockVersion !== input.expectedLockVersion) throw new MaterialError("CONFLICT", "두께 정보가 다른 화면에서 변경되었습니다."); if (current.code !== data.code || current.thicknessMm.toString() !== data.thicknessMm) throw new MaterialError("CONFLICT", "등록된 두께 코드와 두께 값은 변경할 수 없습니다."); const updated = await tx.materialVariant.update({ where: { id: current.id }, data: { name: data.name, defaultInsideRadiusMm: data.defaultInsideRadiusMm, sortOrder: data.sortOrder, active: input.active, lockVersion: { increment: 1 } }, select }); const snap = (row: typeof current) => ({ materialId: input.materialId, code: row.code, thicknessMm: row.thicknessMm.toString(), defaultInsideRadiusMm: row.defaultInsideRadiusMm.toString(), active: row.active, lockVersion: row.lockVersion }); await writeAuditEvent(tx, { organizationId: context.organizationId, actorUserId: context.userId, action: "material.variant_updated", entityId: current.id, requestId: input.requestId, before: snap(current), after: snap(updated) }); return toVariant(updated); }); } catch (error) { if (error instanceof MaterialError) throw error; throwUnique(error); }
 }
+
+/**
+ * 재질을 목록·선택에서 지운다. 물리 삭제는 하지 않는다(`D2-A03-I`) — `deletedAt` 을 찍고
+ * 딸린 두께도 함께 숨긴다. 이미 저장된 도면·수주·재단은 스냅샷과 id 참조를 쓰므로 그대로 읽힌다.
+ * 코드·이름 고유 제약은 남아 있어 같은 코드를 다시 쓸 수 없다.
+ */
+export async function deleteMaterials(prisma: PrismaClient, context: AuthenticatedContext, input: { materialIds: string[]; requestId: string }): Promise<{ deletedCount: number }> {
+  requirePermission(context, "material.write");
+  const ids = [...new Set(input.materialIds)];
+  const now = new Date();
+  return prisma.$transaction(async (tx) => {
+    for (const materialId of ids) {
+      await lockMaterial(tx, context.organizationId, materialId);
+      const current = await getRow(tx, context.organizationId, materialId, now);
+      const variantIds = current.variants.map(({ id }) => id);
+      await tx.materialVariant.updateMany({ where: { id: { in: variantIds }, deletedAt: null }, data: { deletedAt: now, lockVersion: { increment: 1 } } });
+      await tx.material.update({ where: { id: current.id }, data: { deletedAt: now, lockVersion: { increment: 1 } } });
+      await writeAuditEvent(tx, {
+        organizationId: context.organizationId,
+        actorUserId: context.userId,
+        action: "material.deleted",
+        entityId: current.id,
+        requestId: input.requestId,
+        before: { code: current.code, name: current.name, densityKgPerM3: current.densityKgPerM3?.toString() ?? null, active: current.active, lockVersion: current.lockVersion },
+        metadata: { variantCount: variantIds.length },
+      });
+    }
+    return { deletedCount: ids.length };
+  });
+}
