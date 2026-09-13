@@ -68,13 +68,15 @@ test("관리자 UI에서 조직 설정과 사용자 수명주기를 완료한다
 
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "역할과 권한" }).click();
   await expect(page.getByText("ADMINISTRATOR", { exact: true })).toBeVisible();
-  await page.getByPlaceholder("SHOP_TEAM").fill("E2E_SUPPORT");
-  await page.getByLabel("이름").fill("E2E 지원");
-  await page.getByLabel("설명").fill("브라우저 회귀 검증 역할");
-  await page
-    .getByRole("checkbox", { name: "거래처 조회" })
-    .check();
+  // 역할 추가는 팝업에서 한다. 목록 화면에는 권한 목록을 펼치지 않는다.
   await page.getByRole("button", { name: "역할 추가" }).click();
+  const roleDialog = page.getByRole("dialog", { name: "사용자 정의 역할 추가" });
+  await roleDialog.getByPlaceholder("SHOP_TEAM").fill("E2E_SUPPORT");
+  await roleDialog.getByLabel("이름").fill("E2E 지원");
+  await roleDialog.getByLabel("설명").fill("브라우저 회귀 검증 역할");
+  await roleDialog.getByRole("checkbox", { name: "거래처 조회" }).check();
+  await roleDialog.getByRole("button", { name: "역할 추가" }).click();
+  await expect(roleDialog).toHaveCount(0);
   await expect(page.getByText("E2E_SUPPORT", { exact: true })).toBeVisible();
 
   await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "조직 관리" }).click();
