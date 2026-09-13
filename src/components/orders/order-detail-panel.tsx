@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, Lock } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDateTime } from "@/domain/format-date";
@@ -290,9 +291,15 @@ export function OrderDetailPanel({
    * 수주가 지금 어디까지 왔고 다음에 무엇을 해야 하는지. 탭이 여섯 개라 처음 쓰는 사람은
    * 순서를 모른다. 상태·작업 수·계산 여부로 한 줄을 고른다.
    */
-  const nextStep: { message: string; tab?: string; label: string } | null = (() => {
+  const nextStep: { message: string; tab?: string; href?: string; label: string } | null = (() => {
     if (!editable) return null;
     if (order.status === "DRAFT" && foldCount === 0) {
+      if (foldOptions.materials.length === 0) {
+        return { message: "게시된 재질·두께가 없습니다. 먼저 재질·두께를 등록하고 계산 기준을 게시하세요.", href: "/materials", label: "재질·두께 등록하러 가기" };
+      }
+      if (foldOptions.templates.length === 0) {
+        return { message: "게시된 절곡 템플릿이 없습니다. 도면 설계에서 템플릿을 만들어 게시하세요. 수주는 그대로 남아 있습니다.", href: "/fold-editor", label: "템플릿 만들기" };
+      }
       return { message: "게시된 절곡 템플릿에서 절곡 작업을 추가하세요.", tab: "folds", label: "절곡 작업으로" };
     }
     if (order.status === "DRAFT" && !calculation.snapshot) {
@@ -379,7 +386,11 @@ export function OrderDetailPanel({
         <p className="flex flex-wrap items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm text-teal-900">
           <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
           <span><b>다음 할 일</b> · {nextStep.message}</span>
-          {nextStep.tab && nextStep.tab !== tab ? (
+          {nextStep.href ? (
+            <Link className="ml-auto rounded bg-teal-700 px-3 py-1 text-xs font-bold text-white hover:bg-teal-800" href={nextStep.href}>
+              {nextStep.label}
+            </Link>
+          ) : nextStep.tab && nextStep.tab !== tab ? (
             <button className="ml-auto rounded border border-teal-700 bg-white px-3 py-1 text-xs font-bold text-teal-800 hover:bg-teal-100" onClick={() => setTab(nextStep.tab!)} type="button">
               {nextStep.label}
             </button>
