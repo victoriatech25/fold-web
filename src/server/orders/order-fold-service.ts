@@ -65,6 +65,8 @@ export type OrderFoldOptionsDto = {
     thicknessMm: string;
     sheets: Array<{ id: string; code: string; name: string; size: string; isDefault: boolean }>;
   }>;
+  /** 게시되지 않은(초안·검토 중) 템플릿 개정 수. 게시본이 없을 때 "만들기"와 "게시하기"를 가른다. */
+  unpublishedTemplateCount: number;
 };
 
 export type OrderFoldMutationResult = {
@@ -249,7 +251,7 @@ export async function listOrderFoldOptions(
   const order = await prisma.salesOrder.findFirst({ where: { id: input.orderId, organizationId: context.organizationId }, select: { id: true } });
   if (!order) throw new OrderError("NOT_FOUND", "수주를 찾을 수 없습니다.");
   const q = input.q?.trim();
-  const [revisions, rules] = await Promise.all([
+  const [revisions, rules, unpublishedTemplateCount] = await Promise.all([
     prisma.foldRevision.findMany({
       where: {
         organizationId: context.organizationId,
@@ -283,8 +285,17 @@ export async function listOrderFoldOptions(
         },
       },
     }),
+    prisma.foldRevision.count({
+      where: {
+        organizationId: context.organizationId,
+        status: { in: ["DRAFT", "REVIEW"] },
+        deletedAt: null,
+        template: { organizationId: context.organizationId, active: true, deletedAt: null },
+      },
+    }),
   ]);
   return {
+    unpublishedTemplateCount,
     templates: revisions.map((revision) => {
       const document = readFoldRevisionDocument(revision);
       return {

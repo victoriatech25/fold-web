@@ -297,8 +297,11 @@ export function OrderDetailPanel({
       if (foldOptions.materials.length === 0) {
         return { message: "게시된 재질·두께가 없습니다. 먼저 재질·두께를 등록하고 계산 기준을 게시하세요.", href: "/materials", label: "재질·두께 등록하러 가기" };
       }
+      if (foldOptions.templates.length === 0 && foldOptions.unpublishedTemplateCount > 0) {
+        return { message: `템플릿 초안 ${foldOptions.unpublishedTemplateCount}개가 게시되지 않았습니다. 게시해야 절곡 작업에 쓸 수 있습니다.`, href: "/fold-library", label: "템플릿 게시하러 가기" };
+      }
       if (foldOptions.templates.length === 0) {
-        return { message: "게시된 절곡 템플릿이 없습니다. 도면 설계에서 템플릿을 만들어 게시하세요. 수주는 그대로 남아 있습니다.", href: "/fold-editor", label: "템플릿 만들기" };
+        return { message: "게시된 절곡 템플릿이 없습니다. 도면 설계에서 형상을 그리고 '템플릿 게시'를 누르세요. 수주는 그대로 남아 있습니다.", href: "/fold-editor", label: "템플릿 만들기" };
       }
       return { message: "게시된 절곡 템플릿에서 절곡 작업을 추가하세요.", tab: "folds", label: "절곡 작업으로" };
     }

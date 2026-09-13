@@ -75,6 +75,7 @@ export default async function FoldEditorPage({
             userId: auth.userId,
           }}
           canEdit={auth.permissions.includes("template.fold.edit")}
+          canPublish={auth.permissions.includes("template.fold.publish")}
         />
       </main>
     </div>

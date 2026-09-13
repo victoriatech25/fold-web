@@ -8,6 +8,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Send,
   Trash2,
   X,
 } from "lucide-react";
@@ -32,6 +33,7 @@ import {
   listFoldMaterialOptions,
   updateFoldDraft,
 } from "@/client/fold-draft/fold-draft-api";
+import { transitionFoldRevision } from "@/client/fold-library/fold-library-api";
 import {
   deleteFoldDraftRecovery,
   getFoldDraftRecovery,
@@ -63,6 +65,8 @@ type FoldDraftWorkspaceProps = {
     userId: string;
   };
   canEdit: boolean;
+  /** 게시 권한. 있으면 `템플릿 게시` 가 검토 요청과 게시를 한 번에 한다. */
+  canPublish: boolean;
 };
 
 const initialStatus: FoldDraftSaveStatus = {
@@ -125,6 +129,7 @@ export const FoldDraftWorkspace = observer(function FoldDraftWorkspace({
   initialDraftId,
   identity,
   canEdit,
+  canPublish,
 }: FoldDraftWorkspaceProps) {
   const { alert: alertPopup, confirm: confirmPopup } = useCommonPopup();
   const controllerRef = useRef<FoldDraftAutosaveController | null>(null);
@@ -428,6 +433,84 @@ export const FoldDraftWorkspace = observer(function FoldDraftWorkspace({
     }
   }
 
+  /**
+   * 초안을 템플릿으로 게시한다. 저장 → 검토 요청 → (게시 권한이 있으면) 게시.
+   * 게시된 템플릿만 수주의 절곡 작업에서 고를 수 있는데, 이 단계가 `템플릿` 화면에만 있어
+   * 초안을 만든 사람이 다음에 뭘 해야 하는지 몰랐다(2026-09-13).
+   */
+  async function publishCurrentDraft() {
+    if (!detail || !canEdit) return;
+    // 게시는 서버가 문서의 재질·원판 스냅샷을 현재 게시본과 다시 맞춰 본다. 오래된 초안이면 여기서
+    // 걸리므로, 검토 요청을 보내기 전에 먼저 알려 준다.
+    if (!materialOptions.some((option) => option.ruleRevisionId === foldEditorStore.profile.material.id)) {
+      await alertPopup({
+        title: "재질 기준 확인 필요",
+        message: "이 초안의 재질 기준이 현재 게시본과 다릅니다. '서버 재질 기준'에서 다시 선택해 저장한 뒤 게시해 주세요.",
+        variant: "warning",
+      });
+      return;
+    }
+    const confirmed = await confirmPopup({
+      title: canPublish ? "템플릿 게시" : "템플릿 검토 요청",
+      message: canPublish
+        ? `'${detail.name}' 초안을 저장하고 바로 게시합니다. 게시된 템플릿은 수주의 절곡 작업에서 선택할 수 있고, 내용을 바꾸려면 새 개정을 만들어야 합니다.`
+        : `'${detail.name}' 초안을 저장하고 검토를 요청합니다. 게시 권한이 있는 사용자가 템플릿 화면에서 게시하면 수주에서 선택할 수 있습니다.`,
+      confirmText: canPublish ? "게시" : "검토 요청",
+      variant: "warning",
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    try {
+      await controllerRef.current?.flush();
+      if (statusRef.current.kind !== "clean") {
+        throw new Error("초안 저장을 완료한 뒤 다시 시도해 주세요.");
+      }
+      const reviewed = await transitionFoldRevision({
+        revisionId: detail.draftId,
+        expectedLockVersion: controllerRef.current?.currentLockVersion ?? detail.lockVersion,
+        action: "review",
+      });
+      if (canPublish) {
+        const revision = reviewed.revisions.find((item) => item.revisionId === detail.draftId);
+        if (!revision) throw new Error("검토 요청한 개정을 다시 찾지 못했습니다.");
+        try {
+          await transitionFoldRevision({
+            revisionId: detail.draftId,
+            expectedLockVersion: revision.lockVersion,
+            action: "publish",
+          });
+        } catch (publishError) {
+          // 검토 중에 멈추면 이 편집기에서 다시 열 수 없다. 초안으로 되돌려 고칠 수 있게 한다.
+          await transitionFoldRevision({
+            revisionId: detail.draftId,
+            expectedLockVersion: revision.lockVersion,
+            action: "return",
+          }).catch(() => undefined);
+          throw new Error(
+            `${publishError instanceof Error ? publishError.message : "게시하지 못했습니다."} 초안으로 되돌렸습니다. '서버 재질 기준'을 다시 선택해 저장한 뒤 게시해 주세요.`,
+          );
+        }
+      }
+      // 게시(또는 검토 중) 개정은 더 이상 초안이 아니라 이 편집기에서 열리지 않는다. 템플릿 화면으로 보낸다.
+      await alertPopup({
+        title: canPublish ? "게시 완료" : "검토 요청 완료",
+        message: canPublish
+          ? `'${detail.name}' 템플릿을 게시했습니다. 이제 수주의 절곡 작업에서 선택할 수 있습니다.`
+          : `'${detail.name}' 검토를 요청했습니다. 템플릿 화면에서 게시되면 수주에서 선택할 수 있습니다.`,
+      });
+      controllerRef.current?.stop();
+      window.location.assign("/fold-library");
+    } catch (error) {
+      await alertPopup({
+        title: canPublish ? "게시 실패" : "검토 요청 실패",
+        message: error instanceof Error ? error.message : "템플릿을 게시하지 못했습니다.",
+        variant: "danger",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function downloadCurrentDxf() {
     if (!detail) return;
     setBusy(true);
@@ -559,7 +642,7 @@ export const FoldDraftWorkspace = observer(function FoldDraftWorkspace({
               className="field-control mt-1 disabled:bg-slate-100"
             />
           </label>
-          <label className="w-[190px] min-w-[170px] text-xs font-semibold text-slate-600">
+          <label className="w-[180px] min-w-[160px] text-xs font-semibold text-slate-600">
             서버 재질 기준
             <select
               aria-label="서버 재질 기준"
@@ -576,7 +659,7 @@ export const FoldDraftWorkspace = observer(function FoldDraftWorkspace({
               ))}
             </select>
           </label>
-          <label className="w-[220px] min-w-[190px] text-xs font-semibold text-slate-600">
+          <label className="w-[200px] min-w-[180px] text-xs font-semibold text-slate-600">
             서버 원판 기준
             <select
               aria-label="서버 원판 기준"
@@ -605,6 +688,17 @@ export const FoldDraftWorkspace = observer(function FoldDraftWorkspace({
           >
             <Save size={15} /> 지금 저장
           </button>
+          {/* 초안이 없을 때는 상태 문구가 길어 1280px 에서 줄이 바뀐다. 게시 버튼은 초안이 있을 때만 그린다. */}
+          {canEdit && detail ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void publishCurrentDraft()}
+              className="inline-flex h-9 items-center gap-1.5 rounded bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-40"
+            >
+              <Send size={15} /> {canPublish ? "템플릿 게시" : "검토 요청"}
+            </button>
+          ) : null}
           <button
             type="button"
             disabled={!detail || busy}

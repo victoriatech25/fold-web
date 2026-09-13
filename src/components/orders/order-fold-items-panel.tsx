@@ -209,6 +209,10 @@ export function OrderFoldItemsPanel({
             <Link className="rounded bg-teal-700 px-3 py-2 text-sm font-bold text-white" href="/materials" title="게시된 재질·두께가 없어 절곡 작업을 추가할 수 없습니다.">
               재질·두께 등록하러 가기
             </Link>
+          ) : options.templates.length === 0 && options.unpublishedTemplateCount > 0 ? (
+            <Link className="rounded bg-teal-700 px-3 py-2 text-sm font-bold text-white" href="/fold-library" title="템플릿 초안은 있지만 게시되지 않았습니다.">
+              템플릿 게시하러 가기 ({options.unpublishedTemplateCount})
+            </Link>
           ) : options.templates.length === 0 ? (
             <Link className="rounded bg-teal-700 px-3 py-2 text-sm font-bold text-white" href="/fold-editor" title="게시된 절곡 템플릿이 없어 절곡 작업을 추가할 수 없습니다.">
               템플릿 만들기
@@ -240,8 +244,10 @@ export function OrderFoldItemsPanel({
         <div className="mt-5 rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
           {editable && options.materials.length === 0
             ? "게시된 재질·두께가 없습니다. 재질·두께를 등록·게시한 뒤 템플릿을 만들면 여기서 작업을 추가할 수 있습니다."
+            : editable && options.templates.length === 0 && options.unpublishedTemplateCount > 0
+              ? `템플릿 초안 ${options.unpublishedTemplateCount}개가 아직 게시되지 않았습니다. 게시된 템플릿만 절곡 작업에 쓸 수 있습니다. 템플릿 화면(또는 도면 설계의 '템플릿 게시')에서 게시하세요.`
             : editable && options.templates.length === 0
-              ? "게시된 절곡 템플릿이 없습니다. 도면 설계에서 형상을 그려 초안을 저장하고, 템플릿 화면에서 게시하면 여기서 작업을 추가할 수 있습니다. 수주는 그대로 남아 있습니다."
+              ? "게시된 절곡 템플릿이 없습니다. 도면 설계에서 형상을 그려 저장하고 '템플릿 게시'를 누르면 여기서 작업을 추가할 수 있습니다. 수주는 그대로 남아 있습니다."
               : "등록된 절곡 작업이 없습니다. 게시 템플릿에서 첫 작업을 추가해 주세요."}
         </div>
       ) : (
