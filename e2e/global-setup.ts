@@ -16,6 +16,14 @@ export default async function globalSetup() {
     env: {
       ...process.env,
       DATABASE_URL: databaseUrl,
+      // 웹 서버는 playwright.config 가 저장소 기본값을 넣어 주지만 worker 는 process.env 만
+      // 물려받는다. CI 에는 .env.local 이 없어 DXF 작업이 저장소 설정 오류로 죽었다.
+      STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT ?? "http://127.0.0.1:9000",
+      STORAGE_REGION: process.env.STORAGE_REGION ?? "us-east-1",
+      STORAGE_BUCKET: process.env.STORAGE_BUCKET ?? "fold-web-e2e",
+      STORAGE_ACCESS_KEY_ID: process.env.STORAGE_ACCESS_KEY_ID ?? "fold-web-local",
+      STORAGE_SECRET_ACCESS_KEY: process.env.STORAGE_SECRET_ACCESS_KEY ?? "fold-web-local-secret",
+      STORAGE_FORCE_PATH_STYLE: "true",
       WORKER_ID: "e2e-worker",
       WORKER_IDLE_POLL_MS: "500",
       // 작업 큐 화면 E2E 가 `대기 중` 인 dxf.export 작업을 취소해 본다. 그 작업을 먼저
