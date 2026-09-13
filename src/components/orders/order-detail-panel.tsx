@@ -83,6 +83,8 @@ export function OrderDetailPanel({
   const [attachmentCount, setAttachmentCount] = useState<number | null>(null);
   const [form, setForm] = useState(() => formFromOrder(initial));
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "error">("saved");
+  /** 저장 버튼을 눌렀을 때 잠깐 보여 주는 결과. 자동 저장이라 버튼이 할 일이 없어도 응답은 있어야 한다. */
+  const [saveFlash, setSaveFlash] = useState<string | null>(null);
   const formRef = useRef(form);
   const savingRef = useRef(false);
   const editable = canWrite && (order.status === "DRAFT" || order.status === "CALCULATED");
@@ -169,6 +171,22 @@ export function OrderDetailPanel({
     } finally {
       savingRef.current = false;
     }
+  }
+
+  useEffect(() => {
+    if (!saveFlash) return;
+    const timer = window.setTimeout(() => setSaveFlash(null), 3_000);
+    return () => window.clearTimeout(timer);
+  }, [saveFlash]);
+
+  /** 저장 버튼. 이미 저장돼 있으면 그렇다고 알리고, 아니면 지금 저장하고 결과를 알린다. */
+  async function saveNow() {
+    if (fingerprint(form) === serverFingerprint && !savingRef.current) {
+      setSaveFlash(`변경된 내용이 없습니다 · 이미 ${formatDateTime(order.updatedAt)} 에 저장되었습니다.`);
+      return;
+    }
+    const saved = await persist(form, true);
+    if (saved) setSaveFlash("저장했습니다.");
   }
 
   useEffect(() => {
@@ -301,7 +319,7 @@ export function OrderDetailPanel({
                 <button
                   className="rounded border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-50"
                   disabled={saveState === "saving"}
-                  onClick={() => void persist(form, true)}
+                  onClick={() => void saveNow()}
                   type="button"
                 >
                   저장
@@ -312,8 +330,19 @@ export function OrderDetailPanel({
             ) : null}
             {/* 읽기 전용은 저장 상태 문구로 흘리지 않는다. 입력이 왜 안 되는지 먼저 보여야 한다. */}
             {editable ? (
-              <p className={`text-xs ${saveState === "error" ? "text-red-700" : "text-slate-500"}`} role="status">
-                {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "변경 내용 저장 대기 중…" : saveState === "error" ? "저장 실패 · 저장 버튼으로 다시 시도하세요." : `저장됨 · ${formatDateTime(order.updatedAt)}`}
+              <p
+                className={`text-xs ${saveFlash ? "rounded bg-teal-50 px-2 py-1 font-bold text-teal-800" : saveState === "error" ? "text-red-700" : "text-slate-500"}`}
+                role="status"
+              >
+                {saveFlash
+                  ? saveFlash
+                  : saveState === "saving"
+                    ? "저장 중…"
+                    : saveState === "dirty"
+                      ? "변경 내용 저장 대기 중… (1초 뒤 자동 저장)"
+                      : saveState === "error"
+                        ? "저장 실패 · 저장 버튼으로 다시 시도하세요."
+                        : `자동 저장됨 · ${formatDateTime(order.updatedAt)}`}
               </p>
             ) : (
               <p className="flex items-center gap-1.5 rounded border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-900" role="status">
