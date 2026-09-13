@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { OrderRequestError, orderRequest } from "@/components/orders/order-api";
 import { useCommonPopup } from "@/components/ui/common-popup";
@@ -202,8 +203,28 @@ export function OrderFoldItemsPanel({
           <h2 className="text-lg font-black">절곡 작업</h2>
           <p className="mt-1 text-sm text-slate-500">게시 개정을 주문용 불변 스냅샷으로 복사하고 아래 계산·가격에서 금액을 확정합니다.</p>
         </div>
-        {editable ? <button className="rounded bg-teal-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50" disabled={busy || options.templates.length === 0} onClick={() => setAdding((value) => !value)} type="button">{adding ? "선택 닫기" : "절곡 작업 추가"}</button> : null}
+        {editable ? <button className="rounded bg-teal-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50" disabled={busy || options.templates.length === 0 || options.materials.length === 0} onClick={() => setAdding((value) => !value)} title={options.templates.length === 0 ? "게시된 절곡 템플릿이 없습니다." : options.materials.length === 0 ? "게시된 재질·두께가 없습니다." : undefined} type="button">{adding ? "선택 닫기" : "절곡 작업 추가"}</button> : null}
       </div>
+
+      {editable && (options.templates.length === 0 || options.materials.length === 0) ? (
+        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-bold">아직 절곡 작업을 추가할 수 없습니다. 먼저 준비할 것이 있습니다.</p>
+          <ol className="mt-2 list-decimal space-y-1.5 pl-5">
+            {options.materials.length === 0 ? (
+              <li>
+                게시된 재질·두께가 없습니다. <Link className="font-bold underline" href="/materials">기준정보 › 재질·두께</Link> 에서 두께를 등록하고 계산 기준을 게시하세요.
+              </li>
+            ) : null}
+            {options.templates.length === 0 ? (
+              <li>
+                게시된 절곡 템플릿이 없습니다. <Link className="font-bold underline" href="/fold-editor">설계·도면 › 도면 설계</Link> 에서 형상을 그려 초안을 저장하고,{" "}
+                <Link className="font-bold underline" href="/fold-library">템플릿</Link> 에서 검토 요청 → 게시하면 여기서 고를 수 있습니다.
+              </li>
+            ) : null}
+          </ol>
+          <p className="mt-2 text-xs text-amber-800">준비가 끝나면 이 화면을 새로고침하세요. 수주는 그대로 남아 있습니다.</p>
+        </div>
+      ) : null}
 
       {adding ? (
         <div className="mt-4 rounded-lg border border-teal-200 bg-teal-50 p-4">

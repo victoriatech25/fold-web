@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock } from "lucide-react";
+import { ArrowRight, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDateTime } from "@/domain/format-date";
@@ -286,6 +286,27 @@ export function OrderDetailPanel({
   const currentOwnerMissing = order.ownerMembershipId &&
     !options.owners.some((item) => item.id === order.ownerMembershipId);
 
+  /**
+   * 수주가 지금 어디까지 왔고 다음에 무엇을 해야 하는지. 탭이 여섯 개라 처음 쓰는 사람은
+   * 순서를 모른다. 상태·작업 수·계산 여부로 한 줄을 고른다.
+   */
+  const nextStep: { message: string; tab?: string; label: string } | null = (() => {
+    if (!editable) return null;
+    if (order.status === "DRAFT" && foldCount === 0) {
+      return { message: "게시된 절곡 템플릿에서 절곡 작업을 추가하세요.", tab: "folds", label: "절곡 작업으로" };
+    }
+    if (order.status === "DRAFT" && !calculation.snapshot) {
+      return { message: "절곡 작업의 수량·재질을 확인하고 수주 계산을 실행하세요.", tab: "calc", label: "계산·금액으로" };
+    }
+    if (order.status === "DRAFT" || calculation.stale) {
+      return { message: "입력이 바뀌어 계산이 오래됐습니다. 다시 계산한 뒤 승인하세요.", tab: "calc", label: "계산·금액으로" };
+    }
+    if (order.status === "CALCULATED") {
+      return { message: "계산이 끝났습니다. 승인·생산에서 수주를 승인하세요.", tab: "status", label: "승인·생산으로" };
+    }
+    return null;
+  })();
+
   const tabs = [
     { id: "basic", label: "기본정보" },
     { id: "folds", label: "절곡 작업", badge: foldCount },
@@ -353,6 +374,18 @@ export function OrderDetailPanel({
           </div>
         </div>
       </section>
+
+      {nextStep ? (
+        <p className="flex flex-wrap items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm text-teal-900">
+          <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+          <span><b>다음 할 일</b> · {nextStep.message}</span>
+          {nextStep.tab && nextStep.tab !== tab ? (
+            <button className="ml-auto rounded border border-teal-700 bg-white px-3 py-1 text-xs font-bold text-teal-800 hover:bg-teal-100" onClick={() => setTab(nextStep.tab!)} type="button">
+              {nextStep.label}
+            </button>
+          ) : null}
+        </p>
+      ) : null}
 
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <Tabs ariaLabel="수주 상세" onChange={setTab} tabs={tabs} value={tab} />
