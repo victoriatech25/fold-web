@@ -84,7 +84,7 @@ services:
   # 로컬 개발·테스트용 S3 호환 저장소(`D2-B02-A`).
   # 운영 서버 적용은 `P2-C08` 배포 작업에서 함께 한다.
   storage:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":9001"]
     ports:
