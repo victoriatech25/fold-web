@@ -28,6 +28,13 @@ export const planStatusStyles: Record<CuttingPlanDto["status"], string> = {
   FAILED: "bg-red-100 text-red-800",
 };
 
+export class CuttingRequestError extends Error {
+  constructor(message: string, readonly code: string, readonly details?: unknown) {
+    super(message);
+    this.name = "CuttingRequestError";
+  }
+}
+
 export async function cuttingRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
@@ -35,7 +42,11 @@ export async function cuttingRequest<T>(url: string, init?: RequestInit): Promis
   });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(body?.error?.message ?? "재단 요청을 처리하지 못했습니다.");
+    throw new CuttingRequestError(
+      body?.error?.message ?? "재단 요청을 처리하지 못했습니다.",
+      body?.error?.code ?? "UNKNOWN",
+      body?.error?.details,
+    );
   }
   return body.data as T;
 }

@@ -2,6 +2,7 @@
 
 import { BadgeDollarSign, Calculator, CircleDollarSign, Plus, Tags, UsersRound } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type FormEvent, useMemo, useState, useTransition } from "react";
 
 import { CommonDialog, useCommonPopup } from "@/components/ui/common-popup";
@@ -20,9 +21,9 @@ function TierDialog({ open, onClose, onSaved }: { open: boolean; onClose: () => 
   return <CommonDialog open={open} onClose={onClose} title="새 가격등급" description="인증 역할과 별개인 거래처 가격 기준입니다." footer={<><button type="button" onClick={onClose} disabled={pending} className="rounded border bg-white px-4 py-2 text-sm font-bold">취소</button><button form={formId} disabled={pending} className="rounded bg-teal-700 px-4 py-2 text-sm font-bold text-white">등록</button></>}><form id={formId} onSubmit={submit} className="grid gap-4 sm:grid-cols-2"><label className="text-xs font-bold text-slate-600">등급 코드<input autoFocus required name="code" className="field-control uppercase" placeholder="VIP" /></label><label className="text-xs font-bold text-slate-600">등급명<input required name="name" className="field-control" placeholder="우대 거래처" /></label><label className="text-xs font-bold text-slate-600">정렬 순서<input name="sortOrder" type="number" defaultValue="0" className="field-control" /></label><label className="text-xs font-bold text-slate-600 sm:col-span-2">설명<textarea name="description" maxLength={500} className="mt-1.5 min-h-20 w-full rounded border border-slate-300 p-2.5 text-sm" /></label></form></CommonDialog>;
 }
 
-function BookDialog({ open, onClose, onSaved, workspace }: { open: boolean; onClose: () => void; onSaved: () => Promise<void>; workspace: PricingWorkspaceDto }) {
-  const popup=useCommonPopup();const[pending,startTransition]=useTransition();const[scope,setScope]=useState<PriceScopeTypeDto>("TIER");const formId="price-book-create";
-  function submit(event:FormEvent<HTMLFormElement>){event.preventDefault();const data=new FormData(event.currentTarget);startTransition(async()=>{try{await pricingRequest("/api/v1/pricing/books",{method:"POST",body:JSON.stringify({code:field(data,"code"),name:field(data,"name"),scopeType:scope,priceTierId:scope==="TIER"?field(data,"target")||null:null,customerId:scope==="CUSTOMER"?field(data,"target")||null:null})});onClose();await onSaved();await popup.alert({title:"가격표 등록 완료",message:"가격표를 등록했습니다. 상세 화면에서 첫 초안을 작성하세요."});}catch(error){await popup.alert({title:"등록 실패",message:error instanceof Error?error.message:"가격표를 등록하지 못했습니다.",variant:"danger"});}})}
+function BookDialog({ open, onClose, workspace }: { open: boolean; onClose: () => void; workspace: PricingWorkspaceDto }) {
+  const popup=useCommonPopup();const router=useRouter();const[pending,startTransition]=useTransition();/* 처음 쓰는 회사는 등급이 없다. 조직 기본이 첫 가격표다. */const[scope,setScope]=useState<PriceScopeTypeDto>("STANDARD");const formId="price-book-create";
+  function submit(event:FormEvent<HTMLFormElement>){event.preventDefault();const data=new FormData(event.currentTarget);startTransition(async()=>{try{const book=await pricingRequest<{id:string}>("/api/v1/pricing/books",{method:"POST",body:JSON.stringify({code:field(data,"code"),name:field(data,"name"),scopeType:scope,priceTierId:scope==="TIER"?field(data,"target")||null:null,customerId:scope==="CUSTOMER"?field(data,"target")||null:null})});/* 등록 → 상세 → 새 개정 세 단계를 한 번에. 빈 초안을 만들어 바로 값을 넣게 한다. */await pricingRequest(`/api/v1/pricing/books/${book.id}/revisions`,{method:"POST",body:JSON.stringify({sourceRevisionId:null})});onClose();router.push(`/pricing/${book.id}`);}catch(error){await popup.alert({title:"등록 실패",message:error instanceof Error?error.message:"가격표를 등록하지 못했습니다.",variant:"danger"});}})}
   return <CommonDialog open={open} onClose={onClose} title="새 가격표" description="같은 등급이나 거래처에는 활성 가격표를 하나만 둘 수 있습니다." footer={<><button type="button" onClick={onClose} disabled={pending} className="rounded border bg-white px-4 py-2 text-sm font-bold">취소</button><button form={formId} disabled={pending} className="rounded bg-teal-700 px-4 py-2 text-sm font-bold text-white">등록</button></>}><form id={formId} onSubmit={submit} className="grid gap-4 sm:grid-cols-2"><label className="text-xs font-bold text-slate-600">가격표 코드<input autoFocus required name="code" className="field-control uppercase" placeholder="TIER-VIP" /></label><label className="text-xs font-bold text-slate-600">가격표명<input required name="name" className="field-control" placeholder="우대 가격표" /></label><label className="text-xs font-bold text-slate-600">적용 범위<select value={scope} onChange={e=>setScope(e.target.value as PriceScopeTypeDto)} className="field-control bg-white"><option value="STANDARD">조직 기본</option><option value="TIER">가격등급</option><option value="CUSTOMER">거래처 전용</option></select></label>{scope!=="STANDARD"?<label className="text-xs font-bold text-slate-600">적용 대상<select required name="target" className="field-control bg-white"><option value="">선택</option>{(scope==="TIER"?workspace.tiers.filter(x=>x.active):workspace.customers).map(item=><option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>:null}</form></CommonDialog>;
 }
 
@@ -170,7 +171,7 @@ export function PricingPanel({ initial, canWrite }: { initial: PricingWorkspaceD
         <b>로컬 검수 자료:</b> `LOCAL TEST ONLY` 가격은 화면 검수 전용이며 운영 가격으로 사용할 수 없습니다. 모든 가격은 VAT 별도입니다.
       </div>
       <TierDialog onClose={() => setTierOpen(false)} onSaved={reload} open={tierOpen} />
-      <BookDialog onClose={() => setBookOpen(false)} onSaved={reload} open={bookOpen} workspace={workspace} />
+      <BookDialog onClose={() => setBookOpen(false)} open={bookOpen} workspace={workspace} />
     </div>
   );
 }

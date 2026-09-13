@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { useRouter } from "next/navigation";
+
 import {
   cuttingRequest,
+  CuttingRequestError,
   planStatusLabels,
   planStatusStyles,
 } from "@/components/cutting/cutting-plan-list-panel";
@@ -36,6 +39,7 @@ export function OrderCuttingPanel({
   initialPlans: CuttingPlanDto[];
 }) {
   const popup = useCommonPopup();
+  const router = useRouter();
   const [plans, setPlans] = useState(initialPlans);
   const [usage, setUsage] = useState<SheetUsagePage | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,6 +89,18 @@ export function OrderCuttingPanel({
         message: `재질 ${created.items.length}종의 재단 작업을 만들었습니다. 계산이 끝나면 결과가 표시됩니다.`,
       });
     } catch (caught) {
+      const details = caught instanceof CuttingRequestError ? (caught.details as { missing?: string; materialId?: string; materialVariantId?: string } | undefined) : undefined;
+      if (details?.missing === "SHEET_ITEM" && details.materialId && details.materialVariantId) {
+        // 없다고만 하지 않는다. 등록 페이지로 바로 보낸다.
+        const go = await popup.confirm({
+          title: "원판 등록이 필요합니다",
+          message: "이 재질·두께에 등록된 원판이 없어 재단할 수 없습니다. 원판을 등록한 뒤 다시 재단을 시작하세요. 수주는 그대로 남아 있습니다.",
+          confirmText: "원판 등록하러 가기",
+          variant: "warning",
+        });
+        if (go) router.push(`/materials/${details.materialId}/variants/${details.materialVariantId}/sheet-items`);
+        return;
+      }
       await popup.alert({
         title: "재단 시작 실패",
         message: caught instanceof Error ? caught.message : "재단 작업을 만들지 못했습니다.",

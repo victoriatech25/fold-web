@@ -158,7 +158,8 @@ export async function getCurrentOrderCalculation(
 
 function mapPricingError(error: PricingError): OrderError {
   if (error.code === "PRICE_NOT_CONFIGURED" || error.code === "PRICE_REVISION_NOT_EFFECTIVE" || error.code === "NOT_FOUND") {
-    return new OrderError("CONFLICT", error.message);
+    // 화면이 가격표 화면으로 바로 보낼 수 있게 무엇이 없는지 표시한다.
+    return new OrderError("CONFLICT", error.message, { missing: "PRICE_BOOK" });
   }
   return new OrderError("INVALID_REQUEST", error.message);
 }

@@ -33,7 +33,7 @@ const foldItemSelect = {
   materialRuleRevisionId: true,
   createdAt: true,
   updatedAt: true,
-  materialRuleRevision: { select: { materialVariantId: true } },
+  materialRuleRevision: { select: { materialVariantId: true, materialVariant: { select: { materialId: true } } } },
 } as const satisfies Prisma.SalesOrderFoldItemSelect;
 
 const sheetItemSelect = {
@@ -178,9 +178,11 @@ export async function buildCuttingInputs(
       orderBy: [{ isDefault: "desc" }, { sortOrder: "asc" }, { code: "asc" }],
     });
     if (sheetRows.length === 0) {
+      // 화면이 원판 등록 페이지로 바로 보낼 수 있게 어느 두께인지 함께 준다.
       throw new CuttingError(
         "INVALID_REQUEST",
         "이 재질에 쓸 수 있는 원판이 없습니다. 기준정보에서 원판을 먼저 등록해 주세요.",
+        { missing: "SHEET_ITEM", materialId: variantItems[0].materialRuleRevision.materialVariant.materialId, materialVariantId },
       );
     }
 

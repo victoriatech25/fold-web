@@ -49,7 +49,17 @@ export function OrderCalculationPanel({
         message: `계산 버전 ${result.state.snapshot?.snapshotNumber ?? "-"} · 총액 ${result.state.snapshot ? amount(result.state.snapshot.totalAmountKrw) : "-"}`,
       });
     } catch (caught) {
-      if (caught instanceof OrderRequestError && caught.code === "CONFLICT" && caught.details) {
+      const details = caught instanceof OrderRequestError ? (caught.details as { missing?: string } | undefined) : undefined;
+      if (details?.missing === "PRICE_BOOK") {
+        // 없다고만 하지 않는다. 가격표 화면으로 바로 보낸다.
+        const go = await popup.confirm({
+          title: "가격표가 필요합니다",
+          message: `${caught instanceof Error ? caught.message : ""} 기준정보 › 가격 관리에서 조직 기본 가격표를 만들어 게시한 뒤 다시 계산하세요. 수주는 그대로 남아 있습니다.`,
+          confirmText: "가격표 만들러 가기",
+          variant: "warning",
+        });
+        if (go) router.push("/pricing");
+      } else if (caught instanceof OrderRequestError && caught.code === "CONFLICT" && caught.details) {
         await popup.alert({ title: "계산 충돌", message: `${caught.message} 최신 내용을 다시 불러옵니다.`, variant: "warning" });
         router.refresh();
       } else {

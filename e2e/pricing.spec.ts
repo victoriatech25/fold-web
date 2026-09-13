@@ -40,8 +40,9 @@ test("가격 적용 순서를 계산하고 가격표 초안 수명주기를 공�
   await expect(page.getByText("17000", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "새 개정 만들기" }).click();
-  await closeAlert(page, "현재 게시본을 복사해 새 초안을 만들었습니다.");
+  // 새 개정은 알림 없이 바로 편집 상태로 열린다.
   await expect(page.getByRole("heading", { name: "가격표 r2" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "저장하고 게시" })).toBeVisible();
   await page.getByRole("button", { name: "폐기" }).click();
   const confirm = page.getByRole("alertdialog", { name: "가격표 초안 폐기" });
   await expect(confirm.getByText("초안을 폐기하시겠습니까?")).toBeVisible();
@@ -57,4 +58,30 @@ test("가격 적용 순서를 계산하고 가격표 초안 수명주기를 공�
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(viewport.scrollWidth).toBe(viewport.clientWidth);
+});
+
+test("처음 쓰는 회사도 가격표를 등록·게시해 수주 계산까지 간다", async ({ page }) => {
+  await login(page);
+  await page.goto("/pricing");
+  await page.getByRole("button", { name: "가격표" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "새 가격표" });
+  // 기본값은 조직 기본이라 등급이 없어도 바로 등록된다. seed 조직에는 조직 기본이 이미 있어 등급용으로 만든다.
+  await expect(dialog.getByLabel("적용 범위")).toHaveValue("STANDARD");
+  await dialog.getByLabel("적용 범위").selectOption("TIER");
+  await dialog.getByLabel("적용 대상").selectOption({ label: "BASIC · 기본" });
+  await dialog.getByLabel("가격표 코드").fill("E2E-TIER-BASIC");
+  await dialog.getByLabel("가격표명").fill("E2E 기본 등급 가격표");
+  await dialog.getByRole("button", { name: "등록" }).click();
+  // 등록하면 알림 없이 첫 초안이 열린 상세로 간다.
+  await expect(page).toHaveURL(/\/pricing\/[0-9a-f-]+$/);
+  await expect(page.getByRole("heading", { name: "가격표 r1" })).toBeVisible();
+  const priceInputs = page.getByPlaceholder("미설정");
+  await priceInputs.nth(0).fill("20000");
+  await priceInputs.nth(1).fill("1000");
+  await priceInputs.nth(2).fill("500");
+  // 변경 요약을 비워 둬도 게시된다.
+  await page.getByRole("button", { name: "저장하고 게시" }).click();
+  await page.getByRole("alertdialog", { name: "가격표 저장하고 게시" }).getByRole("button", { name: "게시" }).click();
+  await closeAlert(page, "가격표를 게시했습니다.");
+  await expect(page.getByText("사용 중", { exact: true }).first()).toBeVisible();
 });
