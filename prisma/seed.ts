@@ -163,26 +163,25 @@ async function seed() {
       },
     });
 
-    const material = await tx.material.upsert({
-      where: {
-        organizationId_code: {
-          organizationId: organization.id,
-          code: "AL",
-        },
-      },
-      update: {
-        name: "알루미늄",
-        normalizedName: "알루미늄",
-        active: true,
-      },
-      create: {
-        organizationId: organization.id,
-        code: "AL",
-        name: "알루미늄",
-        normalizedName: "알루미늄",
-        densityKgPerM3: "2700",
-      },
+    // 재질·두께 코드 고유는 살아 있는 행에만 걸려 있어 Prisma 복합 키가 없다. 살아 있는 행을 찾아 갱신한다.
+    const existingMaterial = await tx.material.findFirst({
+      where: { organizationId: organization.id, code: "AL", deletedAt: null },
+      select: { id: true },
     });
+    const material = existingMaterial
+      ? await tx.material.update({
+          where: { id: existingMaterial.id },
+          data: { name: "알루미늄", normalizedName: "알루미늄", active: true },
+        })
+      : await tx.material.create({
+          data: {
+            organizationId: organization.id,
+            code: "AL",
+            name: "알루미늄",
+            normalizedName: "알루미늄",
+            densityKgPerM3: "2700",
+          },
+        });
 
     const presets = [
       { code: "AL-1T", name: "알루미늄 1T", thickness: "1", v: "0.6", a: "0.4", noCut: "1" },
@@ -198,26 +197,25 @@ async function seed() {
     ] as const;
 
     for (const [index, preset] of presets.entries()) {
-      const variant = await tx.materialVariant.upsert({
-        where: {
-          organizationId_code: {
-            organizationId: organization.id,
-            code: preset.code,
-          },
-        },
-        update: {
-          name: preset.name,
-          active: true,
-        },
-        create: {
-          organizationId: organization.id,
-          materialId: material.id,
-          code: preset.code,
-          name: preset.name,
-          thicknessMm: preset.thickness,
-          defaultInsideRadiusMm: preset.thickness,
-        },
+      const existingVariant = await tx.materialVariant.findFirst({
+        where: { organizationId: organization.id, code: preset.code, deletedAt: null },
+        select: { id: true },
       });
+      const variant = existingVariant
+        ? await tx.materialVariant.update({
+            where: { id: existingVariant.id },
+            data: { name: preset.name, active: true },
+          })
+        : await tx.materialVariant.create({
+            data: {
+              organizationId: organization.id,
+              materialId: material.id,
+              code: preset.code,
+              name: preset.name,
+              thicknessMm: preset.thickness,
+              defaultInsideRadiusMm: preset.thickness,
+            },
+          });
 
       const ruleFields = {
         calculationMode: "FIXED" as const,

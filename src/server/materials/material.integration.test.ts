@@ -33,5 +33,12 @@ integration.sequential("material and thickness integration",()=>{
     expect((await prisma.auditEvent.findFirst({where:{action:"material.deleted",entityId:material.id}}))?.organizationId).toBe(context.organizationId);
     await expect(deleteMaterials(prisma,context,{materialIds:[material.id],requestId:"d-again"})).rejects.toMatchObject({code:"NOT_FOUND"});
     expect((await prisma.material.findUniqueOrThrow({where:{id:other.id}})).deletedAt).toBeNull();
+    // 삭제한 재질의 코드·이름과 두께 코드는 다시 쓸 수 있다. 고유는 살아 있는 행에만 걸린다.
+    const again=await createMaterial(prisma,context,{...base,code:"DEL",name:"삭제 재질",requestId:"d-recreate"});
+    expect(again.id).not.toBe(material.id);
+    const againVariant=await createMaterialVariant(prisma,context,{materialId:again.id,code:"DEL-1",name:"삭제 1T",thicknessMm:"1",defaultInsideRadiusMm:"1",sortOrder:0,requestId:"d-recreate-variant"});
+    expect(againVariant.code).toBe("DEL-1");
+    // 살아 있는 행끼리는 여전히 막힌다.
+    await expect(createMaterial(prisma,context,{...base,code:"DEL",name:"삭제 재질 2",requestId:"d-dup"})).rejects.toMatchObject({code:"CONFLICT"});
   });
 });

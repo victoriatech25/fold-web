@@ -246,6 +246,7 @@ PATCH  /api/v1/materials/:materialId/variants/:variantId
 - 한 트랜잭션이다. 하나라도 못 찾으면(다른 조직·이미 삭제) 전부 되돌린다
 - 삭제된 재질·두께는 목록(`비활성 포함` 이어도)·상세·설계 재질 선택·원판 품목·가격표 두께 선택에서 빠진다. 기존 모듈이 모두 `deletedAt: null` 로 거르고 있었다
 - 이미 저장된 도면·수주·재단은 스냅샷과 id 참조라 그대로 읽힌다
-- **코드·이름 고유 제약은 남는다.** 삭제한 재질의 코드는 다시 쓸 수 없다. 확인 팝업에 적어 둔다. 재사용이 필요해지면 그때 `deletedAt` 을 포함한 부분 고유 인덱스로 바꾼다
+- 코드·이름 고유는 **살아 있는 행에만** 건다(부분 유일 인덱스 `Material_one_live_per_code` · `Material_one_live_per_name` · `MaterialVariant_one_live_per_code`, migration `20260913150000`). 삭제한 재질의 코드·이름과 두께 코드는 다시 쓸 수 있다. 처음엔 제약을 그대로 두었는데 사용자가 같은 이름을 다시 등록하다 막혔다(2026-09-13) — 숨김 삭제라도 사용자에게는 지운 것이니 재등록이 되어야 한다
+- 그래서 Prisma 복합 키 `organizationId_code` 가 없다. seed 는 살아 있는 행을 `findFirst` 로 찾아 갱신한다
 - 감사 `material.deleted` (before: 재질 스냅샷, metadata: 두께 수)
 

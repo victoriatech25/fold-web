@@ -32,7 +32,7 @@ export function MaterialListPanel({ initial, canWrite }: { initial: MaterialList
     const names = targets.slice(0, 3).map((item) => item.name).join(", ") + (targets.length > 3 ? ` 외 ${targets.length - 3}개` : "");
     const approved = await popup.confirm({
       title: `재질 ${targets.length}개 삭제`,
-      message: `${names} 을(를) 삭제합니다. 딸린 두께 ${variantCount}개도 함께 사라지며, 설계·재질 목록에서 더 이상 선택할 수 없습니다. 이미 저장된 도면·수주는 영향을 받지 않습니다. 삭제한 재질의 코드는 다시 쓸 수 없습니다.`,
+      message: `${names} 을(를) 삭제합니다. 딸린 두께 ${variantCount}개도 함께 사라지며, 설계·재질 목록에서 더 이상 선택할 수 없습니다. 이미 저장된 도면·수주는 영향을 받지 않습니다.`,
       confirmText: "삭제",
       variant: "danger",
     });
